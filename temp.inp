@@ -1,45 +1,57 @@
+; Filename: nine_pipe.inp
+; WNTR: 0.1.5
+; Created: 2019-01-03 20:13:33
 [TITLE]
 
 [JUNCTIONS]
 ;ID                      Elevation       Demand Pattern                 
- node1                    328.0839895               0                            ;
- node2                   164.04199475               0                            ;
+ 3                                  0               0                            ;
+ 5                                  0             100                            ;
+ 6                                  0             100                            ;
+ 7                                  0              80                            ;
+ 8                                  0             120                            ;
+ 9                                  0               0                            ;
+ 10                                 0               0                            ;
 
 [RESERVOIRS]
 ;ID                                   Head                  Pattern
- res                     410.10498688                     pat1   ;
+ 1                                300                            ;
+ 2                                280                            ;
 
 [TANKS]
 ;ID                              Elevation           Init Level            Min Level            Max Level             Diameter           Min Volume Volume Curve        
 
 [PIPES]
 ;ID                   Node1                Node2                              Length             Diameter            Roughness           Minor Loss               Status
- pipe1                node1                node2                           1000              12             100               0                 Open   ;
- pipe2                node1                res                      328.0839895              12             100               0                 Open   ;
+ P9                   10                   8                                600             900             105               0                 Open   ;
+ P8                   8                    7                                460             600             105               0                 Open   ;
+ P5                   7                    5                                400             450             105               0                 Open   ;
+ P4                   5                    6                                500             450             100               0                 Open   ;
+ P6                   6                    7                                850             450             140               0                 Open   ;
+ P7                   8                    6                                730             750              93               0                 Open   ;
+ P3                   6                    3                                650             800              98               0                 Open   ;
+ P2                   3                    5                                910             750             107               0                 Open   ;
+ P1                   3                    1                                620             900              92               0                 Open   ;
+ PV                   2                    9                                  5             900             105               0                 Open   ;
 
 [PUMPS]
 ;ID                   Node1                Node2                Properties          
 
 [VALVES]
 ;ID                   Node1                Node2                            Diameter Type              Setting           Minor Loss
+ 1                    9                    10                               900 FCV                1               0   ;
 
 [TAGS]
 ;type      name       tag       
 
 [DEMANDS]
 ;ID        Demand     Pattern   
-node1      158.50323141488906 pat1      
-node2      317.0064628297781 pat2      
 
 [STATUS]
 ;ID        Setting   
+1          Open      
 [PATTERNS]
 ;ID        Multipliers
-
-pat1 1.000000
-
-pat2 1.000000 2.000000 3.000000 4.000000 5.000000 6.000000
-pat2 7.000000 8.000000 9.000000 10.000000
 
 [CURVES]
 ;ID         X-Value      Y-Value     
@@ -51,6 +63,7 @@ pat2 7.000000 8.000000 9.000000 10.000000
 [ENERGY]
 GLOBAL EFFICIENCY      75.0000
 GLOBAL PRICE           0.0000
+DEMAND CHARGE          0.0000
 
 [EMITTERS]
 ;ID        Flow coefficient
@@ -68,14 +81,16 @@ GLOBAL PRICE           0.0000
  ORDER WALL 1
  GLOBAL BULK 0.0000    
  GLOBAL WALL 0.0000    
+ LIMITING POTENTIAL 0.0000    
+ ROUGHNESS CORRELATION 0.0000    
 
 [MIXING]
 ;Tank ID             Model Fraction
 
 [TIMES]
-DURATION             24:00:00
-HYDRAULIC TIMESTEP   00:15:00
-QUALITY TIMESTEP     00:06:00
+DURATION             00:00:00
+HYDRAULIC TIMESTEP   01:00:00
+QUALITY TIMESTEP     00:05:00
 PATTERN TIMESTEP     01:00:00
 PATTERN START        00:00:00
 REPORT TIMESTEP      01:00:00
@@ -84,9 +99,11 @@ START CLOCKTIME      00:00:00 AM
 STATISTIC            NONE      
 
 [REPORT]
+SUMMARY    NO
+PAGE       0
 
 [OPTIONS]
-UNITS                GPM                 
+UNITS                LPS                 
 HEADLOSS             H-W                 
 SPECIFIC GRAVITY     1
 VISCOSITY            1
@@ -94,8 +111,7 @@ TRIALS               40
 ACCURACY             0.001
 CHECKFREQ            2
 MAXCHECK             10
-UNBALANCED           STOP                
-PATTERN              1                   
+UNBALANCED           CONTINUE 10
 DEMAND MULTIPLIER    1
 EMITTER EXPONENT     0.5
 QUALITY              NONE                
@@ -104,9 +120,15 @@ TOLERANCE            0.01
 
 [COORDINATES]
 ;Node      X-Coord    Y-Coord   
-node1               1.000000000          2.000000000
-node2               1.000000000          3.000000000
-res                 0.000000000          2.000000000
+3                1638.890000000       6018.520000000
+5                2861.110000000       7018.520000000
+6                3361.110000000       5370.370000000
+7                4268.520000000       6648.150000000
+8                5027.780000000       5370.370000000
+9                6546.300000000       5388.890000000
+10               5953.700000000       5370.370000000
+1                 472.220000000       6870.370000000
+2                7175.930000000       5388.890000000
 
 [VERTICES]
 ;Link      X-Coord    Y-Coord   
@@ -115,9 +137,9 @@ res                 0.000000000          2.000000000
 
 [BACKDROP]
 Graphics options:
-  dimensions          : None                
+  dimensions          : ['0.00', '0.00', '10000.00', '10000.00']
   units               : None                
-  offset              : None                
+  offset              : ['0.00', '0.00']    
   image_filename      : None                
   map_filename        : None                
 
