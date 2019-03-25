@@ -1,45 +1,32 @@
-; Filename: nine_pipe.inp
+; Filename: MOC.inp
 ; WNTR: 0.1.5
-; Created: 2019-01-03 20:13:33
+; Created: 2019-03-11 15:06:23
 [TITLE]
 
 [JUNCTIONS]
 ;ID                      Elevation       Demand Pattern                 
- 3                                  0               0                            ;
- 5                                  0             100                            ;
- 6                                  0             100                            ;
- 7                                  0              80                            ;
- 8                                  0             120                            ;
- 9                                  0               0                            ;
- 10                                 0               0                            ;
+ N1                                 0               0                            ;
+ N3                                 0              10                            ;
+ N2                                 0               2                            ;
 
 [RESERVOIRS]
 ;ID                                   Head                  Pattern
- 1                                300                            ;
- 2                                280                            ;
+ T                                100                            ;
 
 [TANKS]
 ;ID                              Elevation           Init Level            Min Level            Max Level             Diameter           Min Volume Volume Curve        
 
 [PIPES]
 ;ID                   Node1                Node2                              Length             Diameter            Roughness           Minor Loss               Status
- P9                   10                   8                                600             900             105               0                 Open   ;
- P8                   8                    7                                460             600             105               0                 Open   ;
- P5                   7                    5                                400             450             105               0                 Open   ;
- P4                   5                    6                                500             450             100               0                 Open   ;
- P6                   6                    7                                850             450             140               0                 Open   ;
- P7                   8                    6                                730             750              93               0                 Open   ;
- P3                   6                    3                                650             800              98               0                 Open   ;
- P2                   3                    5                                910             750             107               0                 Open   ;
- P1                   3                    1                                620             900              92               0                 Open   ;
- PV                   2                    9                                  5             900             105               0                 Open   ;
+ P1                   T                    N1                              1000             100          0.0015               0                 Open   ;
+ P3                   N1                   N3                               800             100          0.0015               0                 Open   ;
+ P2                   N1                   N2                               600             100          0.0015               0                 Open   ;
 
 [PUMPS]
 ;ID                   Node1                Node2                Properties          
 
 [VALVES]
 ;ID                   Node1                Node2                            Diameter Type              Setting           Minor Loss
- 1                    9                    10                               900 FCV                1               0   ;
 
 [TAGS]
 ;type      name       tag       
@@ -49,7 +36,6 @@
 
 [STATUS]
 ;ID        Setting   
-1          Open      
 [PATTERNS]
 ;ID        Multipliers
 
@@ -104,7 +90,7 @@ PAGE       0
 
 [OPTIONS]
 UNITS                LPS                 
-HEADLOSS             H-W                 
+HEADLOSS             D-W                 
 SPECIFIC GRAVITY     1
 VISCOSITY            1
 TRIALS               40
@@ -120,15 +106,10 @@ TOLERANCE            0.01
 
 [COORDINATES]
 ;Node      X-Coord    Y-Coord   
-3                1638.890000000       6018.520000000
-5                2861.110000000       7018.520000000
-6                3361.110000000       5370.370000000
-7                4268.520000000       6648.150000000
-8                5027.780000000       5370.370000000
-9                6546.300000000       5388.890000000
-10               5953.700000000       5370.370000000
-1                 472.220000000       6870.370000000
-2                7175.930000000       5388.890000000
+N1               2342.590000000       6740.740000000
+N3               2342.590000000       5222.220000000
+N2               3638.890000000       6740.740000000
+T                 824.070000000       6740.740000000
 
 [VERTICES]
 ;Link      X-Coord    Y-Coord   
