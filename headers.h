@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-//#include <omp.h>
+#include <omp.h>
 #include <unistd.h>
 #include <sys/time.h>
 

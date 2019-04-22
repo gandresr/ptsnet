@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 
 from math import pi
 
-
 class Simulation:
     def __init__(self, inp_file):
         self.wn = wntr.network.WaterNetworkModel(inp_file)
@@ -71,7 +70,6 @@ T = 1 # simulation time [s]
 pipes = initial_info['id']
 H = [[[0 for i in range(int(T/dt))] for j in range(n_pieces+1)] for n_pieces in initial_info['n_pieces']]
 Q = [[[0 for i in range(int(T/dt))] for j in range(n_pieces+1)] for n_pieces in initial_info['n_pieces']]
-
 
 def run_junction_bc(u_pipes, d_pipes, t):
      sc = 0

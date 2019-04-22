@@ -1,10 +1,9 @@
 all:scan run
 
-CC=gcc
-objs = genbase.o vector.o
+CC = g++
 
 base:$(objs)
-	@$(CC) $(objs) -o base
+	@$(CC) -fopenmp parbase.c vector.c -o base
 
 run:base
 	@./base
