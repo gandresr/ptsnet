@@ -2,19 +2,89 @@ import wntr
 import networkx as nx 
 import matplotlib.pyplot as plt
 import subprocess
+from time import time
 import numpy as np
 
 # CUDA
-import pycuda.autoinit
-import pycuda.driver as drv
-from pycuda.compiler import SourceModule
+# import pycuda.autoinit
+# import pycuda.driver as drv
+# from pycuda.compiler import SourceModule
 
 class CUDA_solver:
     def __init__(self):
         kernels = []
     
-    def add_kernel(self, kernel):
-        kernels.append(SourceModule(kernel))
+    # def add_kernel(self, kernel):
+    #     kernels.append(SourceModule(kernel))
+
+class Wall_clock:
+    def __init__(self):
+        self.clk = time()
+    
+    def tic(self):
+        self.clk = time()
+    
+    def toc(self):
+        print('Elapsed time: %f seconds' % (time() - self.clk))
+
+class MOC_simulation:
+    '''
+    Here all the tables and properties required to
+    run a MOC simulation are defined. Tables for
+    simulations with CUDA, OpenMP, and OpenMPI are
+    created
+    '''
+    def __init__(self, network, T):
+        '''
+        Requires an MOC_network
+        T: total time of simulation in seconds
+        '''
+        self.network = network
+        self.interior_properties = None
+        self.bc_properties = None
+        self.junction_properties = None
+        # Results
+        m = int(T/network.dt)
+        n = len(network.segmented_network)
+        # Steady-state results
+        self.ss_results = None
+        self.H = np.zeros((m,n))
+        self.Q = np.zeros((m,n))
+
+    def define_initial_conditions(self):
+        self.ss_results = wntr.sim.EpanetSimulator(self.network.wn).run_sim()
+        for i, node in enumerate(self.network.order):
+            if '.' in node: # Internal node
+                labels = node.split('.') # [n1, k, n2]
+                n1 = labels[0]
+                n2 = labels[2]
+                k = abs(int(labels[1]))
+                p = self.network.get_pipe(n1, n2)
+                
+                head_1 = float(self.ss_results.node['head'][n2])
+                head_2 = float(self.ss_results.node['head'][n1])
+                hl = head_1 - head_2
+                L = self.network.wn.get_link(p).length
+                dx = k * L / self.network.segments[p]
+                self.H[0,i] = head_1 - (hl*(1 - dx/L))
+                self.Q[0,i] = float(self.ss_results.link['flowrate'][p])
+            else: # Junction
+                self.H[0,i] = float(self.ss_results.node['head'][node])
+                self.Q[0,i] = float(self.ss_results.node['demand'][node])
+
+    def define_MP_properties(self):
+        '''
+        In order to exploit the cache in the 
+        shared memory scheme, tables are defined
+        to be allocated and used locally by each
+        thread
+        '''
+        pass
+
+    def define_MPI_properties(self):
+        pass
+        
+
 
 class MOC_network:
     def __init__(self, input_file):
@@ -23,16 +93,11 @@ class MOC_network:
         self.network = self.wn.get_graph()
         self.segmented_network = None
         self.a = {} # Wavespeed values
+        self.dt = None
         self.hydraulic_model = wntr.sim.hydraulics.HydraulicModel(self.wn)
         # Segments are only defined for pipes
         self.segments = self.wn.query_link_attribute('length')
         self.order = {} # Ordered nodes
-        # Used when sim is run
-        self.sim = None
-        self.results = None
-        # Used to store MOC results
-        self.Q = None
-        self.H = None
 
     def define_wavespeeds(self, default_wavespeed = 1200, wavespeed_file = None):
         if wavespeed_file:
@@ -56,8 +121,9 @@ class MOC_network:
 
         # Desired dt < max_dt ?
         t_step = min(dt, max_dt)
+        self.dt = t_step
 
-        # The number of segments are defined
+        # The number of segments is defined
         for p in self.segments:
             self.segments[p] /= t_step
             # The wavespeed is adjusted to compensate the truncation error
@@ -101,11 +167,11 @@ class MOC_network:
                     n1 = nb
 
                     # Internal nodes are created (ni)
-                    for j in range(s_p):
-                        # Internal nodes labeled with k \in {-1, 1} are 
+                    for j in range(s_p-1):
+                        # Internal nodes labeled with k \in {-s_p, 1} are 
                         #   ghost nodes
 
-                        k = -1 if j == s_p-1 else j+1
+                        k = -(j+1) if j == s_p-2 else j+1
 
                         # 'initial_node.k.end_node'
                         ni = nb + '.' + str(k) + '.' + neighbor
@@ -147,10 +213,11 @@ class MOC_network:
 
     def get_processor(self, node):
         return self.partitions[self.order[node]-1]
-
-    def define_initial_conditions(self):
-        self.sim = wntr.sim.EpanetSimulator(self.wn)
-        self.results = self.sim.run_sim()
+    
+    def get_pipe(self, n1, n2):
+        G = self.network
+        for p in G[n1][n2]:
+            return p
 
 # class Grid_network:
 #     '''
