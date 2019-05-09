@@ -8,7 +8,7 @@ clk = WC()
 
 # Test segmentation and partitioning
 clk.tic()
-network = Net("models/single_pipe.inp")
+network = Net("models/LoopedNet.inp")
 network.define_wavespeeds(default_wavespeed = 1200)
 network.define_segments(0.1)
 network.define_mesh()
@@ -21,4 +21,6 @@ sim = Sim(network, 2)
 clk.tic()
 sim.define_initial_conditions()
 clk.toc()
-print(network.order)
+sim.define_properties()
+
+print(network.pipes_order)
