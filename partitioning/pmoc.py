@@ -37,20 +37,40 @@ class MOC_simulation:
     def __init__(self, network, T):
         '''
         Requires an MOC_network
-        T: total time of simulation in seconds
+        T: total time steps
         '''
+        
         self.network = network
+
         # Dimension of arrays is m x n
-        m = int(T/network.dt) # Time
-        n = len(network.segmented_network) # Points
+        m = T
+        n = len(network.segmented_network)
+
+        ## Pipe table
         # | wavespeeds | friction_factor | lengths | diameter | area
         self.pipe_properties = np.zeros((len(network.wavespeeds),5))
+        ## Junction table
         # | demand
         self.junction_properties = np.zeros((len(network.network),1))
+        ## Valves setting table
+        # If file is not specified, then always open, i.e., setting = 1
+        self.valve_settings = np.ones((T,self.network.wn.num_valves))
+
         # Steady-state results
         self.ss_results = None
         self.H = np.zeros((m,n))
         self.Q = np.zeros((m,n))
+
+    def define_valve_setting(self, valve_id, valve_file):
+        '''
+        The valve_file has to be a CSV file
+        '''
+        settings = open(valve_file).read().split('\n')
+        if ',' not in settings[0]: # Only one entry per line
+            T = min(len(settings), len(self.valve_settings))
+            for t in range(T):
+                i = self.network.valves_order[valve_id]
+                self.valve_settings[t, i-1] = settings[t] # Remember that orders start in 1
 
     def define_properties(self):
         '''
@@ -77,7 +97,6 @@ class MOC_simulation:
         for i, junction in enumerate(self.network.network):
             # (0) demand
             self.junction_properties[i, 0] = self.ss_results.node['demand'][junction]
-
 
     def define_MPI(self):
         pass
@@ -118,14 +137,28 @@ class MOC_network:
         self.segmented_network = None
         self.wavespeeds = {}
         self.dt = None
+        
         # Segments are only defined for pipes
         self.segments = self.wn.query_link_attribute('length')
+        
+        ## Order dictionaries
+        # All the orders start in 1
         self.nodes_order = {} # Ordered nodes (nodes in segmented graph)
-        # Ordered pipes (pipes in WNTR graph)
+        # Ordered pipes and valves (in WNTR graph)
         self.pipes_order = {}
-        for i, (n1, n2) in enumerate(self.network.edges()):
+        self.valves_order = {}
+        
+        i = 0; j = 0
+        for (n1, n2) in self.network.edges():
             p = self.get_pipe(n1, n2)
-            self.pipes_order[p] = i + 1 # +1 to be consistent with nodes_order
+            if self.wn.get_link(p).link_type == 'Pipe':
+                self.pipes_order[p] = i + 1 # +1 to be consistent with nodes_order
+                i += 1
+            elif self.wn.get_link(p).link_type == 'Valve':
+                self.valves_order[p] = j + 1
+                j += 1
+                
+        
         self.partitions = None
 
     def define_wavespeeds(self, default_wavespeed = 1200, wavespeed_file = None):
@@ -185,12 +218,12 @@ class MOC_network:
             
             for neighbor in G[nb]:
                 for p in G[nb][neighbor]:
+                    n1 = nb
+
                     if G[nb][neighbor][p]['type'] == 'Pipe':
                         s_p = self.segments[p] # segments in p
                     else:
                         s_p = 0
-
-                    n1 = nb
 
                     # Points are created (ni)
                     for j in range(s_p-1):
