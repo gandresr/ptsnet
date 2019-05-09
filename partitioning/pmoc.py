@@ -2,25 +2,37 @@ import wntr
 import networkx as nx 
 import matplotlib.pyplot as plt
 import subprocess
-from cython.parallel import parallel, prange
+import numpy as np
 
-class EPANET_network:
+# CUDA
+import pycuda.autoinit
+import pycuda.driver as drv
+from pycuda.compiler import SourceModule
+
+class CUDA_solver:
+    def __init__(self):
+        kernels = []
+    
+    def add_kernel(self, kernel):
+        kernels.append(SourceModule(kernel))
+
+class MOC_network:
     def __init__(self, input_file):
         self.fname = input_file[:input_file.find('.inp')]
         self.wn = wntr.network.WaterNetworkModel(input_file)
         self.network = self.wn.get_graph()
         self.segmented_network = None
         self.a = {} # Wavespeed values
+        self.hydraulic_model = wntr.sim.hydraulics.HydraulicModel(self.wn)
         # Segments are only defined for pipes
         self.segments = self.wn.query_link_attribute('length')
         self.order = {} # Ordered nodes
         # Used when sim is run
         self.sim = None
         self.results = None
-
-    def run_sim(self):
-        self.sim = wntr.sim.EpanetSimulator(self.wn)
-        self.sim.run_sim()
+        # Used to store MOC results
+        self.Q = None
+        self.H = None
 
     def define_wavespeeds(self, default_wavespeed = 1200, wavespeed_file = None):
         if wavespeed_file:
@@ -130,8 +142,24 @@ class EPANET_network:
                     f.write(fline)
 
     def define_partitions(self, k):
-        result = subprocess.call(['./kaffpa', 'models/LoopedNet.graph', '--k=' + str(k), '--preconfiguration=strong'])
+        result = subprocess.call(['./kaffpa', self.fname + '.graph', '--k=' + str(k), '--preconfiguration=strong'])
         self.partitions = list(map(int, open('tmppartition' + str(k)).read()[:-1].split('\n')))
 
     def get_processor(self, node):
         return self.partitions[self.order[node]-1]
+
+    def define_initial_conditions(self):
+        self.sim = wntr.sim.EpanetSimulator(self.wn)
+        self.results = self.sim.run_sim()
+
+# class Grid_network:
+#     '''
+#     This class allows to generate networks with Grid topology 
+#     and 2 boundary conditions, specificaly, one source reservoir
+#     upstream and one valve downstream.
+
+#     The topology of the network is created using networkx
+#     and then, an MOC_network is created using WNTR and assigning
+#     random parameters for (lengths, )
+#     '''
+#     def __init__(self, n, m):

@@ -6,7 +6,6 @@
 #include <sys/time.h>
 #include <math.h>
 
-
 void printM(double ** A, int n, int m)
 {
 	int i,j;
@@ -33,7 +32,6 @@ int main(int argc, char** argv)
 	n = atoi(argv[1]);
 	m = atoi(argv[2]);
 	p = atoi(argv[3]);
-
 
 	pi = 3.1416;
 	D = 0.5; // [m]
@@ -80,7 +78,6 @@ int main(int argc, char** argv)
 			V[i][j] = 0;
 		}
 	}
-
 
     // START > Wall-clock timing in [s]
     gettimeofday(&timecheck, NULL);
