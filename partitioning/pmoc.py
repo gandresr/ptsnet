@@ -45,10 +45,63 @@ class MOC_simulation:
         # If file is not specified, then always open, i.e., setting = 1
         self.valve_settings = np.ones((T,self.network.wn.num_valves))
 
-        # Steady-state results
+        # Steady-state results / Initial conditions
         self.ss_results = None
-        self.H = np.zeros((m,n))
-        self.Q = np.zeros((m,n))
+        self.H0 = np.zeros(n)
+        self.Q0 = np.zeros(n)
+        
+        # For PRAM-like simulation
+        self.point_order = {}
+        self.point_table = {}
+
+    def define_point_table(self):
+        self.point_table['Q1'] = []
+        self.point_table['Q2'] = []
+        self.point_table['H1'] = []
+        self.point_table['H2'] = []
+        self.point_table['wavespeed'] = []
+        self.point_table['D'] = []
+        self.point_table['frictionfact'] = []
+        self.point_table['dx'] = []
+        self.point_table['A'] = []
+
+        j = 1
+        for node in self.network.segmented_network:
+            if '.' in node: # is point
+                labels = node.split('.')
+                k = int(labels[1])
+
+                if not (k == 1 or k < 0):
+                    k = abs(k)
+                    n1 = labels[0]
+                    n2 = labels[2]
+                    self.point_order[node] = j
+                    p = self.network.get_pipe_name(n1, n2)
+                    j += 1
+
+                    upoint = str(k-1)
+                    dpoint = str(k+1)
+
+                    if k+1 == (self.network.segments[p] - 1):
+                        dpoint = str(-(k+1)) 
+
+                    upstream_point = self.network.nodes_order[n1 + '.' + upoint + '.' + n2] - 1
+                    downstream_point = self.network.nodes_order[n1 + '.' + dpoint + '.' + n2] - 1
+                    pipe_point = self.network.pipes_order[p]-1
+                    
+                    L = self.network.wn.get_link(p).length
+                    dx = abs(k) * L / self.network.segments[p]
+                    
+                    self.point_table['Q1'].append(self.Q0[upstream_point])
+                    self.point_table['Q2'].append(self.Q0[downstream_point])
+                    self.point_table['H1'].append(self.H0[upstream_point])
+                    self.point_table['H2'].append(self.H0[downstream_point])
+                    self.point_table['wavespeed'].append(self.network.wavespeeds[p])
+                    d = self.pipe_properties[pipe_point,3]
+                    self.point_table['D'].append(d)
+                    self.point_table['frictionfact'].append(self.pipe_properties[pipe_point,1])
+                    self.point_table['dx'].append(dx)
+                    self.point_table['A'].append(np.pi*d**2/4)
 
     def define_valve_setting(self, valve_id, valve_file):
         '''
@@ -86,9 +139,6 @@ class MOC_simulation:
         for i, junction in enumerate(self.network.network):
             # (0) demand
             self.junction_properties[i, 0] = self.ss_results.node['demand'][junction]
-
-    def define_MPI(self):
-        pass
         
     def define_initial_conditions(self):
         self.ss_results = wntr.sim.EpanetSimulator(self.network.wn).run_sim()
@@ -98,18 +148,18 @@ class MOC_simulation:
                 n1 = labels[0]
                 n2 = labels[2]
                 k = abs(int(labels[1]))
-                p = self.network.get_pipe(n1, n2)
+                p = self.network.get_pipe_name(n1, n2)
                 
                 head_1 = float(self.ss_results.node['head'][n2])
                 head_2 = float(self.ss_results.node['head'][n1])
                 hl = head_1 - head_2
                 L = self.network.wn.get_link(p).length
                 dx = k * L / self.network.segments[p]
-                self.H[0,i] = head_1 - (hl*(1 - dx/L))
-                self.Q[0,i] = float(self.ss_results.link['flowrate'][p])
+                self.H0[i] = head_1 - (hl*(1 - dx/L))
+                self.Q0[i] = float(self.ss_results.link['flowrate'][p])
             else: # Junctions
-                self.H[0,i] = float(self.ss_results.node['head'][node])
-                self.Q[0,i] = float(self.ss_results.node['demand'][node])
+                self.H0[i] = float(self.ss_results.node['head'][node])
+                self.Q0[i] = float(self.ss_results.node['demand'][node])
 
 class MOC_network:
     def __init__(self, input_file):
@@ -245,7 +295,6 @@ class MOC_network:
         
         # parfor
         for i, node in enumerate(dfs):
-            print(i,type(node))
             self.nodes_order[node] = i + 1
 
     def write_mesh(self):
