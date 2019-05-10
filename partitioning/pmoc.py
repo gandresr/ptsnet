@@ -12,11 +12,63 @@ import numpy as np
 
 class CUDA_solver:
     def __init__(self):
-        kernels = []
-    
-    # def add_kernel(self, kernel):
-    #     kernels.append(SourceModule(kernel))
+        self.point_kernel = SourceModule('''
+        __global__ void point_step(
+            float * HH,
+            float * QQ,
+            float * Q1_point, 
+            float * Q2_point, 
+            float * H1_point, 
+            float * H2_point, 
+            float * wavespeed_point,
+            float * D_point,
+            float * frictionfact_point,
+            float * dx_point,
+            float * A_point)
+        {
+            const int i = threadIdx.x;
+            float B, R, Cp, Cm, Bp, Bm;
 
+            B = wavespeed[i]/(9.81*A_point[i]);
+            R = frictionfact[i]*dx_point[i]/(2*9.81*D_point[i]*A_point[i]*A_point[i]);
+            Cp = H1_point[i] + B*Q1_point[i];
+            Cm = H2_point[i] - B*Q2_point[i];
+            Bp = B + R*abs(Q1_point[i]);
+            Bm = B + R*abs(Q2_point[i]);
+            HH_points[i] = (Cp*Bm + Cm*Bp)/(Bp + Bm);
+            QQ_points[i] = (Cp - Cm)/(Bp + Bm);
+        }
+        ''')
+
+        # self.junction_kernel = SourceModule('''
+        #
+        # ''')
+
+        self.valve_kernel = SourceModule('''
+        __global__ void valve_step(
+            float * H1_valve, 
+            float * Q1_valve, 
+            float * H0_valve, 
+            float * Q0_valve, 
+            float * setting, 
+            float * wavespeed_valve, 
+            float * D_valve, 
+            float * frictionfact_valve, 
+            float * dx_valve,
+            float * area_valve
+        )
+            float B, R, Cv, Cp, Bp
+            B = wavespeed_valve[i]/(9.81*area_valve[i])
+            R = f*dx/(2*g*d*area_valve*area_valve)
+            Cv = (Q0*tau)**2/(2*H0)
+            Cp = H1 + B*Q1
+            Bp = B + R*abs(Q1)
+            QQ = -Bp*Cv + ((Bp*Cv)**2 + 2*Cv*Cp)**0.5
+            HH = Cp - Bp*QQ
+            return HH, QQ
+        
+        ''')
+    
 class Wall_clock:
     def __init__(self):
         self.clk = time()
@@ -136,6 +188,7 @@ class MOC_network:
         self.network = self.wn.get_graph()
         self.segmented_network = None
         self.wavespeeds = {}
+        self.valve_nodes = []
         self.dt = None
         
         # Segments are only defined for pipes
@@ -148,9 +201,13 @@ class MOC_network:
         self.pipes_order = {}
         self.valves_order = {}
         
+        # Nodes connected to valves
+        self.valve_nodes = [valve[1].end_node_name for valve in self.wn.valves()] + \
+            [valve[1].start_node_name for valve in self.wn.valves()]
+        
         i = 0; j = 0
         for (n1, n2) in self.network.edges():
-            p = self.get_pipe(n1, n2)
+            p = self.get_pipe_name(n1, n2)
             if self.wn.get_link(p).link_type == 'Pipe':
                 self.pipes_order[p] = i + 1 # +1 to be consistent with nodes_order
                 i += 1
@@ -163,6 +220,9 @@ class MOC_network:
 
     def define_wavespeeds(self, default_wavespeed = 1200, wavespeed_file = None):
         if wavespeed_file:
+            '''
+            CSV file only
+            '''
             f = open(wavespeed_file).read().split('\n')
             for p, a_p in map(lambda x : x.split(','), f):
                 self.wavespeeds[p] = float(a_p)
@@ -219,10 +279,10 @@ class MOC_network:
             for neighbor in G[nb]:
                 for p in G[nb][neighbor]:
                     n1 = nb
-
-                    if G[nb][neighbor][p]['type'] == 'Pipe':
+                    link = self.wn.get_link(p)
+                    if link.link_type == 'Pipe':
                         s_p = self.segments[p] # segments in p
-                    else:
+                    elif link.link_type == 'Valve':
                         s_p = 0
 
                     # Points are created (ni)
@@ -248,6 +308,7 @@ class MOC_network:
         
         # parfor
         for i, node in enumerate(dfs):
+            print(i,type(node))
             self.nodes_order[node] = i + 1
 
     def write_mesh(self):
@@ -273,7 +334,7 @@ class MOC_network:
     def get_processor(self, node):
         return self.partitions[self.nodes_order[node]-1]
     
-    def get_pipe(self, n1, n2):
+    def get_pipe_name(self, n1, n2):
         if n2 not in self.network[n1]:
             return None
         for p in self.network[n1][n2]:
