@@ -45,63 +45,10 @@ class MOC_simulation:
         # If file is not specified, then always open, i.e., setting = 1
         self.valve_settings = np.ones((T,self.network.wn.num_valves))
 
-        # Steady-state results / Initial conditions
+        # Steady-state results
         self.ss_results = None
-        self.H0 = np.zeros(n)
-        self.Q0 = np.zeros(n)
-        
-        # For PRAM-like simulation
-        self.point_order = {}
-        self.point_table = {}
-
-    def define_point_table(self):
-        self.point_table['Q1'] = []
-        self.point_table['Q2'] = []
-        self.point_table['H1'] = []
-        self.point_table['H2'] = []
-        self.point_table['wavespeed'] = []
-        self.point_table['D'] = []
-        self.point_table['frictionfact'] = []
-        self.point_table['dx'] = []
-        self.point_table['A'] = []
-
-        j = 1
-        for node in self.network.segmented_network:
-            if '.' in node: # is point
-                labels = node.split('.')
-                k = int(labels[1])
-
-                if not (k == 1 or k < 0):
-                    k = abs(k)
-                    n1 = labels[0]
-                    n2 = labels[2]
-                    self.point_order[node] = j
-                    p = self.network.get_pipe_name(n1, n2)
-                    j += 1
-
-                    upoint = str(k-1)
-                    dpoint = str(k+1)
-
-                    if k+1 == (self.network.segments[p] - 1):
-                        dpoint = str(-(k+1)) 
-
-                    upstream_point = self.network.nodes_order[n1 + '.' + upoint + '.' + n2] - 1
-                    downstream_point = self.network.nodes_order[n1 + '.' + dpoint + '.' + n2] - 1
-                    pipe_point = self.network.pipes_order[p]-1
-                    
-                    L = self.network.wn.get_link(p).length
-                    dx = abs(k) * L / self.network.segments[p]
-                    
-                    self.point_table['Q1'].append(self.Q0[upstream_point])
-                    self.point_table['Q2'].append(self.Q0[downstream_point])
-                    self.point_table['H1'].append(self.H0[upstream_point])
-                    self.point_table['H2'].append(self.H0[downstream_point])
-                    self.point_table['wavespeed'].append(self.network.wavespeeds[p])
-                    d = self.pipe_properties[pipe_point,3]
-                    self.point_table['D'].append(d)
-                    self.point_table['frictionfact'].append(self.pipe_properties[pipe_point,1])
-                    self.point_table['dx'].append(dx)
-                    self.point_table['A'].append(np.pi*d**2/4)
+        self.H = np.zeros((m,n))
+        self.Q = np.zeros((m,n))
 
     def define_valve_setting(self, valve_id, valve_file):
         '''
@@ -112,7 +59,7 @@ class MOC_simulation:
             T = min(len(settings), len(self.valve_settings))
             for t in range(T):
                 i = self.network.valves_order[valve_id]
-                self.valve_settings[t, i-1] = settings[t] # Remember that orders start in 1
+                self.valve_settings[t, i] = settings[t]
 
     def define_properties(self):
         '''
@@ -155,11 +102,11 @@ class MOC_simulation:
                 hl = head_1 - head_2
                 L = self.network.wn.get_link(p).length
                 dx = k * L / self.network.segments[p]
-                self.H0[i] = head_1 - (hl*(1 - dx/L))
-                self.Q0[i] = float(self.ss_results.link['flowrate'][p])
+                self.H[0,i] = head_1 - (hl*(1 - dx/L))
+                self.Q[0,i] = float(self.ss_results.link['flowrate'][p])
             else: # Junctions
-                self.H0[i] = float(self.ss_results.node['head'][node])
-                self.Q0[i] = float(self.ss_results.node['demand'][node])
+                self.H[0,i] = float(self.ss_results.node['head'][node])
+                self.Q[0,i] = float(self.ss_results.node['demand'][node])
 
 class MOC_network:
     def __init__(self, input_file):
@@ -196,10 +143,10 @@ class MOC_network:
         for (n1, n2) in self.network.edges():
             p = self.get_pipe_name(n1, n2)
             if self.wn.get_link(p).link_type == 'Pipe':
-                self.pipes_order[p] = i + 1 # +1 to be consistent with nodes_order
+                self.pipes_order[p] = i
                 i += 1
             elif self.wn.get_link(p).link_type == 'Valve':
-                self.valves_order[p] = j + 1
+                self.valves_order[p] = j
                 j += 1
                 
         
@@ -277,7 +224,7 @@ class MOC_network:
                         # Points labeled with k \in {-s_p, 1} are 
                         #   ghost nodes
 
-                        k = -(j+1) if j == s_p-2 else j+1
+                        k = -j if j == s_p-2 else j
 
                         # 'initial_node.k.end_node'
                         ni = nb + '.' + str(k) + '.' + neighbor
@@ -291,11 +238,11 @@ class MOC_network:
         #   to the DFS traversal. This is done to guarantee
         #   locality in memory and to minimize memory coalescing
 
-        dfs = nx.dfs_preorder_nodes(self.segmented_network, source=boundary_node)
+        # dfs = nx.dfs_preorder_nodes(self.segmented_network, source=boundary_node)
         
         # parfor
-        for i, node in enumerate(dfs):
-            self.nodes_order[node] = i + 1
+        for i, node in enumerate(self.segmented_network):
+            self.nodes_order[node] = i
 
     def write_mesh(self):
         '''
@@ -309,7 +256,7 @@ class MOC_network:
                 for i, node in enumerate(self.nodes_order):
                     fline = "" # file content
                     for neighbor in G[node]:
-                        fline += "%d " % self.nodes_order[neighbor]
+                        fline += "%d " % (self.nodes_order[neighbor] + 1)
                     fline += '\n'
                     f.write(fline)
 
@@ -318,7 +265,7 @@ class MOC_network:
         self.partitions = np.array(list(map(int, open('tmppartition' + str(k)).read()[:-1].split('\n'))))
 
     def get_processor(self, node):
-        return self.partitions[self.nodes_order[node]-1]
+        return self.partitions[self.nodes_order[node]]
     
     def get_pipe_name(self, n1, n2):
         if n2 not in self.network[n1]:
