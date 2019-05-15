@@ -8,7 +8,7 @@ clk = WC()
 
 # Test segmentation and partitioning
 clk.tic()
-network = Net("models/single_pipe.inp")
+network = Net("models/LoopedNet.inp")
 network.define_wavespeeds(default_wavespeed = 1200)
 network.define_segments(0.1)
 network.define_mesh()
@@ -25,7 +25,5 @@ clk.toc()
 sim.define_properties()
 
 print(network.valves_order)
-# sim.define_valve_setting('9', 'valves/v9.csv')
+sim.define_valve_setting('9', 'valves/v9.csv')
 print(sim.valve_settings)
-
-sim.define_point_table()
