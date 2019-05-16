@@ -28,85 +28,7 @@ class MOC_simulation:
         Requires an MOC_network
         T: total time steps
         '''
-        
-        self.network = network
-
-        # Dimension of arrays is m x n
-        m = T
-        n = len(network.segmented_network)
-
-        ## Pipe table
-        # | wavespeeds | friction_factor | lengths | diameter | area
-        self.pipe_properties = np.zeros((len(network.wavespeeds),5))
-        ## Junction table
-        # | demand
-        self.junction_properties = np.zeros((len(network.network),1))
-        ## Valves setting table
-        # If file is not specified, then always open, i.e., setting = 1
-        self.valve_settings = np.ones((T,self.network.wn.num_valves))
-
-        # Steady-state results
-        self.ss_results = None
-        self.H = np.zeros((m,n))
-        self.Q = np.zeros((m,n))
-
-    def define_valve_setting(self, valve_id, valve_file):
-        '''
-        The valve_file has to be a CSV file
-        '''
-        settings = open(valve_file).read().split('\n')
-        if ',' not in settings[0]: # Only one entry per line
-            T = min(len(settings), len(self.valve_settings))
-            for t in range(T):
-                i = self.network.valves_order[valve_id]
-                self.valve_settings[t, i] = settings[t]
-
-    def define_properties(self):
-        '''
-        In order to exploit the cache in the 
-        shared memory scheme, tables are defined
-        to be allocated and used locally by each
-        thread
-        '''
-        # Pipe properties
-        for i, p in enumerate(self.network.wavespeeds):
-            # (0) wavespeed
-            # (1) friction_factor
-            # (2) length
-            # (3) diameter
-            # (4) area
-            self.pipe_properties[i,0] = self.network.wavespeeds[p]
-            self.pipe_properties[i,1] = float(self.ss_results.link['frictionfact'][p])
-            self.pipe_properties[i,2] = self.network.wn.get_link(p).length
-            self.pipe_properties[i,3] = self.network.wn.get_link(p).diameter
-            self.pipe_properties[i,4] = np.pi*(self.pipe_properties[i][3])**2/4
-
-        # Junction properties
-        # Note: notice that junctions with negative demands are source reservoirs
-        for i, junction in enumerate(self.network.network):
-            # (0) demand
-            self.junction_properties[i, 0] = self.ss_results.node['demand'][junction]
-        
-    def define_initial_conditions(self):
-        self.ss_results = wntr.sim.EpanetSimulator(self.network.wn).run_sim()
-        for i, node in enumerate(self.network.nodes_order):
-            if '.' in node: # Points
-                labels = node.split('.') # [n1, k, n2]
-                n1 = labels[0]
-                n2 = labels[2]
-                k = abs(int(labels[1]))
-                p = self.network.get_pipe_name(n1, n2)
-                
-                head_1 = float(self.ss_results.node['head'][n2])
-                head_2 = float(self.ss_results.node['head'][n1])
-                hl = head_1 - head_2
-                L = self.network.wn.get_link(p).length
-                dx = k * L / self.network.segments[p]
-                self.H[0,i] = head_1 - (hl*(1 - dx/L))
-                self.Q[0,i] = float(self.ss_results.link['flowrate'][p])
-            else: # Junctions
-                self.H[0,i] = float(self.ss_results.node['head'][node])
-                self.Q[0,i] = float(self.ss_results.node['demand'][node])
+        pass
 
 class MOC_network:
     def __init__(self, input_file):
@@ -115,7 +37,6 @@ class MOC_network:
         * The MOC_network is a segmented network that includes 
             new nodes between pipes which are denominated points
         * The nodes in the network graph are denominated junctions
-
         '''
         self.fname = input_file[:input_file.find('.inp')]
         self.wn = wntr.network.WaterNetworkModel(input_file)
