@@ -5,16 +5,8 @@ import subprocess
 from time import time
 import numpy as np
 
-
-class Wall_clock:
-    def __init__(self):
-        self.clk = time()
-    
-    def tic(self):
-        self.clk = time()
-    
-    def toc(self):
-        print('Elapsed time: %f seconds' % (time() - self.clk))
+# Temporal
+import enum
 
 class MOC_simulation:
     '''
@@ -28,6 +20,13 @@ class MOC_simulation:
         Requires an MOC_network
         T: total time steps
         '''
+        self.moc_network = network
+        self.Node = np.zeros((len(Node), len(network.segmented_network)), dtype = int)
+        self.Pipe = np.zeros((len(Pipe), len(network.network.num_pipes)), dtype = int)
+        self.Valve = np.zeros((len(Valve), len(network.network.num_valves)), dtype = int)
+        
+
+    def define_nodes(self):
         pass
 
 class MOC_network:
@@ -193,3 +192,40 @@ class MOC_network:
             return None
         for p in self.network[n1][n2]:
             return p
+
+
+class Wall_clock:
+    def __init__(self):
+        self.clk = time()
+    
+    def tic(self):
+        self.clk = time()
+    
+    def toc(self):
+        print('Elapsed time: %f seconds' % (time() - self.clk))
+
+# Enumerators
+
+class Node(enum.Enum):
+    node_type = 1
+    in_nodes_id = 2
+    out_nodes_id = 3
+    results_id = 4
+    pipe_id = 5
+    bc_id = 6
+    k = 7
+
+class Pipe(enum.Enum):
+    node_a = 1
+    node_b = 2
+    diameter = 3
+    area = 4
+    wavespeed = 5
+    ffactor = 6
+    length = 7
+
+class Valve(enum.Enum):
+    curve_id = 1
+    node_a = 2
+    node_b = 3
+    setting_id = 4
