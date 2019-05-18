@@ -16,29 +16,37 @@ class MOC_simulation:
     # Enumerators
 
     class Node(enum.Enum):
-        node_type = 1
-        in_nodes_id = 2
-        out_nodes_id = 3
-        results_id = 4
-        pipe_id = 5
-        bc_id = 6
-        processor = 7
-        is_ghost = 8
-
+        node_type = 0 # {none, junction, reservoir, valve_a, valve_b}
+        in_nodes_id = 1
+        out_nodes_id = 2
+        results_id = 3
+        pipe_id = 4
+        bc_id = 5
+        processor = 6
+        is_ghost = 7
+  
     class Pipe(enum.Enum):
-        node_a = 1
-        node_b = 2
-        diameter = 3
-        area = 4
-        wavespeed = 5
-        ffactor = 6
-        length = 7
+        node_a = 0
+        node_b = 1
+        diameter = 2
+        area = 3
+        wavespeed = 4
+        ffactor = 5
+        length = 6
 
     class Valve(enum.Enum):
-        curve_id = 1
-        node_a = 2
-        node_b = 3
-        setting_id = 4
+        curve_id = 0
+        node_a = 1
+        node_b = 2
+        setting_id = 3
+      
+    class node_type(enum.Enum):
+        none = 0
+        reservoir = 1
+        junction = 2
+        end = 3
+        valve_a = 4
+        valve_b = 5
 
     '''
     Here all the tables and properties required to
@@ -52,31 +60,68 @@ class MOC_simulation:
         '''
         self.moc_network = network
         # a[a[:,self.Node.processor.value].argsort()] - Sort by processor
-        self.nodes = np.zeros((len(self.Node), len(network.mesh)), dtype = int)
-        self.pipes = np.zeros((len(self.Pipe), network.wn.num_pipes), dtype = int)
-        self.valves = np.zeros((len(self.Valve), network.wn.num_valves), dtype = int)
+        self.nodes = np.zeros((len(network.mesh), len(self.Node)), dtype = int)
+        self.pipes = np.zeros((network.wn.num_pipes, len(self.Pipe)), dtype = int)
+        self.valves = np.zeros((network.wn.num_valves, len(self.Valve)), dtype = int)
+        
+        # Simulation results
+        self.steady_state_sim = wntr.sim.EpanetSimulator(network.wn).run_sim()
+        self.flow_results = None # np.zeros(T, len(network.mesh))
+        self.head_results = None # np.zeros(T, len(network.mesh))
 
     def define_nodes(self):
-        # node_type = 1
-        # in_nodes_id = 2
-        # out_nodes_id = 3
-        # results_id = 4
-        # pipe_id = 5
-        # bc_id = 6
-        # processor = 7
-        # is_ghost = 8
-        for node in self.moc_network.mesh:
-            in_edges = self.moc_network.network.in_edges(node)
-            out_edges = self.moc_network.network.out_edges(node)
-            if len(in_edges) + len(out_edges) > 2:
-                pass
+        '''
+        In the meantime, valves are not valid in general junctions
+        '''
+        for node, idx in self.moc_network.node_ids.items():
+            # Remember that mesh is an undirected networkx Graph
+            neighbors = list(self.moc_network.mesh.neighbors(node))
+            if node in self.moc_network.wn.reservoir_name_list:
+                # Check if node is reservoir node
+                self.nodes[idx, self.Node.node_type.value] = self.node_type.reservoir.value
+            # Check if the node belongs to a valve
+            if self.nodes[idx, self.Node.node_type.value] == self.node_type.none.value: # Type not defined yet
+                for valve in self.moc_network.valve_ids:
+                    start = self.moc_network.wn.get_link(valve).start_node_name
+                    end = self.moc_network.wn.get_link(valve).end_node_name
+                    if node == start:
+                        self.nodes[idx, self.Node.node_type.value] = self.node_type.valve_a.value
+                        break
+                    elif node == end:
+                        self.nodes[idx, self.Node.node_type.value] = self.node_type.valve_b.value
+                        break
+            if self.nodes[idx, self.Node.node_type.value] == self.node_type.none.value: # Type not defined yet
+                if len(neighbors) > 1:
+                    # Node is considered a junction if there is more than one pipe attached to it is not a valve or reservoir
+                    self.nodes[idx, self.Node.node_type.value] = self.node_type.junction.value
+                
+                
+    # def define_initial_conditions(self):
+    #     for i, node in enumerate(self.network.node_ids):
+    #         if '.' in node: # interior points
+    #             labels = node.split('.') # [n1, k, n2]
+    #             n1 = labels[0]
+    #             n2 = labels[2]
+    #             k = abs(int(labels[1]))
+    #             p = self.network.get_pipe_name(n1, n2)
+                
+    #             head_1 = float(self.steady_state_sim.node['head'][n2])
+    #             head_2 = float(self.steady_state_sim.node['head'][n1])
+    #             hl = head_1 - head_2
+    #             L = self.network.wn.get_link(p).length
+    #             dx = k * L / self.network.segments[p]
+    #             self.H0[i] = head_1 - (hl*(1 - dx/L))
+    #             self.Q0[i] = float(self.steady_state_sim.link['flowrate'][p])
+    #         else: # Junctions
+    #             self.H0[i] = float(self.steady_state_sim.node['head'][node])
+    #             self.Q0[i] = float(self.steady_state_sim.node['demand'][node])
 
 class MOC_network:
     def __init__(self, input_file):
         '''
         * The network graph is generated by WNTR
         * The MOC_network is a segmented network that includes 
-            new nodes between pipes which are denominated points
+            new nodes between pipes which are denominated interior points
         * The nodes in the network graph are denominated junctions
         '''
         self.fname = input_file[:input_file.find('.inp')]
@@ -90,13 +135,13 @@ class MOC_network:
         self.segments = self.wn.query_link_attribute('length')
         
         # Ids for nodes, pipes, and valves
-        self.nodes_id = {}
-        self.pipes_id = {}
-        self.valves_id = {}
+        self.node_ids = {}
+        self.pipe_ids = {}
+        self.valve_ids = {}
                 
         self.partition = None
         self.separator = None
-
+   
     def define_wavespeeds(self, default_wavespeed = 1200, wavespeed_file = None):
         if wavespeed_file:
             '''
@@ -164,9 +209,9 @@ class MOC_network:
                     elif link.link_type == 'Valve':
                         s_p = 0
 
-                    # Points are created (ni)
+                    # interior points are created (ni)
                     for j in range(s_p-1):
-                        # Points labeled with k \in {-s_p, 1} are 
+                        # interior points labeled with k \in {-s_p, 1} are 
                         #   ghost nodes
 
                         k = -j if j == s_p-2 else j
@@ -183,15 +228,15 @@ class MOC_network:
 
     def _define_ids(self):
         for i, node in enumerate(self.mesh):
-            self.nodes_id[node] = i
+            self.node_ids[node] = i
         i = 0; j = 0
         for (n1, n2) in self.network.edges():
             p = self.get_pipe_name(n1, n2)
             if self.wn.get_link(p).link_type == 'Pipe':
-                self.pipes_id[p] = i
+                self.pipe_ids[p] = i
                 i += 1
             elif self.wn.get_link(p).link_type == 'Valve':
-                self.valves_id[p] = j
+                self.valve_ids[p] = j
                 j += 1
 
     def write_mesh(self):
@@ -203,10 +248,10 @@ class MOC_network:
         if G:
             with open(self.fname + '.graph', 'w') as f:
                 f.write("%d %d\n" % (len(G), len(G.edges())))
-                for i, node in enumerate(self.nodes_id):
+                for i, node in enumerate(self.node_ids):
                     fline = "" # file content
                     for neighbor in G[node]:
-                        fline += "%d " % (self.nodes_id[neighbor] + 1)
+                        fline += "%d " % (self.node_ids[neighbor] + 1)
                     fline += '\n'
                     f.write(fline)
 
@@ -233,7 +278,7 @@ class MOC_network:
         self.separator = np.loadtxt('partitionings/s%d' % k, dtype=int)
         
     def get_processor(self, node):
-        return self.partition[self.nodes_id[node]]
+        return self.partition[self.node_ids[node]]
     
     def get_pipe_name(self, n1, n2):
         if n2 not in self.network[n1]:

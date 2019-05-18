@@ -1,6 +1,6 @@
 ; Filename: models/LoopedNet.inp
-; WNTR: 0.1.5
-; Created: 2019-05-15 17:10:05
+; WNTR: 0.1.6
+; Created: 2019-05-18 16:28:01
 [TITLE]
 
 [JUNCTIONS]

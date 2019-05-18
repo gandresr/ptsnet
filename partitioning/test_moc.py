@@ -18,13 +18,14 @@ network.define_partitions(4)
 clk.toc()
 
 # Test MOC
-# T = 10
-# sim = Sim(network, T)
+T = 10
+sim = Sim(network, T)
+sim.define_nodes()
 # clk.tic()
 # sim.define_initial_conditions()
 # clk.toc()
-# sim.define_properties()
+# # sim.define_properties()
 
-# print(network.valves_order)
-# sim.define_valve_setting('9', 'valves/v9.csv')
-# print(sim.valve_settings)
+# # print(network.valves_order)
+# # sim.define_valve_setting('9', 'valves/v9.csv')
+# # print(sim.valve_settings)
