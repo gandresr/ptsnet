@@ -16,14 +16,10 @@ class MOC_simulation:
     # Enumerators
 
     class Node(enum.Enum):
-        node_type = 0 # {none, junction, reservoir, valve_a, valve_b}
-        in_nodes_id = 1
-        out_nodes_id = 2
-        results_id = 3
-        pipe_id = 4
-        bc_id = 5
-        processor = 6
-        is_ghost = 7
+        node_type = 0 # {none, reservoir, junction, end, valve_a, valve_b}
+        link_id = 1 # {none (-1), link_id, valve_id}
+        processor = 2
+        is_ghost = 3
   
     class Pipe(enum.Enum):
         node_a = 0
@@ -74,28 +70,54 @@ class MOC_simulation:
         In the meantime, valves are not valid in general junctions
         also it is not possible to connect one valve to another
         '''
-        for node, idx in self.moc_network.node_ids.items():
+        for node, node_id in self.moc_network.node_ids.items():
+
+            ## TYPE & LINK_ID ARE DEFINED
+            # ----------------------------------------------------------------------------------------------------------------
+
             # Remember that mesh is an undirected networkx Graph
             neighbors = list(self.moc_network.mesh.neighbors(node))
             if node in self.moc_network.wn.reservoir_name_list:
                 # Check if node is reservoir node
-                self.nodes[idx, self.Node.node_type.value] = self.node_type.reservoir.value
+                self.nodes[node_id, self.Node.node_type.value] = self.node_type.reservoir.value
+                self.nodes[node_id, self.Node.link_id.value] = -1
             # Check if the node belongs to a valve
-            if self.nodes[idx, self.Node.node_type.value] == self.node_type.none.value: # Type not defined yet
-                for valve in self.moc_network.valve_ids:
+            if self.nodes[node_id, self.Node.node_type.value] == self.node_type.none.value: # Type not defined yet
+                for valve, valve_id in self.moc_network.valve_ids.items():
                     start = self.moc_network.wn.get_link(valve).start_node_name
                     end = self.moc_network.wn.get_link(valve).end_node_name
                     if node == start:
-                        self.nodes[idx, self.Node.node_type.value] = self.node_type.valve_a.value
+                        self.nodes[node_id, self.Node.node_type.value] = self.node_type.valve_a.value
+                        # link_id is associated to a valve
+                        self.nodes[node_id, self.Node.link_id.value] = valve_id
                         break
                     elif node == end:
-                        self.nodes[idx, self.Node.node_type.value] = self.node_type.valve_b.value
+                        self.nodes[node_id, self.Node.node_type.value] = self.node_type.valve_b.value
+                        # link_id is associated to a valve
+                        self.nodes[node_id, self.Node.link_id.value] = valve_id
                         break
-            if self.nodes[idx, self.Node.node_type.value] == self.node_type.none.value: # Type not defined yet
+            if self.nodes[node_id, self.Node.node_type.value] == self.node_type.none.value: # Type not defined yet
+                # Node is considered a junction if there is more than one pipe attached to it is not a valve or reservoir
                 if len(neighbors) > 1:
-                    # Node is considered a junction if there is more than one pipe attached to it is not a valve or reservoir
-                    self.nodes[idx, self.Node.node_type.value] = self.node_type.junction.value
-                
+                    self.nodes[node_id, self.Node.node_type.value] = self.node_type.junction.value
+                    if '.' in node: # interior points
+                        labels = node.split('.') # [n1, k, n2]
+                        n1 = labels[0]
+                        n2 = labels[2]
+                        pipe = self.moc_network.get_pipe_name(n1, n2)
+                        self.nodes[node_id, self.Node.link_id.value] = self.moc_network.pipe_ids[pipe]
+                    else:
+                        self.nodes[node_id, self.Node.link_id.value] = -1
+            # ----------------------------------------------------------------------------------------------------------------
+
+            ## PROCESSOR & IS_GHOST ARE DEFINED
+            # ----------------------------------------------------------------------------------------------------------------
+
+            self.nodes[node_id, self.Node.processor.value] = self.moc_network.get_processor(node)
+            self.nodes[node_id, self.Node.is_ghost.value] = (self.moc_network.separator[node_id] == self.moc_network.num_processors)
+
+            # ----------------------------------------------------------------------------------------------------------------
+    
                 
     def define_initial_conditions(self):
         for node, idx in self.moc_network.node_ids.items():
@@ -132,7 +154,8 @@ class MOC_network:
         self.mesh = None
         self.wavespeeds = {}
         self.dt = None
-        
+        self.num_processors = None # number of processors
+
         # Number of segments are only defined for pipes
         self.segments = self.wn.query_link_attribute('length')
         
@@ -276,6 +299,7 @@ class MOC_network:
             '--input_partition=partitionings/p%d' % k, 
             '--output_filename=partitionings/s%d' % k])
 
+        self.num_processors = k
         self.partition = np.loadtxt('partitionings/p%d' % k, dtype=int)
         self.separator = np.loadtxt('partitionings/s%d' % k, dtype=int)
         
