@@ -118,7 +118,17 @@ class MOC_simulation:
 
             # ----------------------------------------------------------------------------------------------------------------
     
-                
+
+    def define_pipes(self):
+        for pipe, idx in self.moc_network.pipe_ids.items():
+        # node_a = 0
+        # node_b = 1
+        # diameter = 2
+        # area = 3
+        # wavespeed = 4
+        # ffactor = 5
+        # length = 6
+
     def define_initial_conditions(self):
         for node, idx in self.moc_network.node_ids.items():
             if '.' in node: # interior points
