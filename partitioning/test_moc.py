@@ -20,9 +20,6 @@ clk.toc()
 # Test MOC
 T = 10
 sim = Sim(network, T)
-clk.tic()
-sim.define_initial_conditions()
-clk.toc()
 # # sim.define_properties()
 
 # # print(network.valves_order)

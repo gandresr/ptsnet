@@ -31,9 +31,9 @@ class MOC_simulation:
         length = 6
 
     class Valve(enum.Enum):
-        curve_id = 0
-        node_a = 1
-        node_b = 2
+        node_a = 0
+        node_b = 1
+        curve_id = 2
         setting_id = 3
       
     class node_type(enum.Enum):
@@ -67,7 +67,18 @@ class MOC_simulation:
         self.valves = np.zeros((network.wn.num_valves, len(self.Valve)))
         self._define_tables()
         
+        self._define_initial_conditions()
 
+        # Simulation inputs
+        self.valve_curves = []
+        self.valve_settings = []
+
+    def get_in_nodes(self, node):
+        pass
+
+    def get_out_nodes(self, node):
+        pass
+        
     def _define_tables(self):
         self._define_pipes()
         self._define_nodes()
@@ -138,7 +149,10 @@ class MOC_simulation:
             self.pipes[pipe_id, self.Pipe.ffactor.value] = float(self.steady_state_sim.link['frictionfact'][pipe])
             self.pipes[pipe_id, self.Pipe.length.value] = link.length
 
-    def define_initial_conditions(self):
+    def _define_valves(self):
+
+
+    def _define_initial_conditions(self):
         for node, idx in self.moc_network.node_ids.items():
             if '.' in node: # interior points
                 labels = node.split('.') # [n1, k, n2]
