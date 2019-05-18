@@ -22,7 +22,8 @@ class MOC_simulation:
         results_id = 4
         pipe_id = 5
         bc_id = 6
-        k = 7
+        processor = 7
+        is_ghost = 8
 
     class Pipe(enum.Enum):
         node_a = 1
@@ -42,8 +43,7 @@ class MOC_simulation:
     '''
     Here all the tables and properties required to
     run a MOC simulation are defined. Tables for
-    simulations with CUDA, OpenMP, and OpenMPI are
-    created
+    simulations in parallel are created
     '''
     def __init__(self, network, T):
         '''
@@ -51,11 +51,20 @@ class MOC_simulation:
         T: total time steps
         '''
         self.moc_network = network
+        # a[a[:,self.Node.processor.value].argsort()] - Sort by processor
         self.nodes = np.zeros((len(self.Node), len(network.mesh)), dtype = int)
         self.pipes = np.zeros((len(self.Pipe), network.wn.num_pipes), dtype = int)
         self.valves = np.zeros((len(self.Valve), network.wn.num_valves), dtype = int)
 
     def define_nodes(self):
+        # node_type = 1
+        # in_nodes_id = 2
+        # out_nodes_id = 3
+        # results_id = 4
+        # pipe_id = 5
+        # bc_id = 6
+        # processor = 7
+        # is_ghost = 8
         for node in self.moc_network.mesh:
             in_edges = self.moc_network.network.in_edges(node)
             out_edges = self.moc_network.network.out_edges(node)
