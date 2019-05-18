@@ -55,17 +55,24 @@ class MOC_simulation:
         T: total time steps
         '''
         self.moc_network = network
-        # a[a[:,self.Node.processor.value].argsort()] - Sort by processor
-        self.nodes = np.zeros((len(network.mesh), len(self.Node)), dtype = int)
-        self.pipes = np.zeros((network.wn.num_pipes, len(self.Pipe)), dtype = int)
-        self.valves = np.zeros((network.wn.num_valves, len(self.Valve)), dtype = int)
         
         # Simulation results
         self.steady_state_sim = wntr.sim.EpanetSimulator(network.wn).run_sim()
         self.flow_results = np.zeros( (len(network.mesh), T) )
         self.head_results = np.zeros( (len(network.mesh), T) )
+        
+        # a[a[:,self.Node.processor.value].argsort()] - Sort by processor
+        self.nodes = np.zeros((len(network.mesh), len(self.Node)))
+        self.pipes = np.zeros((network.wn.num_pipes, len(self.Pipe)))
+        self.valves = np.zeros((network.wn.num_valves, len(self.Valve)))
+        self._define_tables()
+        
 
-    def define_nodes(self):
+    def _define_tables(self):
+        self._define_pipes()
+        self._define_nodes()
+
+    def _define_nodes(self):
         '''
         In the meantime, valves are not valid in general junctions
         also it is not possible to connect one valve to another
@@ -84,8 +91,9 @@ class MOC_simulation:
             # Check if the node belongs to a valve
             if self.nodes[node_id, self.Node.node_type.value] == self.node_type.none.value: # Type not defined yet
                 for valve, valve_id in self.moc_network.valve_ids.items():
-                    start = self.moc_network.wn.get_link(valve).start_node_name
-                    end = self.moc_network.wn.get_link(valve).end_node_name
+                    link = self.moc_network.wn.get_link(valve)
+                    start = link.start_node_name
+                    end = link.end_node_name
                     if node == start:
                         self.nodes[node_id, self.Node.node_type.value] = self.node_type.valve_a.value
                         # link_id is associated to a valve
@@ -118,16 +126,17 @@ class MOC_simulation:
 
             # ----------------------------------------------------------------------------------------------------------------
     
-
-    def define_pipes(self):
-        for pipe, idx in self.moc_network.pipe_ids.items():
-        # node_a = 0
-        # node_b = 1
-        # diameter = 2
-        # area = 3
-        # wavespeed = 4
-        # ffactor = 5
-        # length = 6
+    def _define_pipes(self):
+        for pipe, pipe_id in self.moc_network.pipe_ids.items():
+            link = self.moc_network.wn.get_link(pipe)
+            self.pipes[pipe_id, self.Pipe.node_a.value] = link.start_node_name
+            self.pipes[pipe_id, self.Pipe.node_b.value] = link.end_node_name
+            diameter = link.diameter
+            self.pipes[pipe_id, self.Pipe.diameter.value] = diameter
+            self.pipes[pipe_id, self.Pipe.area.value] = np.pi*diameter**2/4
+            self.pipes[pipe_id, self.Pipe.wavespeed.value] = self.moc_network.wavespeeds[pipe]
+            self.pipes[pipe_id, self.Pipe.ffactor.value] = float(self.steady_state_sim.link['frictionfact'][pipe])
+            self.pipes[pipe_id, self.Pipe.length.value] = link.length
 
     def define_initial_conditions(self):
         for node, idx in self.moc_network.node_ids.items():
@@ -141,7 +150,7 @@ class MOC_simulation:
                 head_1 = float(self.steady_state_sim.node['head'][n2])
                 head_2 = float(self.steady_state_sim.node['head'][n1])
                 hl = head_1 - head_2
-                L = self.moc_network.wn.get_link(pipe).length
+                L = self.pipes[int(self.nodes[idx, self.Node.link_id.value]), self.Pipe.length.value]
                 dx = k * L / self.moc_network.segments[pipe]
 
                 self.head_results[idx, 0] = head_1 - (hl*(1 - dx/L))
@@ -267,10 +276,11 @@ class MOC_network:
         i = 0; j = 0
         for (n1, n2) in self.network.edges():
             p = self.get_pipe_name(n1, n2)
-            if self.wn.get_link(p).link_type == 'Pipe':
+            link = self.wn.get_link(p)
+            if link.link_type == 'Pipe':
                 self.pipe_ids[p] = i
                 i += 1
-            elif self.wn.get_link(p).link_type == 'Valve':
+            elif link.link_type == 'Valve':
                 self.valve_ids[p] = j
                 j += 1
 

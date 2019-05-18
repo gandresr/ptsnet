@@ -20,7 +20,6 @@ clk.toc()
 # Test MOC
 T = 10
 sim = Sim(network, T)
-sim.define_nodes()
 clk.tic()
 sim.define_initial_conditions()
 clk.toc()
