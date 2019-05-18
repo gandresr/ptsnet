@@ -13,17 +13,18 @@ network.define_wavespeeds(default_wavespeed = 1200)
 network.define_segments(0.1)
 network.define_mesh()
 network.write_mesh()
-network.define_partitions(2)
+# network.define_partitions(4)
+network.define_partitions(4)
 clk.toc()
 
 # Test MOC
-T = 10
-sim = Sim(network, T)
-clk.tic()
-sim.define_initial_conditions()
-clk.toc()
-sim.define_properties()
+# T = 10
+# sim = Sim(network, T)
+# clk.tic()
+# sim.define_initial_conditions()
+# clk.toc()
+# sim.define_properties()
 
-print(network.valves_order)
-sim.define_valve_setting('9', 'valves/v9.csv')
-print(sim.valve_settings)
+# print(network.valves_order)
+# sim.define_valve_setting('9', 'valves/v9.csv')
+# print(sim.valve_settings)

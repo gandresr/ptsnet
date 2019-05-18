@@ -1,0 +1,58 @@
+io time: 9.89437e-05
+graph has 40 nodes and 84 edges
+performing partitioning!
+time spent for partitioning 0.019762
+cut 		6
+finalobjective  6
+bnd 		11
+balance 	1
+max_comm_vol 	4
+writing partition to partitionings/p4 ... 
+io time: 8.98838e-05
+reading input partition
+graph has 40 nodes and 84 edges
+separatorsize 6
+cut 		10
+time spent for conversion 5.10216e-05
+writing partition to partitionings/s4 ... 
+True
+True
+True
+True
+True
+True
+True
+True
+True
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+True
+False
+False
+False
+True
+True
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+False
+Elapsed time: 0.034320 seconds

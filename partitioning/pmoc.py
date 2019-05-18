@@ -1,14 +1,44 @@
+
 import wntr
 import networkx as nx 
-import matplotlib.pyplot as plt
-import subprocess
-from time import time
+import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+from numba import njit 
+
+from time import time
+import subprocess
 
 # Temporal
 import enum
 
 class MOC_simulation:
+    # Enumerators
+
+    class Node(enum.Enum):
+        node_type = 1
+        in_nodes_id = 2
+        out_nodes_id = 3
+        results_id = 4
+        pipe_id = 5
+        bc_id = 6
+        k = 7
+
+    class Pipe(enum.Enum):
+        node_a = 1
+        node_b = 2
+        diameter = 3
+        area = 4
+        wavespeed = 5
+        ffactor = 6
+        length = 7
+
+    class Valve(enum.Enum):
+        curve_id = 1
+        node_a = 2
+        node_b = 3
+        setting_id = 4
+
     '''
     Here all the tables and properties required to
     run a MOC simulation are defined. Tables for
@@ -21,13 +51,16 @@ class MOC_simulation:
         T: total time steps
         '''
         self.moc_network = network
-        self.Node = np.zeros((len(Node), len(network.segmented_network)), dtype = int)
-        self.Pipe = np.zeros((len(Pipe), len(network.network.num_pipes)), dtype = int)
-        self.Valve = np.zeros((len(Valve), len(network.network.num_valves)), dtype = int)
-        
+        self.nodes = np.zeros((len(self.Node), len(network.mesh)), dtype = int)
+        self.pipes = np.zeros((len(self.Pipe), network.wn.num_pipes), dtype = int)
+        self.valves = np.zeros((len(self.Valve), network.wn.num_valves), dtype = int)
 
     def define_nodes(self):
-        pass
+        for node in self.moc_network.mesh:
+            in_edges = self.moc_network.network.in_edges(node)
+            out_edges = self.moc_network.network.out_edges(node)
+            if len(in_edges) + len(out_edges) > 2:
+                pass
 
 class MOC_network:
     def __init__(self, input_file):
@@ -40,37 +73,20 @@ class MOC_network:
         self.fname = input_file[:input_file.find('.inp')]
         self.wn = wntr.network.WaterNetworkModel(input_file)
         self.network = self.wn.get_graph()
-        self.segmented_network = None
+        self.mesh = None
         self.wavespeeds = {}
-        self.valve_nodes = []
         self.dt = None
         
         # Segments are only defined for pipes
         self.segments = self.wn.query_link_attribute('length')
         
-        ## Order dictionaries
-        # All the orders start in 1
-        self.nodes_order = {} # Ordered nodes (nodes in segmented graph)
-        # Ordered pipes and valves (in WNTR graph)
-        self.pipes_order = {}
-        self.valves_order = {}
-        
-        # Nodes connected to valves
-        self.valve_nodes = [valve[1].end_node_name for valve in self.wn.valves()] + \
-            [valve[1].start_node_name for valve in self.wn.valves()]
-        
-        i = 0; j = 0
-        for (n1, n2) in self.network.edges():
-            p = self.get_pipe_name(n1, n2)
-            if self.wn.get_link(p).link_type == 'Pipe':
-                self.pipes_order[p] = i
-                i += 1
-            elif self.wn.get_link(p).link_type == 'Valve':
-                self.valves_order[p] = j
-                j += 1
+        # Ids for nodes, pipes, and valves
+        self.nodes_id = {}
+        self.pipes_id = {}
+        self.valves_id = {}
                 
-        
-        self.partitions = None
+        self.partition = None
+        self.separator = None
 
     def define_wavespeeds(self, default_wavespeed = 1200, wavespeed_file = None):
         if wavespeed_file:
@@ -114,7 +130,7 @@ class MOC_network:
         G = self.network
         
         # The segmented MOC-mesh graph is generated
-        self.segmented_network = nx.Graph() 
+        self.mesh = nx.Graph() 
         
         # The MOC-mesh graph will be traversed from a boundary node
         #   Because of the nature of the WDS it is always guaranteed
@@ -148,44 +164,67 @@ class MOC_network:
 
                         # 'initial_node.k.end_node'
                         ni = nb + '.' + str(k) + '.' + neighbor
-                        self.segmented_network.add_edge(n1, ni)
+                        self.mesh.add_edge(n1, ni)
                         n1 = ni
 
-                    self.segmented_network.add_edge(n1, neighbor)
-
-        # The undirected graph of the network is traversed using DFS
-        #   DFS. The points in the MOC-mesh are allocated according
-        #   to the DFS traversal. This is done to guarantee
-        #   locality in memory and to minimize memory coalescing
-
-        # dfs = nx.dfs_preorder_nodes(self.segmented_network, source=boundary_node)
+                    self.mesh.add_edge(n1, neighbor)
         
         # parfor
-        for i, node in enumerate(self.segmented_network):
-            self.nodes_order[node] = i
+        self._define_ids()
+
+    def _define_ids(self):
+        for i, node in enumerate(self.mesh):
+            self.nodes_id[node] = i
+        i = 0; j = 0
+        for (n1, n2) in self.network.edges():
+            p = self.get_pipe_name(n1, n2)
+            if self.wn.get_link(p).link_type == 'Pipe':
+                self.pipes_id[p] = i
+                i += 1
+            elif self.wn.get_link(p).link_type == 'Valve':
+                self.valves_id[p] = j
+                j += 1
 
     def write_mesh(self):
         '''
         This function should only be called after defining the mesh
         '''
-        G = self.segmented_network
+        G = self.mesh
         # Network is stored in METIS format
         if G:
             with open(self.fname + '.graph', 'w') as f:
                 f.write("%d %d\n" % (len(G), len(G.edges())))
-                for i, node in enumerate(self.nodes_order):
+                for i, node in enumerate(self.nodes_id):
                     fline = "" # file content
                     for neighbor in G[node]:
-                        fline += "%d " % (self.nodes_order[neighbor] + 1)
+                        fline += "%d " % (self.nodes_id[neighbor] + 1)
                     fline += '\n'
                     f.write(fline)
 
     def define_partitions(self, k):
-        result = subprocess.call(['./kaffpa', self.fname + '.graph', '--k=' + str(k), '--preconfiguration=strong'])
-        self.partitions = np.array(list(map(int, open('tmppartition' + str(k)).read()[:-1].split('\n'))))
+        script = './parHIP/kaffpa'
+        subprocess.call([
+            script, self.fname + '.graph', 
+            '--k=' + str(k), 
+            '--preconfiguration=strong', 
+            '--output_filename=partitionings/p%d' % k])
 
+        if k == 2:
+            script = './parHIP/node_separator'
+        else:
+            script = './parHIP/partition_to_vertex_separator'
+
+        subprocess.call([
+            script, self.fname + '.graph', 
+            '--k=' + str(k), 
+            '--input_partition=partitionings/p%d' % k, 
+            '--output_filename=partitionings/s%d' % k])
+
+        self.partition = np.loadtxt('partitionings/p%d' % k, dtype=int)
+        self.separator = np.loadtxt('partitionings/s%d' % k, dtype=int)
+        
     def get_processor(self, node):
-        return self.partitions[self.nodes_order[node]]
+        return self.partition[self.nodes_id[node]]
     
     def get_pipe_name(self, n1, n2):
         if n2 not in self.network[n1]:
@@ -203,29 +242,3 @@ class Wall_clock:
     
     def toc(self):
         print('Elapsed time: %f seconds' % (time() - self.clk))
-
-# Enumerators
-
-class Node(enum.Enum):
-    node_type = 1
-    in_nodes_id = 2
-    out_nodes_id = 3
-    results_id = 4
-    pipe_id = 5
-    bc_id = 6
-    k = 7
-
-class Pipe(enum.Enum):
-    node_a = 1
-    node_b = 2
-    diameter = 3
-    area = 4
-    wavespeed = 5
-    ffactor = 6
-    length = 7
-
-class Valve(enum.Enum):
-    curve_id = 1
-    node_a = 2
-    node_b = 3
-    setting_id = 4
