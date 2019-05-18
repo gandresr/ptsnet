@@ -21,9 +21,9 @@ clk.toc()
 T = 10
 sim = Sim(network, T)
 sim.define_nodes()
-# clk.tic()
-# sim.define_initial_conditions()
-# clk.toc()
+clk.tic()
+sim.define_initial_conditions()
+clk.toc()
 # # sim.define_properties()
 
 # # print(network.valves_order)

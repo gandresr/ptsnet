@@ -66,12 +66,13 @@ class MOC_simulation:
         
         # Simulation results
         self.steady_state_sim = wntr.sim.EpanetSimulator(network.wn).run_sim()
-        self.flow_results = None # np.zeros(T, len(network.mesh))
-        self.head_results = None # np.zeros(T, len(network.mesh))
+        self.flow_results = np.zeros( (len(network.mesh), T) )
+        self.head_results = np.zeros( (len(network.mesh), T) )
 
     def define_nodes(self):
         '''
         In the meantime, valves are not valid in general junctions
+        also it is not possible to connect one valve to another
         '''
         for node, idx in self.moc_network.node_ids.items():
             # Remember that mesh is an undirected networkx Graph
@@ -96,25 +97,26 @@ class MOC_simulation:
                     self.nodes[idx, self.Node.node_type.value] = self.node_type.junction.value
                 
                 
-    # def define_initial_conditions(self):
-    #     for i, node in enumerate(self.network.node_ids):
-    #         if '.' in node: # interior points
-    #             labels = node.split('.') # [n1, k, n2]
-    #             n1 = labels[0]
-    #             n2 = labels[2]
-    #             k = abs(int(labels[1]))
-    #             p = self.network.get_pipe_name(n1, n2)
+    def define_initial_conditions(self):
+        for node, idx in self.moc_network.node_ids.items():
+            if '.' in node: # interior points
+                labels = node.split('.') # [n1, k, n2]
+                n1 = labels[0]
+                n2 = labels[2]
+                k = abs(int(labels[1]))
+                pipe = self.moc_network.get_pipe_name(n1, n2)
                 
-    #             head_1 = float(self.steady_state_sim.node['head'][n2])
-    #             head_2 = float(self.steady_state_sim.node['head'][n1])
-    #             hl = head_1 - head_2
-    #             L = self.network.wn.get_link(p).length
-    #             dx = k * L / self.network.segments[p]
-    #             self.H0[i] = head_1 - (hl*(1 - dx/L))
-    #             self.Q0[i] = float(self.steady_state_sim.link['flowrate'][p])
-    #         else: # Junctions
-    #             self.H0[i] = float(self.steady_state_sim.node['head'][node])
-    #             self.Q0[i] = float(self.steady_state_sim.node['demand'][node])
+                head_1 = float(self.steady_state_sim.node['head'][n2])
+                head_2 = float(self.steady_state_sim.node['head'][n1])
+                hl = head_1 - head_2
+                L = self.moc_network.wn.get_link(pipe).length
+                dx = k * L / self.moc_network.segments[pipe]
+
+                self.head_results[idx, 0] = head_1 - (hl*(1 - dx/L))
+                self.flow_results[idx, 0] = float(self.steady_state_sim.link['flowrate'][pipe])
+            else: # Junctions
+                self.head_results[idx, 0] = float(self.steady_state_sim.node['head'][node])
+                self.flow_results[idx, 0] = float(self.steady_state_sim.node['demand'][node])
 
 class MOC_network:
     def __init__(self, input_file):
@@ -131,7 +133,7 @@ class MOC_network:
         self.wavespeeds = {}
         self.dt = None
         
-        # Segments are only defined for pipes
+        # Number of segments are only defined for pipes
         self.segments = self.wn.query_link_attribute('length')
         
         # Ids for nodes, pipes, and valves
@@ -248,7 +250,7 @@ class MOC_network:
         if G:
             with open(self.fname + '.graph', 'w') as f:
                 f.write("%d %d\n" % (len(G), len(G.edges())))
-                for i, node in enumerate(self.node_ids):
+                for node in self.node_ids:
                     fline = "" # file content
                     for neighbor in G[node]:
                         fline += "%d " % (self.node_ids[neighbor] + 1)
