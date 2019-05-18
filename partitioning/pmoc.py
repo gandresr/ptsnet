@@ -55,7 +55,8 @@ class MOC_simulation:
         T: total time steps
         '''
         self.moc_network = network
-        
+        self.time_steps = T
+
         # Simulation results
         self.steady_state_sim = wntr.sim.EpanetSimulator(network.wn).run_sim()
         self.flow_results = np.zeros( (len(network.mesh), T) )
@@ -71,7 +72,7 @@ class MOC_simulation:
 
         # Simulation inputs
         self.valve_curves = []
-        self.valve_settings = []
+        self.valve_settings = np.ones( (network.wn.num_valves, T) )
 
     def get_in_nodes(self, node):
         pass
@@ -150,7 +151,23 @@ class MOC_simulation:
             self.pipes[pipe_id, self.Pipe.length.value] = link.length
 
     def _define_valves(self):
+        pass
 
+    def define_valve_setting(self, valve_name, valve_file):
+        '''
+        The valve_file has to be a file with T <= self.time_steps lines 
+        The i-th of the file has the value of the valve setting at 
+        the i-th time step. If the valve setting is not defined in the file
+        for a certain time step, it is assumed that the valve will be
+        fully open at that time step.
+        '''
+        settings = np.loadtxt(valve_file, dtype=float)
+        valve_id = self.moc_network.valve_ids[valve_name]
+
+        T = min(len(settings), self.time_steps)
+            
+        for t in range(T):
+            self.valve_settings[valve_id, t] = settings[t]
 
     def _define_initial_conditions(self):
         for node, idx in self.moc_network.node_ids.items():
