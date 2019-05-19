@@ -28,6 +28,7 @@ class MOC_simulation:
         wavespeed = 4
         ffactor = 5
         length = 6
+        dx = 7
 
     class Valve(enum.Enum):
         node_a = 0
@@ -77,52 +78,68 @@ class MOC_simulation:
     def run_step(self):
         pass
     
-    def _run_junction_step(self, i, np):
+    def _run_junction_step(self, i, t, np):
         '''
         '''
         for i in range(np):
-            pipe_id = self.nodes[i, self.Node.link_id]
-            wavespeed = self.pipes[pipe_id, self.Pipe.wavespeed]
-            diameter = self.pipes[pipe_id, self.Pipe.diameter]
-            area = self.pipes[pipe_id, self.Pipe.area]
-            length = self.pipes[pipe_id, self.Pipe.length]
-        
-        def run_junction_bc(u_pipes, d_pipes, t):
+            
+            upstream_pipes = self.pipes_upstream[i]
+            downstream_pipes = self.pipes_downtream[i]
+            upstream_nodes = self.nodes_upstream[i]
+            downstream_nodes = self.nodes_downtream[i]
+
             sc = 0
             sb = 0
-            Cp = [0 for i in range(len(u_pipes))]
-            Bp = [0 for i in range(len(u_pipes))]
-            uQQ = [0 for i in range(len(u_pipes))]
-            Cm = [0 for i in range(len(d_pipes))]
-            Bm = [0 for i in range(len(d_pipes))]
-            dQQ = [0 for i in range(len(d_pipes))]
+            
+            Cp = np.zeros(len(u_pipes))
+            Bp = np.zeroslike(Cp)
+            uQQ = np.zeroslike(Cp)
+            
+            Cm = np.zeros(len(d_pipes))
+            Bm = np.zeroslike(Cm)
+            dQQ = np.zeroslike(Cm)
+            
+            g = 9.81
 
-            for i, p in enumerate(u_pipes['pipes']):
-                A = pi*u_pipes['d'][i]**2/4
-                g = 9.81
-                B = u_pipes['a'][i]/(g*A)
-                R = u_pipes['f'][i]*u_pipes['dx'][i]/(2*g*u_pipes['d'][i]*A**2)
-                H1 = u_pipes['H1'][i]
-                Q1 = u_pipes['Q1'][i]
-                Cp[i] = H1 + B*Q1
-                Bp[i] = B + R*abs(Q1)
-                sc += Cp[i]/Bp[i]
-                sb += 1/Bp[i]
-            for i, p in enumerate(d_pipes['pipes']):
-                A = pi*d_pipes['d'][i]**2/4
-                g = 9.81
-                B = d_pipes['a'][i]/(g*A)
-                R = d_pipes['f'][i]*d_pipes['dx'][i]/(2*g*d_pipes['d'][i]*A**2)
-                H1 = d_pipes['H1'][i]
-                Q1 = d_pipes['Q1'][i]
+            for j, u_pipe_id in enumerate(upstream_pipes):
+                u_node = upstream_nodes[j]
+                wavespeed = self.pipes[u_pipe_id, self.Pipe.wavespeed.value]
+                area = self.pipes[u_pipe_id, self.Pipe.area.value]
+                ffactor = self.pipes[u_pipe_id, self.Pipe.ffactor.value]
+                diameter = self.pipes[u_pipe_id, self.Pipe.diameter.value]
+                dx = self.pipes[u_pipe_id, self.Pipe.dx.value]
+
+                B = wavespeed/(g*area)
+                R = ffactor*dx/(2*g*diameter*area**2)
+                H1 = self.head_results[u_node, t-1]
+                Q1 = self.flow_results[u_node, t-1]
+                Cp[j] = H1 + B*Q1
+                Bp[j] = B + R*abs(Q1)
+                sc += Cp[j]/Bp[j]
+                sb += 1/Bp[j]
+
+            for j, d_pipe_id in enumerate(downstream_pipes):
+                d_node = upstream_nodes[j]
+                wavespeed = self.pipes[d_pipe_id, self.Pipe.wavespeed.value]
+                area = self.pipes[d_pipe_id, self.Pipe.area.value]
+                ffactor = self.pipes[d_pipe_id, self.Pipe.ffactor.value]
+                diameter = self.pipes[d_pipe_id, self.Pipe.diameter.value]
+                dx = self.pipes[d_pipe_id, self.Pipe.dx.value]
+
+                B = wavespeed/(g*area)
+                R = ffactor*dx/(2*g*diameter*area**2)
+                H1 = self.head_results[d_node, t-1]
+                Q1 = self.flow_results[d_node, t-1]
                 Cm[i] = H1 - B*Q1
                 Bm[i] = B + R*abs(Q1)
                 sc += Cm[i]/Bm[i]
                 sb += 1/Bm[i]
+                
             HH = sc/sb
-            for i, p in enumerate(u_pipes['pipes']):
+
+            for i in range(len(upstream_pipes)):
                 uQQ[i] = (Cp[i] - HH)/Bp[i]
-            for i, p in enumerate(d_pipes['pipes']):
+            for i in range(len(downstream_pipes)):
                 dQQ[i] = (HH - Cm[i])/Bm[i]
 
             return (HH, uQQ, dQQ)
@@ -266,6 +283,7 @@ class MOC_simulation:
             self.pipes[pipe_id, self.Pipe.wavespeed.value] = self.moc_network.wavespeeds[pipe]
             self.pipes[pipe_id, self.Pipe.ffactor.value] = float(self.steady_state_sim.link['frictionfact'][pipe])
             self.pipes[pipe_id, self.Pipe.length.value] = link.length
+            self.pipes[pipe_id, self.Pipe.dx.value] = link.length / self.moc_network.segments[pipe]
 
     def _define_valves(self):
         for valve, valve_id in self.moc_network.valve_ids.items():
@@ -290,7 +308,7 @@ class MOC_simulation:
             self.valve_settings[valve_id, t] = settings[t]
 
     def _define_initial_conditions(self):
-        for node, idx in self.moc_network.node_ids.items():
+        for node, node_id in self.moc_network.node_ids.items():
             if '.' in node: # interior points
                 labels = node.split('.') # [n1, k, n2, p]
                 n1 = labels[0]
@@ -303,12 +321,12 @@ class MOC_simulation:
                 hl = head_1 - head_2
                 L = self.moc_network.wn.get_link(pipe).length
                 dx = k * L / self.moc_network.segments[pipe]
-
-                self.head_results[idx, 0] = head_1 - (hl*(1 - dx/L))
-                self.flow_results[idx, 0] = float(self.steady_state_sim.link['flowrate'][pipe])
+                
+                self.head_results[node_id, 0] = head_1 - (hl*(1 - dx/L))
+                self.flow_results[node_id, 0] = float(self.steady_state_sim.link['flowrate'][pipe])
             else: # Junctions
-                self.head_results[idx, 0] = float(self.steady_state_sim.node['head'][node])
-                self.flow_results[idx, 0] = float(self.steady_state_sim.node['demand'][node])
+                self.head_results[node_id, 0] = float(self.steady_state_sim.node['head'][node])
+                self.flow_results[node_id, 0] = float(self.steady_state_sim.node['demand'][node])
 
 class MOC_network:
     def __init__(self, input_file):
