@@ -10,7 +10,7 @@ clk = WC()
 clk.tic()
 network = Net("models/LoopedNet.inp")
 network.define_wavespeeds(default_wavespeed = 1200)
-network.define_segments(0.1)
+network.define_segments(0.01)
 network.define_mesh()
 network.write_mesh()
 # network.define_partitions(4)
@@ -19,9 +19,9 @@ clk.toc()
 
 # Test MOC
 T = 20
+clk.tic()
 sim = Sim(network, T)
-# # sim.define_properties()
-
-# # print(network.valves_order)
+clk.toc()
+clk.tic()
 sim.define_valve_setting('9', 'valves/v9.csv')
-# # print(sim.valve_settings)
+clk.toc()

@@ -1,4 +1,3 @@
-
 import wntr
 import networkx as nx 
 import pandas as pd
@@ -33,8 +32,6 @@ class MOC_simulation:
     class Valve(enum.Enum):
         node_a = 0
         node_b = 1
-        curve_id = 2
-        setting_id = 3
       
     class node_type(enum.Enum):
         none = 0
@@ -59,30 +56,90 @@ class MOC_simulation:
 
         # Simulation results
         self.steady_state_sim = wntr.sim.EpanetSimulator(network.wn).run_sim()
-        self.flow_results = np.zeros( (len(network.mesh), T) )
-        self.head_results = np.zeros( (len(network.mesh), T) )
+        self.flow_results = np.empty( (len(network.mesh), T) )
+        self.head_results = np.empty( (len(network.mesh), T) )
+        self._define_initial_conditions()
         
         # a[a[:,self.Node.processor.value].argsort()] - Sort by processor
-        self.nodes = np.zeros((len(network.mesh), len(self.Node)))
-        self.pipes = np.zeros((network.wn.num_pipes, len(self.Pipe)))
-        self.valves = np.zeros((network.wn.num_valves, len(self.Valve)))
-        self._define_tables()
-        
-        self._define_initial_conditions()
+        self.nodes = np.empty((len(network.mesh), len(self.Node)))
+        self.pipes_upstream = [[] for i in range(len(network.mesh))]
+        self.pipes_downstream = [[] for i in range(len(network.mesh))]
+        self.nodes_upstream = [[] for i in range(len(network.mesh))]
+        self.nodes_downstream = [[] for i in range(len(network.mesh))]
+
+        self.pipes = np.empty((network.wn.num_pipes, len(self.Pipe)))
+        self.valves = np.empty((network.wn.num_valves, len(self.Valve)))
+        self._define_properties()
 
         # Simulation inputs
-        self.valve_curves = []
         self.valve_settings = np.ones( (network.wn.num_valves, T) )
 
-    def get_in_nodes(self, node):
+    def run_step(self):
+        pass
+    
+    def _run_junction_step(self, i, np):
+        '''
+        '''
+        for i in range(np):
+            pipe_id = self.nodes[i, self.Node.link_id]
+            wavespeed = self.pipes[pipe_id, self.Pipe.wavespeed]
+            diameter = self.pipes[pipe_id, self.Pipe.diameter]
+            area = self.pipes[pipe_id, self.Pipe.area]
+            length = self.pipes[pipe_id, self.Pipe.length]
+        
+        def run_junction_bc(u_pipes, d_pipes, t):
+            sc = 0
+            sb = 0
+            Cp = [0 for i in range(len(u_pipes))]
+            Bp = [0 for i in range(len(u_pipes))]
+            uQQ = [0 for i in range(len(u_pipes))]
+            Cm = [0 for i in range(len(d_pipes))]
+            Bm = [0 for i in range(len(d_pipes))]
+            dQQ = [0 for i in range(len(d_pipes))]
+
+            for i, p in enumerate(u_pipes['pipes']):
+                A = pi*u_pipes['d'][i]**2/4
+                g = 9.81
+                B = u_pipes['a'][i]/(g*A)
+                R = u_pipes['f'][i]*u_pipes['dx'][i]/(2*g*u_pipes['d'][i]*A**2)
+                H1 = u_pipes['H1'][i]
+                Q1 = u_pipes['Q1'][i]
+                Cp[i] = H1 + B*Q1
+                Bp[i] = B + R*abs(Q1)
+                sc += Cp[i]/Bp[i]
+                sb += 1/Bp[i]
+            for i, p in enumerate(d_pipes['pipes']):
+                A = pi*d_pipes['d'][i]**2/4
+                g = 9.81
+                B = d_pipes['a'][i]/(g*A)
+                R = d_pipes['f'][i]*d_pipes['dx'][i]/(2*g*d_pipes['d'][i]*A**2)
+                H1 = d_pipes['H1'][i]
+                Q1 = d_pipes['Q1'][i]
+                Cm[i] = H1 - B*Q1
+                Bm[i] = B + R*abs(Q1)
+                sc += Cm[i]/Bm[i]
+                sb += 1/Bm[i]
+            HH = sc/sb
+            for i, p in enumerate(u_pipes['pipes']):
+                uQQ[i] = (Cp[i] - HH)/Bp[i]
+            for i, p in enumerate(d_pipes['pipes']):
+                dQQ[i] = (HH - Cm[i])/Bm[i]
+
+            return (HH, uQQ, dQQ)
+
+    def _run_valve_step(self):
         pass
 
-    def get_out_nodes(self, node):
+    def _run_source_step(self):
         pass
-        
-    def _define_tables(self):
+    
+    def get_valve_curve(self, valve_name):
+        pass
+
+    def _define_properties(self):
         self._define_pipes()
         self._define_nodes()
+        self._define_valves()
 
     def _define_nodes(self):
         '''
@@ -121,10 +178,10 @@ class MOC_simulation:
                 if len(neighbors) > 1:
                     self.nodes[node_id, self.Node.node_type.value] = self.node_type.junction.value
                     if '.' in node: # interior points
-                        labels = node.split('.') # [n1, k, n2]
+                        labels = node.split('.') # [n1, k, n2, p]
                         n1 = labels[0]
                         n2 = labels[2]
-                        pipe = self.moc_network.get_pipe_name(n1, n2)
+                        pipe = labels[3]
                         self.nodes[node_id, self.Node.link_id.value] = self.moc_network.pipe_ids[pipe]
                     else:
                         self.nodes[node_id, self.Node.link_id.value] = -1
@@ -138,11 +195,71 @@ class MOC_simulation:
 
             # ----------------------------------------------------------------------------------------------------------------
     
+            ## NODE UPSTREAM & DOWNSTREAM PIPES INFORMATION
+            # ----------------------------------------------------------------------------------------------------------------
+
+            if '.' in node:
+                labels = node.split('.')
+                n1 = labels[0]
+                k = int(labels[1])
+                n2 = labels[2]
+                pipe = labels[3]
+                segments = int(labels[4])
+                if k == 0:
+                    self.pipes_upstream[node_id].append(self.moc_network.pipe_ids[pipe])
+                    self.pipes_downstream[node_id].append(self.moc_network.pipe_ids[pipe])
+                    self.nodes_upstream[node_id].append(self.moc_network.node_ids[n1])
+                    self.nodes_downstream[node_id].append(self.moc_network.node_ids[
+                        n1 + '.1.' + n2 + '.' + pipe + '.' + str(segments)])
+                elif k == segments-2: # last interior point in pipe
+                    self.pipes_upstream[node_id].append(self.moc_network.pipe_ids[pipe])
+                    self.pipes_downstream[node_id].append(self.moc_network.pipe_ids[pipe])
+                    self.nodes_upstream[node_id].append(self.moc_network.node_ids[
+                        n1 + '.' + str(abs(k) - 1) + '.' + n2 + '.' + pipe + '.' + str(segments)])
+                    self.nodes_downstream[node_id].append(self.moc_network.node_ids[n2])
+                else:
+                    self.pipes_upstream[node_id].append(self.moc_network.pipe_ids[pipe])
+                    self.pipes_downstream[node_id].append(self.moc_network.pipe_ids[pipe])
+                    self.nodes_upstream[node_id].append(self.moc_network.node_ids[
+                        n1 + '.' + str(abs(k) - 1) + '.' + n2 + '.' + pipe + '.' + str(segments)])
+                    self.nodes_downstream[node_id].append(self.moc_network.node_ids[
+                        n1 + '.' + str(abs(k) + 1) + '.' + n2 + '.' + pipe + '.' + str(segments)])
+            else:
+                neighbors = self.moc_network.mesh.neighbors(node)
+                for n in neighbors:
+                    if '.' in n:
+                        labels_n = n.split('.')
+                        k = int(labels_n[1])
+                        pipe = labels_n[3]
+                        if k == 0:
+                            self.pipes_downstream[node_id].append(self.moc_network.pipe_ids[pipe])
+                            self.nodes_downstream[node_id].append(self.moc_network.node_ids[n])
+                        else:
+                            self.pipes_upstream[node_id].append(self.moc_network.pipe_ids[pipe])
+                            self.nodes_upstream[node_id].append(self.moc_network.node_ids[n])
+                    else:
+                        pipe = self.moc_network.get_pipe_name(n, node)
+                        if pipe == None:
+                            pipe = self.moc_network.get_pipe_name(node, n)
+                            if self.nodes[node_id, self.Node.node_type.value] == self.node_type.valve_a.value:
+                                self.pipes_downstream[node_id].append(self.moc_network.valve_ids[pipe])
+                            else:
+                                self.pipes_downstream[node_id].append(self.moc_network.pipe_ids[pipe])
+                            self.nodes_downstream[node_id].append(self.moc_network.node_ids[n])
+                        else:
+                            if self.nodes[node_id, self.Node.node_type.value] == self.node_type.valve_b.value:
+                                self.pipes_upstream[node_id].append(self.moc_network.valve_ids[pipe])
+                            else:
+                                self.pipes_upstream[node_id].append(self.moc_network.pipe_ids[pipe])
+                            self.nodes_upstream[node_id].append(self.moc_network.node_ids[n])
+           
+            # ----------------------------------------------------------------------------------------------------------------
+
     def _define_pipes(self):
         for pipe, pipe_id in self.moc_network.pipe_ids.items():
             link = self.moc_network.wn.get_link(pipe)
-            self.pipes[pipe_id, self.Pipe.node_a.value] = link.start_node_name
-            self.pipes[pipe_id, self.Pipe.node_b.value] = link.end_node_name
+            self.pipes[pipe_id, self.Pipe.node_a.value] = self.moc_network.node_ids[link.start_node_name]
+            self.pipes[pipe_id, self.Pipe.node_b.value] = self.moc_network.node_ids[link.end_node_name]
             diameter = link.diameter
             self.pipes[pipe_id, self.Pipe.diameter.value] = diameter
             self.pipes[pipe_id, self.Pipe.area.value] = np.pi*diameter**2/4
@@ -151,7 +268,10 @@ class MOC_simulation:
             self.pipes[pipe_id, self.Pipe.length.value] = link.length
 
     def _define_valves(self):
-        pass
+        for valve, valve_id in self.moc_network.valve_ids.items():
+            link = self.moc_network.wn.get_link(valve)
+            self.valves[valve_id, self.Valve.node_a.value] = link.start_node_name
+            self.valves[valve_id, self.Valve.node_b.value] = link.end_node_name
 
     def define_valve_setting(self, valve_name, valve_file):
         '''
@@ -172,16 +292,16 @@ class MOC_simulation:
     def _define_initial_conditions(self):
         for node, idx in self.moc_network.node_ids.items():
             if '.' in node: # interior points
-                labels = node.split('.') # [n1, k, n2]
+                labels = node.split('.') # [n1, k, n2, p]
                 n1 = labels[0]
-                n2 = labels[2]
                 k = abs(int(labels[1]))
-                pipe = self.moc_network.get_pipe_name(n1, n2)
+                n2 = labels[2]
+                pipe = labels[3]
                 
                 head_1 = float(self.steady_state_sim.node['head'][n2])
                 head_2 = float(self.steady_state_sim.node['head'][n1])
                 hl = head_1 - head_2
-                L = self.pipes[int(self.nodes[idx, self.Node.link_id.value]), self.Pipe.length.value]
+                L = self.moc_network.wn.get_link(pipe).length
                 dx = k * L / self.moc_network.segments[pipe]
 
                 self.head_results[idx, 0] = head_1 - (hl*(1 - dx/L))
@@ -286,13 +406,8 @@ class MOC_network:
 
                     # interior points are created (ni)
                     for j in range(s_p-1):
-                        # interior points labeled with k \in {-s_p, 1} are 
-                        #   ghost nodes
-
-                        k = -j if j == s_p-2 else j
-
                         # 'initial_node.k.end_node'
-                        ni = nb + '.' + str(k) + '.' + neighbor
+                        ni = nb + '.' + str(j) + '.' + neighbor + '.' + p + '.' + str(self.segments[p])
                         self.mesh.add_edge(n1, ni)
                         n1 = ni
 
@@ -358,11 +473,11 @@ class MOC_network:
         return self.partition[self.node_ids[node]]
     
     def get_pipe_name(self, n1, n2):
-        if n2 not in self.network[n1]:
+        try:
+            for p in self.network[n1][n2]:
+                return p
+        except:
             return None
-        for p in self.network[n1][n2]:
-            return p
-
 
 class Wall_clock:
     def __init__(self):
