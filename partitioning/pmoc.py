@@ -62,6 +62,7 @@ class MOC_simulation:
         self.node_upstream_flow_results = []
         self.node_upstream_head_results = []
         self.node_downstream_flow_results = []
+        # TODO remove head_results unnecessary for the sims considering that the result can be stored in the general table
         self.node_downstream_head_results = []
         self._define_initial_conditions()
         
@@ -91,7 +92,6 @@ class MOC_simulation:
     def _run_junction_step(self, i, t, np):
         '''
         TODO fix initial conditions
-        TODO dont store ids instead names
         '''
         for i in range(np):
             
@@ -371,9 +371,12 @@ class MOC_simulation:
                 
                 self.head_results[node_id, 0] = head_1 - (hl*(1 - dx/L))
                 self.flow_results[node_id, 0] = float(self.steady_state_sim.link['flowrate'][pipe])
-            else: # Junctions
-                self.head_results[node_id, 0] = float(self.steady_state_sim.node['head'][node])
-                self.flow_results[node_id, 0] = float(self.steady_state_sim.node['demand'][node])
+            else: # Junctions & valve nodes
+                head = float(self.steady_state_sim.node['head'][node])
+                if self.nodes[node_id, self.Node.node_type.value] == self.node_types.junction.value:
+                else:
+                    self.flow_results[node_id, 0] = float(self.steady_state_sim.node['demand'][node])
+                self.head_results[node_id, 0] = head
 
 class MOC_network:
     def __init__(self, input_file):
