@@ -34,11 +34,11 @@ class MOC_simulation:
         node_a = 0
         node_b = 1
       
-    class node_type(enum.Enum):
+    class node_types(enum.Enum):
         none = 0
         reservoir = 1
         junction = 2
-        end = 3
+        interior = 3
         valve_a = 4
         valve_b = 5
 
@@ -59,14 +59,24 @@ class MOC_simulation:
         self.steady_state_sim = wntr.sim.EpanetSimulator(network.wn).run_sim()
         self.flow_results = np.empty( (len(network.mesh), T) )
         self.head_results = np.empty( (len(network.mesh), T) )
+        self.node_upstream_flow_results = []
+        self.node_upstream_head_results = []
+        self.node_downstream_flow_results = []
+        self.node_downstream_head_results = []
         self._define_initial_conditions()
         
         # a[a[:,self.Node.processor.value].argsort()] - Sort by processor
         self.nodes = np.empty((len(network.mesh), len(self.Node)))
-        self.pipes_upstream = [[] for i in range(len(network.mesh))]
-        self.pipes_downstream = [[] for i in range(len(network.mesh))]
-        self.nodes_upstream = [[] for i in range(len(network.mesh))]
-        self.nodes_downstream = [[] for i in range(len(network.mesh))]
+        self.junction_ids = {}
+        self.pipes_upstream = []
+        self.pipes_downstream = []
+        self.nodes_upstream = []
+        self.nodes_downstream = []
+        for i in range(len(network.mesh)):
+            self.pipes_upstream.append( [] )
+            self.pipes_downstream.append( [] )
+            self.nodes_upstream.append( [] )
+            self.nodes_downstream.append( [] )
 
         self.pipes = np.empty((network.wn.num_pipes, len(self.Pipe)))
         self.valves = np.empty((network.wn.num_valves, len(self.Valve)))
@@ -80,6 +90,8 @@ class MOC_simulation:
     
     def _run_junction_step(self, i, t, np):
         '''
+        TODO fix initial conditions
+        TODO dont store ids instead names
         '''
         for i in range(np):
             
@@ -101,8 +113,12 @@ class MOC_simulation:
             
             g = 9.81
 
-            for j, u_pipe_id in enumerate(upstream_pipes):
+            for j, u_pipe in enumerate(upstream_pipes):
                 u_node = upstream_nodes[j]
+
+                u_pipe_id = self.moc_network.pipe_ids[u_pipe]
+                u_node_id = self.moc_network.node_ids[u_node]
+
                 wavespeed = self.pipes[u_pipe_id, self.Pipe.wavespeed.value]
                 area = self.pipes[u_pipe_id, self.Pipe.area.value]
                 ffactor = self.pipes[u_pipe_id, self.Pipe.ffactor.value]
@@ -111,8 +127,16 @@ class MOC_simulation:
 
                 B = wavespeed/(g*area)
                 R = ffactor*dx/(2*g*diameter*area**2)
-                H1 = self.head_results[u_node, t-1]
-                Q1 = self.flow_results[u_node, t-1]
+                H1 = None
+                Q1 = None
+                if self.nodes[u_node_id, self.Node.node_type.value] == self.node_types.junction.value:
+                    uu_id = self.junction_ids[u_node_id]
+                    H1 = self.node_upstream_head_results[uu_id][j][t-1]
+                    Q1 = self.node_upstream_flow_results[uu_id][j][t-1]
+                else:
+                    H1 = self.head_results[u_node_id, t-1]
+                    Q1 = self.flow_results[u_node_id, t-1]
+
                 Cp[j] = H1 + B*Q1
                 Bp[j] = B + R*abs(Q1)
                 sc += Cp[j]/Bp[j]
@@ -120,6 +144,10 @@ class MOC_simulation:
 
             for j, d_pipe_id in enumerate(downstream_pipes):
                 d_node = upstream_nodes[j]
+
+                d_pipe_id = self.moc_network.pipe_ids[d_pipe]
+                d_node_id = self.moc_network.node_ids[d_node]
+
                 wavespeed = self.pipes[d_pipe_id, self.Pipe.wavespeed.value]
                 area = self.pipes[d_pipe_id, self.Pipe.area.value]
                 ffactor = self.pipes[d_pipe_id, self.Pipe.ffactor.value]
@@ -128,8 +156,15 @@ class MOC_simulation:
 
                 B = wavespeed/(g*area)
                 R = ffactor*dx/(2*g*diameter*area**2)
-                H1 = self.head_results[d_node, t-1]
-                Q1 = self.flow_results[d_node, t-1]
+                H1 = None
+                Q1 = None
+                if self.nodes[d_node_id, self.Node.node_type.value] == self.node_types.junction.value:
+                    dd_id = self.junction_ids[d_node_id]
+                    H1 = self.node_downstream_head_results[dd_id][j][t-1]
+                    Q1 = self.node_downstream_flow_results[dd_id][j][t-1]
+                else:
+                    H1 = self.head_results[d_node_id, t-1]
+                    Q1 = self.flow_results[d_node_id, t-1]
                 Cm[i] = H1 - B*Q1
                 Bm[i] = B + R*abs(Q1)
                 sc += Cm[i]/Bm[i]
@@ -163,6 +198,7 @@ class MOC_simulation:
         In the meantime, valves are not valid in general junctions
         also it is not possible to connect one valve to another
         '''
+        i = 0 # Index to count junctions
         for node, node_id in self.moc_network.node_ids.items():
 
             ## TYPE & LINK_ID ARE DEFINED
@@ -172,35 +208,42 @@ class MOC_simulation:
             neighbors = list(self.moc_network.mesh.neighbors(node))
             if node in self.moc_network.wn.reservoir_name_list:
                 # Check if node is reservoir node
-                self.nodes[node_id, self.Node.node_type.value] = self.node_type.reservoir.value
+                self.nodes[node_id, self.Node.node_type.value] = self.node_types.reservoir.value
                 self.nodes[node_id, self.Node.link_id.value] = -1
             # Check if the node belongs to a valve
-            if self.nodes[node_id, self.Node.node_type.value] == self.node_type.none.value: # Type not defined yet
+            if self.nodes[node_id, self.Node.node_type.value] == self.node_types.none.value: # Type not defined yet
                 for valve, valve_id in self.moc_network.valve_ids.items():
                     link = self.moc_network.wn.get_link(valve)
                     start = link.start_node_name
                     end = link.end_node_name
                     if node == start:
-                        self.nodes[node_id, self.Node.node_type.value] = self.node_type.valve_a.value
+                        self.nodes[node_id, self.Node.node_type.value] = self.node_types.valve_a.value
                         # link_id is associated to a valve
                         self.nodes[node_id, self.Node.link_id.value] = valve_id
                         break
                     elif node == end:
-                        self.nodes[node_id, self.Node.node_type.value] = self.node_type.valve_b.value
+                        self.nodes[node_id, self.Node.node_type.value] = self.node_types.valve_b.value
                         # link_id is associated to a valve
                         self.nodes[node_id, self.Node.link_id.value] = valve_id
                         break
-            if self.nodes[node_id, self.Node.node_type.value] == self.node_type.none.value: # Type not defined yet
+            if self.nodes[node_id, self.Node.node_type.value] == self.node_types.none.value: # Type not defined yet
                 # Node is considered a junction if there is more than one pipe attached to it is not a valve or reservoir
                 if len(neighbors) > 1:
-                    self.nodes[node_id, self.Node.node_type.value] = self.node_type.junction.value
                     if '.' in node: # interior points
+                        self.nodes[node_id, self.Node.node_type.value] = self.node_types.interior.value
                         labels = node.split('.') # [n1, k, n2, p]
                         n1 = labels[0]
                         n2 = labels[2]
                         pipe = labels[3]
                         self.nodes[node_id, self.Node.link_id.value] = self.moc_network.pipe_ids[pipe]
                     else:
+                        self.nodes[node_id, self.Node.node_type.value] = self.node_types.junction.value
+                        self.junction_ids[node] = i
+                        self.node_upstream_flow_results.append( [] )
+                        self.node_upstream_head_results.append( [] )
+                        self.node_downstream_flow_results.append( [] )
+                        self.node_downstream_head_results.append( [] )
+                        i += 1
                         self.nodes[node_id, self.Node.link_id.value] = -1
             # ----------------------------------------------------------------------------------------------------------------
 
@@ -223,24 +266,24 @@ class MOC_simulation:
                 pipe = labels[3]
                 segments = int(labels[4])
                 if k == 0:
-                    self.pipes_upstream[node_id].append(self.moc_network.pipe_ids[pipe])
-                    self.pipes_downstream[node_id].append(self.moc_network.pipe_ids[pipe])
-                    self.nodes_upstream[node_id].append(self.moc_network.node_ids[n1])
-                    self.nodes_downstream[node_id].append(self.moc_network.node_ids[
-                        n1 + '.1.' + n2 + '.' + pipe + '.' + str(segments)])
+                    self.pipes_upstream[node_id].append(pipe)
+                    self.pipes_downstream[node_id].append(pipe)
+                    self.nodes_upstream[node_id].append(n1)
+                    self.nodes_downstream[node_id].append(
+                        n1 + '.1.' + n2 + '.' + pipe + '.' + str(segments))
                 elif k == segments-2: # last interior point in pipe
-                    self.pipes_upstream[node_id].append(self.moc_network.pipe_ids[pipe])
-                    self.pipes_downstream[node_id].append(self.moc_network.pipe_ids[pipe])
-                    self.nodes_upstream[node_id].append(self.moc_network.node_ids[
-                        n1 + '.' + str(abs(k) - 1) + '.' + n2 + '.' + pipe + '.' + str(segments)])
-                    self.nodes_downstream[node_id].append(self.moc_network.node_ids[n2])
+                    self.pipes_upstream[node_id].append(pipe)
+                    self.pipes_downstream[node_id].append(pipe)
+                    self.nodes_upstream[node_id].append(
+                        n1 + '.' + str(abs(k) - 1) + '.' + n2 + '.' + pipe + '.' + str(segments))
+                    self.nodes_downstream[node_id].append(n2)
                 else:
-                    self.pipes_upstream[node_id].append(self.moc_network.pipe_ids[pipe])
-                    self.pipes_downstream[node_id].append(self.moc_network.pipe_ids[pipe])
-                    self.nodes_upstream[node_id].append(self.moc_network.node_ids[
-                        n1 + '.' + str(abs(k) - 1) + '.' + n2 + '.' + pipe + '.' + str(segments)])
-                    self.nodes_downstream[node_id].append(self.moc_network.node_ids[
-                        n1 + '.' + str(abs(k) + 1) + '.' + n2 + '.' + pipe + '.' + str(segments)])
+                    self.pipes_upstream[node_id].append(pipe)
+                    self.pipes_downstream[node_id].append(pipe)
+                    self.nodes_upstream[node_id].append(
+                        n1 + '.' + str(abs(k) - 1) + '.' + n2 + '.' + pipe + '.' + str(segments))
+                    self.nodes_downstream[node_id].append(
+                        n1 + '.' + str(abs(k) + 1) + '.' + n2 + '.' + pipe + '.' + str(segments))
             else:
                 neighbors = self.moc_network.mesh.neighbors(node)
                 for n in neighbors:
@@ -249,26 +292,30 @@ class MOC_simulation:
                         k = int(labels_n[1])
                         pipe = labels_n[3]
                         if k == 0:
-                            self.pipes_downstream[node_id].append(self.moc_network.pipe_ids[pipe])
-                            self.nodes_downstream[node_id].append(self.moc_network.node_ids[n])
+                            self.pipes_downstream[node_id].append(pipe)
+                            self.nodes_downstream[node_id].append(n)
                         else:
-                            self.pipes_upstream[node_id].append(self.moc_network.pipe_ids[pipe])
-                            self.nodes_upstream[node_id].append(self.moc_network.node_ids[n])
+                            self.pipes_upstream[node_id].append(pipe)
+                            self.nodes_upstream[node_id].append(n)
                     else:
                         pipe = self.moc_network.get_pipe_name(n, node)
                         if pipe == None:
                             pipe = self.moc_network.get_pipe_name(node, n)
-                            if self.nodes[node_id, self.Node.node_type.value] == self.node_type.valve_a.value:
-                                self.pipes_downstream[node_id].append(self.moc_network.valve_ids[pipe])
-                            else:
-                                self.pipes_downstream[node_id].append(self.moc_network.pipe_ids[pipe])
-                            self.nodes_downstream[node_id].append(self.moc_network.node_ids[n])
+                            if self.nodes[node_id, self.Node.node_type.value] == self.node_types.valve_a.value:
+                                self.pipes_downstream[node_id].append(pipe)
+                            elif self.nodes[node_id, self.Node.node_type.value] == self.node_types.junction.value:
+                                self.pipes_downstream[node_id].append(pipe)
+                                self.node_downstream_flow_results[-1].append( np.zeros( self.time_steps ) )
+                                self.node_downstream_head_results[-1].append( np.zeros( self.time_steps ) )
+                            self.nodes_downstream[node_id].append(n)
                         else:
-                            if self.nodes[node_id, self.Node.node_type.value] == self.node_type.valve_b.value:
-                                self.pipes_upstream[node_id].append(self.moc_network.valve_ids[pipe])
-                            else:
-                                self.pipes_upstream[node_id].append(self.moc_network.pipe_ids[pipe])
-                            self.nodes_upstream[node_id].append(self.moc_network.node_ids[n])
+                            if self.nodes[node_id, self.Node.node_type.value] == self.node_types.valve_b.value:
+                                self.pipes_upstream[node_id].append(pipe)
+                            elif self.nodes[node_id, self.Node.node_type.value] == self.node_types.junction.value:
+                                self.pipes_upstream[node_id].append(pipe)
+                                self.node_upstream_flow_results[-1].append( np.zeros( self.time_steps ) )
+                                self.node_upstream_head_results[-1].append( np.zeros( self.time_steps ) )
+                            self.nodes_upstream[node_id].append(n)
            
             # ----------------------------------------------------------------------------------------------------------------
 
