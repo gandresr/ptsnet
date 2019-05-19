@@ -295,13 +295,11 @@ class MOC_simulation:
                             self.downstream_nodes[node_id].append(n)
                             if len(neighbors) > 2:
                                 self.downstream_flow_results[-1].append( np.zeros( self.time_steps ) )
-                                print('ups', node)
                         else:
                             self.upstream_pipes[node_id].append(pipe)
                             self.upstream_nodes[node_id].append(n)
                             if len(neighbors) > 2:
                                 self.upstream_flow_results[-1].append( np.zeros( self.time_steps ) )
-                                print('dws', node)
                     else:
                         pipe = self.moc_network.get_pipe_name(n, node)
                         if pipe == None:
@@ -381,10 +379,9 @@ class MOC_simulation:
                         link_name = self.moc_network.valve_names[self.nodes[neighbor_id, self.Node.link_id.value]]
                     else:
                         idx = int(self.nodes[neighbor_id, self.Node.link_id.value])
-                        print('idx', idx)
                         link_name = self.moc_network.pipe_names[idx]
                     
-                    if len(self.upstream_nodes[node_id]) > 2:
+                    if len(list(self.moc_network.mesh.neighbors(node))) > 2:
                         junction_id = self.junction_ids[node]
                         self.upstream_flow_results[junction_id][j][0] = float(
                             self.steady_state_sim.link['flowrate'][link_name])
@@ -396,7 +393,7 @@ class MOC_simulation:
                     else:
                         link_name = self.moc_network.pipe_names[int(self.nodes[neighbor_id, self.Node.link_id.value])]
                     
-                    if len(self.downstream_nodes[node_id]) > 2:
+                    if len(list(self.moc_network.mesh.neighbors(node))) > 2:
                         junction_id = self.junction_ids[node]
                         self.downstream_flow_results[junction_id][j][0] = float(
                             self.steady_state_sim.link['flowrate'][link_name])
