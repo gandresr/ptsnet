@@ -91,106 +91,129 @@ class MOC_simulation:
         # self._define_initial_conditions()
         self.valve_settings = np.ones( (network.wn.num_valves, T) )
 
-    def run_step(self):
-        pass
-    
-    def _run_junction_step(self, i, t, np):
-        '''
-        TODO fix initial conditions
-        '''
-        for i in range(np):
-            
+    def run_step(self, t, thread_id, N):
+        g = 9.81
+        for i in range(thread_id, thread_id+N):
+            node_type = self.nodes[i, self.Node.node_type.value]
             u_pipes = self.upstream_pipes[i]
             d_pipes = self.downstream_pipes[i]
             u_nodes = self.upstream_nodes[i]
             d_nodes = self.downstream_nodes[i]
 
-            sc = 0
-            sb = 0
-            
-            Cp = np.zeros(len(u_pipes))
-            Bp = np.zeroslike(Cp)
-            uQQ = np.zeroslike(Cp)
-            
-            Cm = np.zeros(len(d_pipes))
-            Bm = np.zeroslike(Cm)
-            dQQ = np.zeroslike(Cm)
-            
-            g = 9.81
+            if node_type == self.node_types.reservoir.value:
+                pass
+            elif node_type == self.node_types.interior.value:
+                if len(u_pipes) != 1 or len(d_pipes) != 1:
+                    raise Exception("There is an error with the data structures")
 
-            for j, u_pipe in enumerate(u_pipes):
-                u_node = u_nodes[j]
+                u_node_id = self.moc_network.node_ids[u_nodes[0]]
+                d_node_id = self.moc_network.node_ids[d_nodes[0]]
+                pipe_id = self.nodes[i, self.Node.link_id.value]
 
-                u_pipe_id = self.moc_network.pipe_ids[u_pipe]
-                u_node_id = self.moc_network.node_ids[u_node]
+                u_node_type = self.nodes[u_node_id, self.Node.node_type.value]
+                d_node_type = self.nodes[d_node_id, self.Node.node_type.value]
+                
+                # Extract heads
+                H1 = self.head_results[u_node_id, t-1] 
+                H2 = self.head_results[d_node_id, t-1]
 
-                wavespeed = self.pipes[u_pipe_id, self.Pipe.wavespeed.value]
-                area = self.pipes[u_pipe_id, self.Pipe.area.value]
-                ffactor = self.pipes[u_pipe_id, self.Pipe.ffactor.value]
-                diameter = self.pipes[u_pipe_id, self.Pipe.diameter.value]
-                dx = self.pipes[u_pipe_id, self.Pipe.dx.value]
-
-                B = wavespeed/(g*area)
-                R = ffactor*dx/(2*g*diameter*area**2)
-                H1 = self.head_results[u_node_id, t-1]
-                Q1 = None
-
-                if self.nodes[u_node_id, self.Node.node_type.value] == self.node_types.junction.value:
-                    uu_id = self.junction_ids[u_node_id]
-                    Q1 = self.upstream_flow_results[uu_id][j][t-1]
+                Q1 = None; Q2 = None
+                # Extract flows
+                if u_node_type == self.node_types.junction:
+                    j = self.junction_ids[u_nodes[0]]
+                    Q1 = self.upstream_flow_results[j][self.upstream_nodes[j].index(u_nodes[0])][t-1]
                 else:
                     Q1 = self.flow_results[u_node_id, t-1]
+                if d_node_type == self.node_types.junction:
+                    j = self.junction_ids[d_nodes[0]]
+                    Q2 = self.upstream_flow_results[j][self.upstream_nodes[j].index(d_nodes[0])][t-1]
+                else:
+                    Q2 = self.flow_results[d_node_id, t-1]
 
-                Cp[j] = H1 + B*Q1
-                Bp[j] = B + R*abs(Q1)
-                sc += Cp[j]/Bp[j]
-                sb += 1/Bp[j]
-
-            for j, d_pipe_id in enumerate(d_pipes):
-                d_node = d_nodes[j]
-
-                d_pipe_id = self.moc_network.pipe_ids[d_pipe]
-                d_node_id = self.moc_network.node_ids[d_node]
-
-                wavespeed = self.pipes[d_pipe_id, self.Pipe.wavespeed.value]
-                area = self.pipes[d_pipe_id, self.Pipe.area.value]
-                ffactor = self.pipes[d_pipe_id, self.Pipe.ffactor.value]
-                diameter = self.pipes[d_pipe_id, self.Pipe.diameter.value]
-                dx = self.pipes[d_pipe_id, self.Pipe.dx.value]
+                wavespeed = self.pipes[pipe_id, self.Pipe.wavespeed.value]
+                area = self.pipes[pipe_id, self.Pipe.area.value]
+                ffactor = self.pipes[pipe_id, self.Pipe.ffactor.value]
+                diameter = self.pipes[pipe_id, self.Pipe.diameter.value]
+                dx = self.pipes[pipe_id, self.Pipe.dx.value]
 
                 B = wavespeed/(g*area)
                 R = ffactor*dx/(2*g*diameter*area**2)
-                H1 = None
-                Q1 = None
-                if self.nodes[d_node_id, self.Node.node_type.value] == self.node_types.junction.value:
-                    dd_id = self.junction_ids[d_node_id]
-                    H1 = self.node_downstream_head_results[dd_id][j][t-1]
-                    Q1 = self.downstream_flow_results[dd_id][j][t-1]
-                else:
+
+                Cp = H1 + B*Q1
+                Cm = H2 - B*Q2
+                Bp = B + R*abs(Q1)
+                Bm = B + R*abs(Q2)
+                
+                # Save head and flow results at node
+                self.head_results[i, t] = (Cp*Bm + Cm*Bp)/(Bp + Bm)
+                self.flow_results[i, t] = (Cp - Cm)/(Bp + Bm) 
+
+            elif node_type == self.node_types.junction.value:
+
+                sc = 0
+                sb = 0
+                
+                Cp = np.zeros(len(u_pipes))
+                Bp = np.zeros_like(Cp)
+                
+                Cm = np.zeros(len(d_pipes))
+                Bm = np.zeros_like(Cm)
+
+                for j, u_pipe in enumerate(u_pipes):
+                    u_node = u_nodes[j]
+
+                    u_pipe_id = self.moc_network.pipe_ids[u_pipe]
+                    u_node_id = self.moc_network.node_ids[u_node]
+
+                    wavespeed = self.pipes[u_pipe_id, self.Pipe.wavespeed.value]
+                    area = self.pipes[u_pipe_id, self.Pipe.area.value]
+                    ffactor = self.pipes[u_pipe_id, self.Pipe.ffactor.value]
+                    diameter = self.pipes[u_pipe_id, self.Pipe.diameter.value]
+                    dx = self.pipes[u_pipe_id, self.Pipe.dx.value]
+
+                    B = wavespeed/(g*area)
+                    R = ffactor*dx/(2*g*diameter*area**2)
+                    H1 = self.head_results[u_node_id, t-1]
+                    Q1 = self.flow_results[u_node_id, t-1]
+
+                    Cp[j] = H1 + B*Q1
+                    Bp[j] = B + R*abs(Q1)
+                    sc += Cp[j]/Bp[j]
+                    sb += 1/Bp[j]
+
+                for j, d_pipe in enumerate(d_pipes):
+                    d_node = d_nodes[j]
+
+                    d_pipe_id = self.moc_network.pipe_ids[d_pipe]
+                    d_node_id = self.moc_network.node_ids[d_node]
+
+                    wavespeed = self.pipes[d_pipe_id, self.Pipe.wavespeed.value]
+                    area = self.pipes[d_pipe_id, self.Pipe.area.value]
+                    ffactor = self.pipes[d_pipe_id, self.Pipe.ffactor.value]
+                    diameter = self.pipes[d_pipe_id, self.Pipe.diameter.value]
+                    dx = self.pipes[d_pipe_id, self.Pipe.dx.value]
+
+                    B = wavespeed/(g*area)
+                    R = ffactor*dx/(2*g*diameter*area**2)
                     H1 = self.head_results[d_node_id, t-1]
                     Q1 = self.flow_results[d_node_id, t-1]
-                Cm[i] = H1 - B*Q1
-                Bm[i] = B + R*abs(Q1)
-                sc += Cm[i]/Bm[i]
-                sb += 1/Bm[i]
+                    Cm[j] = H1 - B*Q1
+                    Bm[j] = B + R*abs(Q1)
+                    sc += Cm[j]/Bm[j]
+                    sb += 1/Bm[j]
                 
-            HH = sc/sb
+                # Update new head at node
+                HH = sc/sb
+                self.head_results[i, t] = HH
 
-            for i in range(len(u_pipes)):
-                uQQ[i] = (Cp[i] - HH)/Bp[i]
-            for i in range(len(d_pipes)):
-                dQQ[i] = (HH - Cm[i])/Bm[i]
+                node_name = self.moc_network.node_names[i]
+                junction_id = self.junction_ids[node_name]
 
-            return (HH, uQQ, dQQ)
-
-    def _run_valve_step(self):
-        pass
-
-    def _run_source_step(self):
-        pass
-    
-    def get_valve_curve(self, valve_name):
-        pass
+                # Update new flows at node
+                for j in range(len(u_pipes)):
+                    self.upstream_flow_results[junction_id][j][t] = (Cp[j] - HH)/Bp[j]
+                for j in range(len(d_pipes)):
+                    self.downstream_flow_results[junction_id][j][t] = (HH - Cm[j])/Bm[j]
 
     def _define_properties(self):
         self._define_pipes()
