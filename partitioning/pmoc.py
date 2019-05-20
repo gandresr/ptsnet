@@ -64,8 +64,6 @@ class MOC_simulation:
         self.steady_state_sim = wntr.sim.EpanetSimulator(network.wn).run_sim()
         self.flow_results = np.zeros( (len(network.mesh), T) )
         self.head_results = np.zeros( (len(network.mesh), T) )
-        self.upstream_flow_results = []
-        self.downstream_flow_results = []
         
         # a[a[:,self.Node.processor.value].argsort()] - Sort by processor
         self.nodes = np.zeros((len(network.mesh), len(self.Node)), dtype=int)
@@ -117,7 +115,6 @@ class MOC_simulation:
                 # Extract heads
                 H1 = self.head_results[u_node_id, t-1] 
                 H2 = self.head_results[d_node_id, t-1]
-
                 Q1 = None; Q2 = None
                 # Extract flows
                 if u_node_type == self.node_types.junction.value:
@@ -261,8 +258,6 @@ class MOC_simulation:
                         self.nodes[node_id, self.Node.link_id.value] = self.moc_network.pipe_ids[pipe]
                     else:
                         self.nodes[node_id, self.Node.node_type.value] = self.node_types.junction.value
-                        self.upstream_flow_results.append( [] )
-                        self.downstream_flow_results.append( [] )
                         self.nodes[node_id, self.Node.link_id.value] = -1
 
             # ----------------------------------------------------------------------------------------------------------------
