@@ -131,12 +131,6 @@ class MOC_simulation:
                 else:
                     Q2 = self.flow_results[d_node_id, t-1]
 
-                if Q1 == 0:
-                    print("Q1 error")
-                    print("NODE %s: " % self.moc_network.node_names[i], "u_node %s" % u_nodes[0])
-                if Q2  == 0:
-                    print("Q2 error")
-                    print("NODE %s: " % self.moc_network.node_names[i], "u_node %s" % u_nodes[0])
                 wavespeed = self.pipes[pipe_id, self.Pipe.wavespeed.value]
                 area = self.pipes[pipe_id, self.Pipe.area.value]
                 ffactor = self.pipes[pipe_id, self.Pipe.ffactor.value]
