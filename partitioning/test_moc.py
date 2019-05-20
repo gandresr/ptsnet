@@ -22,8 +22,5 @@ T = 20
 clk.tic()
 sim = Sim(network, T)
 clk.tic()
-sim._define_initial_conditions()
-clk.toc()
-clk.tic()
 sim.define_valve_setting('9', 'valves/v9.csv')
 clk.toc()

@@ -88,13 +88,14 @@ class MOC_simulation:
         self._define_properties()
 
         # Simulation inputs
-        # self._define_initial_conditions()
+        self._define_initial_conditions()
         self.valve_settings = np.ones( (network.wn.num_valves, T) )
 
     def run_step(self, t, thread_id, N):
         g = 9.81
         for i in range(thread_id, thread_id+N):
             node_type = self.nodes[i, self.Node.node_type.value]
+            node_name = self.moc_network.node_names[i]
             u_pipes = self.upstream_pipes[i]
             d_pipes = self.downstream_pipes[i]
             u_nodes = self.upstream_nodes[i]
@@ -119,17 +120,23 @@ class MOC_simulation:
 
                 Q1 = None; Q2 = None
                 # Extract flows
-                if u_node_type == self.node_types.junction:
+                if u_node_type == self.node_types.junction.value:
                     j = self.junction_ids[u_nodes[0]]
-                    Q1 = self.upstream_flow_results[j][self.upstream_nodes[j].index(u_nodes[0])][t-1]
+                    Q1 = self.downstream_flow_results[j][self.downstream_nodes[u_node_id].index(node_name)][t-1]
                 else:
                     Q1 = self.flow_results[u_node_id, t-1]
-                if d_node_type == self.node_types.junction:
+                if d_node_type == self.node_types.junction.value:
                     j = self.junction_ids[d_nodes[0]]
-                    Q2 = self.upstream_flow_results[j][self.upstream_nodes[j].index(d_nodes[0])][t-1]
+                    Q2 = self.upstream_flow_results[j][self.upstream_nodes[d_node_id].index(node_name)][t-1]
                 else:
                     Q2 = self.flow_results[d_node_id, t-1]
 
+                if Q1 == 0:
+                    print("Q1 error")
+                    print("NODE %s: " % self.moc_network.node_names[i], "u_node %s" % u_nodes[0])
+                if Q2  == 0:
+                    print("Q2 error")
+                    print("NODE %s: " % self.moc_network.node_names[i], "u_node %s" % u_nodes[0])
                 wavespeed = self.pipes[pipe_id, self.Pipe.wavespeed.value]
                 area = self.pipes[pipe_id, self.Pipe.area.value]
                 ffactor = self.pipes[pipe_id, self.Pipe.ffactor.value]
