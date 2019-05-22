@@ -20,25 +20,25 @@ network.define_partitions(4)
 T = 20
 sim = Sim(network, T)
 
-for t in range(1, T):
-    sim.run_step(t, 0, len(network.mesh))
+# for t in range(1, T):
+#     sim.run_step(t, 0, len(network.mesh))
 
-# clk.tic()
-# num_threads = 3
-# N = [int(len(network.mesh)/num_threads) for i in range(num_threads-1)]
-# N.append(len(network.mesh) - sum(N))
-# for t in range(1,T):
-#     processes = []
-#     for i in range(num_threads):
-#         p = Process(target=sim.run_step, args=(t, i, N[i]))
-#         processes.append(p)
-#     # Start the processes
-#     for p in processes:
-#         p.start()
-#     # Ensure all processes have finished execution
-#     for p in processes:
-#         p.join()
-# clk.toc()
+clk.tic()
+num_threads = 3
+N = [int(len(network.mesh)/num_threads) for i in range(num_threads-1)]
+N.append(len(network.mesh) - sum(N))
+for t in range(1,T):
+    processes = []
+    for i in range(num_threads):
+        p = Process(target=sim.run_step, args=(t, i, N[i]))
+        processes.append(p)
+    # Start the processes
+    for p in processes:
+        p.start()
+    # Ensure all processes have finished execution
+    for p in processes:
+        p.join()
+clk.toc()
 
 # print(sim.head_results)
 # clk.tic()
