@@ -111,8 +111,6 @@ def run_junction_bc(u_pipes, d_pipes, t):
 
      return (HH, uQQ, dQQ)
 
-
-
 def run_demand_bc(H1, Q1, a, d, f, dx):
      A = pi*d**2/4
      g = 9.81
@@ -172,9 +170,7 @@ def run_interior_step(Q1, Q2, H1, H2, a, d, f, dx):
      QQ = (Cp - Cm)/(Bp + Bm) 
      return (HH, QQ)
 
-
 #### SIM STARTS !!!
-
 
 for i, p in enumerate(pipes):
      Np = int(initial_info['n_pieces'][i])

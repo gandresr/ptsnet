@@ -1,4 +1,4 @@
 *.bin
 *.rpt
 *.sh
-tmppartition*
+*.graph
