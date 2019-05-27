@@ -443,7 +443,7 @@ class Mesh:
         input_file, 
         dt, 
         wave_speed_file = None, 
-        default_wave_speed = 1200, 
+        default_wave_speed = None, 
         file_separator = ','):
 
         '''
@@ -473,6 +473,8 @@ class Mesh:
         self.wave_speeds = {}
 
         # Create mesh
+        if (default_wave_speed is None) and (wave_speed_file is None):
+            raise Exception("It is necessary to define a wave speed value or waves speed file")
         self._define_wave_speeds(default_wave_speed, wave_speed_file)
         self._define_segments(dt)
         self._define_mesh()
