@@ -1,9 +1,8 @@
 import wntr
-import networkx as nx 
-import pandas as pd
+import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
-from numba import njit 
+from numba import njit
 
 from time import time
 import subprocess
@@ -20,7 +19,7 @@ class Simulation:
         neighbors_id = 2
         processor = 3
         is_ghost = 4
-  
+
     class Pipe(enum.Enum):
         node_a = 0
         node_b = 1
@@ -34,16 +33,16 @@ class Simulation:
     class Valve(enum.Enum):
         node_a = 0
         node_b = 1
-      
+
     class node_types(enum.Enum):
         none = 0
         reservoir = 1
         junction = 2
         interior = 3
         link_a = 4
-        link_b = 5 
+        link_b = 5
 
-    '''
+    """
     Here all the tables and properties required to
     run a MOC simulation are defined. Tables for
     simulations in parallel are created
@@ -52,12 +51,12 @@ class Simulation:
     * valves are not valid in general junctions
     * it is not possible to connect one valve to another
     * valves should be 100% open for initial conditions
-    '''
+    """
     def __init__(self, network, T):
-        '''
+        """
         Requires an Mesh
         T: total time steps
-        '''
+        """
         self.mesh = network
         self.time_steps = T
 
@@ -67,7 +66,7 @@ class Simulation:
         self.head_results = np.zeros( (len(network.mesh_graph), T) )
         self.upstream_flow_results = []
         self.downstream_flow_results = []
-        
+
         # a[a[:,self.Node.processor.value].argsort()] - Sort by processor
         self.nodes = np.zeros((len(network.mesh_graph), len(self.Node)), dtype=int)
         self.upstream_pipes = []
@@ -80,7 +79,7 @@ class Simulation:
             self.downstream_pipes.append( [] )
             self.upstream_nodes.append( [] )
             self.downstream_nodes.append( [] )
-        
+
         self.pipes = np.zeros((network.wn.num_pipes, len(self.Pipe)))
         self.valves = np.zeros((network.wn.num_valves, len(self.Valve)))
         self._define_properties()
@@ -111,9 +110,9 @@ class Simulation:
 
                 u_node_type = self.nodes[u_node_id, self.Node.node_type.value]
                 d_node_type = self.nodes[d_node_id, self.Node.node_type.value]
-                
+
                 # Extract heads
-                H1 = self.head_results[u_node_id, t-1] 
+                H1 = self.head_results[u_node_id, t-1]
                 H2 = self.head_results[d_node_id, t-1]
 
                 Q1 = None; Q2 = None
@@ -142,19 +141,19 @@ class Simulation:
                 Cm = H2 - B*Q2
                 Bp = B + R*abs(Q1)
                 Bm = B + R*abs(Q2)
-                
+
                 # Save head and flow results at node
                 self.head_results[i, t] = (Cp*Bm + Cm*Bp)/(Bp + Bm)
-                self.flow_results[i, t] = (Cp - Cm)/(Bp + Bm) 
+                self.flow_results[i, t] = (Cp - Cm)/(Bp + Bm)
 
             elif node_type == self.node_types.junction.value:
 
                 sc = 0
                 sb = 0
-                
+
                 Cp = np.zeros(len(u_pipes))
                 Bp = np.zeros_like(Cp)
-                
+
                 Cm = np.zeros(len(d_pipes))
                 Bm = np.zeros_like(Cm)
 
@@ -200,7 +199,7 @@ class Simulation:
                     Bm[j] = B + R*abs(Q1)
                     sc += Cm[j]/Bm[j]
                     sb += 1/Bm[j]
-                
+
                 # Update new head at node
                 HH = sc/sb
                 self.head_results[i, t] = HH
@@ -272,7 +271,7 @@ class Simulation:
             self.nodes[node_id, self.Node.is_ghost.value] = (self.mesh.separator[node_id] == self.mesh.num_processors)
 
             # ----------------------------------------------------------------------------------------------------------------
-    
+
             ## NODE UPSTREAM & DOWNSTREAM PIPES INFORMATION
             # ----------------------------------------------------------------------------------------------------------------
 
@@ -337,7 +336,7 @@ class Simulation:
                             elif self.nodes[node_id, self.Node.node_type.value] == self.node_types.junction.value:
                                 self.upstream_pipes[node_id].append(pipe)
                             self.upstream_nodes[node_id].append(n)
-           
+
             # ----------------------------------------------------------------------------------------------------------------
 
     def _define_pipes(self):
@@ -360,18 +359,18 @@ class Simulation:
             self.valves[valve_id, self.Valve.node_b.value] = link.end_node_name
 
     def define_valve_setting(self, valve_name, valve_file):
-        '''
-        The valve_file has to be a file with T <= self.time_steps lines 
-        The i-th of the file has the value of the valve setting at 
+        """
+        The valve_file has to be a file with T <= self.time_steps lines
+        The i-th of the file has the value of the valve setting at
         the i-th time step. If the valve setting is not defined in the file
         for a certain time step, it is assumed that the valve will be
         fully open at that time step.
-        '''
+        """
         settings = np.loadtxt(valve_file, dtype=float)
         valve_id = self.mesh.valve_ids[valve_name]
 
         T = min(len(settings), self.time_steps)
-            
+
         for t in range(T):
             self.valve_settings[valve_id, t] = settings[t]
 
@@ -383,13 +382,13 @@ class Simulation:
                 k = abs(int(labels[1]))
                 n2 = labels[2]
                 pipe = labels[3]
-                
+
                 head_1 = float(self.steady_state_sim.node['head'][n2])
                 head_2 = float(self.steady_state_sim.node['head'][n1])
                 hl = head_1 - head_2
                 L = self.mesh.wn.get_link(pipe).length
                 dx = k * L / self.mesh.segments[pipe]
-                
+
                 self.head_results[node_id, 0] = head_1 - (hl*(1 - dx/L))
                 self.flow_results[node_id, 0] = float(self.steady_state_sim.link['flowrate'][pipe])
             else:
@@ -402,7 +401,7 @@ class Simulation:
                     else:
                         idx = int(self.nodes[neighbor_id, self.Node.link_id.value])
                         link_name = self.mesh.link_name_list[idx]
-                    
+
                     if len(list(self.mesh.mesh_graph.neighbors(node))) > 2:
                         junction_id = self.junction_ids[node]
                         self.upstream_flow_results[junction_id][j][0] = float(
@@ -414,7 +413,7 @@ class Simulation:
                         link_name = self.mesh.valve_names[self.nodes[neighbor_id, self.Node.link_id.value]]
                     else:
                         link_name = self.mesh.link_name_list[int(self.nodes[neighbor_id, self.Node.link_id.value])]
-                    
+
                     if len(list(self.mesh.mesh_graph.neighbors(node))) > 2:
                         junction_id = self.junction_ids[node]
                         self.downstream_flow_results[junction_id][j][0] = float(
@@ -423,36 +422,52 @@ class Simulation:
                 self.head_results[node_id, 0] = head
 
 class Mesh:
-    '''
-    This class allows the creation of a Mesh object to 
+    """ Defines the mesh for an EPANET network to solve the 1D MOC
+
+    This class allows the creation of a Mesh object to
     solve the method of characteristics. The mesh is created
-    based on an EPANET .inp file with information of the 
-    WDS network. Information is extracted from the .inp 
-    using WNTR and networkx. 
-    
+    based on an EPANET .inp file with information of the
+    WDS network. Information is extracted from the .inp
+    using WNTR and networkx.
+
     In order to create the mesh, it is necessary that the user
-    defines the wave_speeds for every pipe in the network. This
-    can be done through a file or by specifying a default_wave_speed
-    for all the pipes in the network.
+    defines wave speed values for every pipe in the network. This
+    can be done through a file or by specifying a default wave speed
+    value for all the pipes in the network.
 
-    The mesh is created based on the CFL condition and 
-    wave speed values are adjusted to satisfy that all the 
-    pipes have the same time step value in the space-time grid    
-    '''
-    def __init__(self, 
-        input_file, 
-        dt, 
-        wave_speed_file = None, 
-        default_wave_speed = None, 
-        file_separator = ','):
+    The mesh is created based on the CFL condition and
+    wave speed values are adjusted to satisfy that all the
+    pipes have the same time step value in the space-time grid
 
-        '''
-
-        * The network graph is generated by WNTR
-        * The Mesh is a segmented network that includes 
+    Important considerations:
+        * The network graph is generated by the WNTR library
+        * The Mesh is a segmented network that includes
             new nodes between pipes which are denominated interior points
         * The nodes in the network graph are denominated junctions
-        '''
+        * Indexes are considered ids and object names are EPANET identifiers
+    """
+    def __init__(self, input_file, dt, wave_speed_file = None, default_wave_speed = None):
+        """Creates a Mesh object from a .inp EPANET file
+
+        The MOC Mesh is created based on a desired time step which is the
+        the same for every pipe in the network. This is achieved by adjusting
+        the wave speed values of the pipes
+
+        Arguments:
+            input_file {string} -- path to EPANET's .inp file of the water network
+            dt {float} -- desired time step for the MOC simulation
+
+        Keyword Arguments:
+            wave_speed_file {string} -- path to the file that contains information
+                of the wave speed values for the pipes in the network (default: {None})
+            default_wave_speed {float} -- wave speed value for all the pipes in
+                the network (default: {None})
+
+        Raises:
+            Exception: If no definition of default_wave_speed value or wave_speed_file
+                is given. At least one should be given
+        """
+
         self.fname = input_file[:input_file.find('.inp')]
         self.wn = wntr.network.WaterNetworkModel(input_file)
         self.sim_graph = self.wn.get_graph()
@@ -462,14 +477,14 @@ class Mesh:
 
         # Number of segments are only defined for pipes
         self.segments = None
-        
+
         # Ids for nodes, pipes, and valves
         self.node_ids = {}
         self.node_name_list = []
-        
+
         self.link_ids = {}
         self.link_name_list = []
-        
+
         self.wave_speeds = {}
 
         # Create mesh
@@ -485,17 +500,9 @@ class Mesh:
         self.separator = None
 
     def _define_wave_speeds(self, default_wave_speed = None, wave_speed_file = None):
-        '''
-        Stores the values of the wave speeds for every pipe in the
-        EPANET network.
+        """ Stores the values of the wave speeds for every pipe in the EPANET network
 
-        Inputs: 
-        - default_wave_speed: 
-        - wave_speed_file:
-
-        The file should be a CSV file, specifying the pipe and its 
-        wave_speed as follows:
-
+        The file should be a CSV file, specifying the pipe and its wave_speed as follows:
             pipe_name_1,wave_speed_1
             pipe_name_2,wave_speed_n
             ...
@@ -503,8 +510,14 @@ class Mesh:
 
         Pipes not specified in the file will have a wave_speed value
         equal to the default_wave_speed
-        '''
-        
+
+        Keyword Arguments:
+            default_wave_speed {float} -- default value of wave speed for all the pipes in
+            the network (default: {None})
+            wave_speed_file {string} -- path to CSV file that contains information of the wave speeds
+            for each pipe in the network (default: {None})
+        """
+
         if default_wave_speed is not None:
             self.wave_speeds = dict.fromkeys(self.wn.pipe_name_list, default_wave_speed)
 
@@ -516,12 +529,19 @@ class Mesh:
                     self.wave_speeds[pipe] = float(wave_speed)
 
     def _define_segments(self, dt):
+        """Estimates the number of segments for each pipe in the EPANET network
+
+        Pipes are segmented in order to create a Mesh for the MOC
+
+        Arguments:
+            dt {float} -- desired time step
+        """
         # Get the maximum time steps for each pipe
         self.segments = self.wn.query_link_attribute('length') # The lenght attribute is just for pipes
 
         for pipe in self.segments:
             self.segments[pipe] /= self.wave_speeds[pipe]
-        
+
         # Maximum dt in the system to capture waves in all pipes
         max_dt = self.segments[min(self.segments, key=self.segments.get)]
 
@@ -538,16 +558,36 @@ class Mesh:
             self.segments[pipe] = int(self.segments[pipe])
 
     def _define_mesh(self):
-        '''
-        This function should be called only after defining the segments
+        """Defines the mesh graph of the water network
+
+        The physical network given by WNTR as a networkx Graph
+        is segmented to create a mesh for the MOC. Then, a
+        mesh graph is created based on the network graph
+        and interior nodes are created and labeled using the
+        following convention:
+
+        'initial_node.k.end_node.link_name.segments_num'
+
+        where:
+
+        initial_node: name of the start node of the pipe to which
+            the interior point belongs
+        k: interior point order in the pipe
+        end_node: name of the end node of the pipe to which
+            the interior point belongs
+        link_name: name of the pipe to which the interior
+            point belongs
+        segments_num: total number of segments in pipe
+
+        * This function should be called only after defining the segments
         for each pipe in the network
-        '''
+        """
 
         G = self.sim_graph
-        
+
         # The segmented MOC-mesh_graph graph is generated
-        self.mesh_graph = nx.Graph() 
-        
+        self.mesh_graph = nx.Graph()
+
         # The MOC-mesh_graph graph will be traversed from a boundary node
         #   Because of the nature of the WDS it is always guaranteed
         #   to have a boundary node in the model.
@@ -561,7 +601,7 @@ class Mesh:
             if not boundary_node:
                 if G.degree(nb) == 1:
                     boundary_node = nb
-            
+
             for neighbor in G[nb]:
                 for p in G[nb][neighbor]:
                     n1 = nb
@@ -573,17 +613,23 @@ class Mesh:
 
                     # interior points are created (ni)
                     for j in range(s_p-1):
-                        # 'initial_node.k.end_node'
+                        # 'initial_node.k.end_node.link_name.segments_num'
                         ni = nb + '.' + str(j) + '.' + neighbor + '.' + p + '.' + str(self.segments[p])
                         self.mesh_graph.add_edge(n1, ni)
                         n1 = ni
 
                     self.mesh_graph.add_edge(n1, neighbor)
-        
+
         # parfor
         self._define_ids()
 
     def _define_ids(self):
+        """Defines dictionaries with names as keys and ids as values for links and nodes
+
+        Updates the values of the dictionary that maps object names
+        to indexes, and of the list that maps indexes to object names
+        for links, and nodes
+        """
         for i, node in enumerate(self.mesh_graph):
             self.node_ids[node] = i
             self.node_name_list.append(node)
@@ -596,9 +642,10 @@ class Mesh:
             i += 1
 
     def _write_mesh(self):
-        '''
-        This function should only be called after defining the mesh_graph
-        '''
+        """ Saves the mesh graph in a file compatible with METIS
+
+        * This function should only be called after defining the mesh_graph
+        """
         G = self.mesh_graph
         # Network is stored in METIS format
         if G:
@@ -612,12 +659,17 @@ class Mesh:
                     f.write(fline)
 
     def define_partitions(self, k):
+        """Defines network partitioning using parHIP (external lib)
+
+        Arguments:
+            k {integer} -- desired number of partitions
+        """
         self._write_mesh()
         script = './parHIP/kaffpa'
         subprocess.call([
-            script, self.fname + '.graph', 
-            '--k=' + str(k), 
-            '--preconfiguration=strong', 
+            script, self.fname + '.graph',
+            '--k=' + str(k),
+            '--preconfiguration=strong',
             '--output_filename=partitionings/p%d.graph' % k])
 
         if k == 2:
@@ -626,18 +678,26 @@ class Mesh:
             script = './parHIP/partition_to_vertex_separator'
 
         subprocess.call([
-            script, self.fname + '.graph', 
-            '--k=' + str(k), 
-            '--input_partition=partitionings/p%d.graph' % k, 
+            script, self.fname + '.graph',
+            '--k=' + str(k),
+            '--input_partition=partitionings/p%d.graph' % k,
             '--output_filename=partitionings/s%d.graph' % k])
 
         self.num_processors = k
         self.partition = np.loadtxt('partitionings/p%d.graph' % k, dtype=int)
         self.separator = np.loadtxt('partitionings/s%d.graph' % k, dtype=int)
-        
+
     def get_processor(self, node):
+        """Returns the processor assigned to a node in the mesh graph
+
+        Arguments:
+            node {string} -- name of the node
+
+        Returns:
+            integer -- processor id
+        """
         return self.partition[self.node_ids[node]]
-    
+
     def get_link_name(self, n1, n2):
         try:
             for p in self.sim_graph[n1][n2]:
@@ -646,11 +706,17 @@ class Mesh:
             return None
 
 class Clock:
+    """Wall-clock time
+    """
     def __init__(self):
         self.clk = time()
-    
+
     def tic(self):
+        """Starts timer
+        """
         self.clk = time()
-    
+
     def toc(self):
+        """Ends timer and prints time elapsed
+        """
         print('Elapsed time: %f seconds' % (time() - self.clk))

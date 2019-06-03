@@ -7,7 +7,7 @@ from pprint import pprint
 clk = Clock()
 
 # Test segmentation and partitioning
-mesh = Mesh("models/LoopedNet.inp", dt = 0.1, default_wavespeed = 1200)
+mesh = Mesh("models/LoopedNet.inp", dt = 0.1, default_wave_speed = 1200)
 # mesh.define_partitions(4)
 
 # Test MOC
