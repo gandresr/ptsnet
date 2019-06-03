@@ -2,3 +2,4 @@
 *.rpt
 *.sh
 *.graph
+partitioning/__pycache__
