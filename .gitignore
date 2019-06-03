@@ -2,4 +2,4 @@
 *.rpt
 *.sh
 *.graph
-partitioning/__pycache__
+*.pyc
