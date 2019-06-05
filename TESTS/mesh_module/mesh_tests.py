@@ -8,6 +8,7 @@ spec = importlib.util.spec_from_file_location("pmoc", pmoc_path)
 pmoc = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pmoc)
 Mesh = pmoc.Mesh
+PATH = pmoc.MOC_PATH
 
 class MeshTests(unittest.TestCase):
     def test_mesh_creation(self):
@@ -31,7 +32,7 @@ class MeshTests(unittest.TestCase):
             }
 
         test_mesh = Mesh(
-            os.getcwd() + os.sep + 'models/LoopedNet.inp',
+            PATH + 'example_models/LoopedNet.inp',
             dt = 0.01,
             default_wave_speed = 100)
 
@@ -56,7 +57,7 @@ class MeshTests(unittest.TestCase):
 
     def test_segment_definition(self):
         test_mesh = Mesh(
-            os.getcwd() + os.sep + 'models/LoopedNet.inp',
+            PATH + 'example_models/LoopedNet.inp',
             dt = 0.01,
             default_wave_speed = 1500)
 
@@ -83,7 +84,7 @@ class MeshTests(unittest.TestCase):
 
     def test_ids_definition(self):
         test_mesh = Mesh(
-            os.getcwd() + os.sep + 'models/LoopedNet.inp',
+            PATH + 'example_models/LoopedNet.inp',
             dt = 0.01,
             default_wave_speed = 10000)
         test_mesh._define_segments(0.5)
@@ -108,7 +109,7 @@ class MeshTests(unittest.TestCase):
 
     def test_partitioning(self):
         test_mesh = Mesh(
-            os.getcwd() + os.sep + 'models/LoopedNet.inp',
+            PATH + 'example_models/LoopedNet.inp',
             dt = 0.01,
             default_wave_speed = 10000)
         test_mesh._define_partitions(4)
