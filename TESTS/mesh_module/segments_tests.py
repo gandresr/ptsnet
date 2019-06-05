@@ -1,13 +1,16 @@
 import importlib.util
+import os
 
-pmoc_path = "/home/watsup/Documents/Github/hammer-net/partitioning/pmoc.py"
+pmoc_path = "/home/watsup/Documents/Github/hammer-net/parallel_moc/pmoc.py"
 spec = importlib.util.spec_from_file_location("pmoc", pmoc_path)
 pmoc = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pmoc)
 Mesh = pmoc.Mesh
 
-test_mesh = Mesh('models/LoopedNet.inp', 0.01, default_wave_speed = 1500)
-
+test_mesh = Mesh(
+    os.getcwd() + os.sep + 'models/LoopedNet.inp',
+    dt = 0.01,
+    default_wave_speed = 1500)
 
 test_mesh._define_segments(0.1)
 assert test_mesh.time_step == 0.1

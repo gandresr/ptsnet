@@ -1,12 +1,13 @@
 import importlib.util
+import os
+import unittest
 
-pmoc_path = "/home/watsup/Documents/Github/hammer-net/partitioning/pmoc.py"
+pmoc_path = "/home/watsup/Documents/Github/hammer-net/parallel_moc/pmoc.py"
 spec = importlib.util.spec_from_file_location("pmoc", pmoc_path)
 pmoc = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pmoc)
 Mesh = pmoc.Mesh
 
-test_mesh = Mesh('models/LoopedNet.inp', 0.01)
 
 results_test_1 = {
     '0': 100, '1': 100, '2': 100, '3': 100, '4': 100,
@@ -24,14 +25,33 @@ result_test_3 = {
     '5': 1500, '6': 1500, '7': 123.1231, '8': 1500
     }
 
-# Test 1
-test_mesh._define_wave_speeds(100)
-assert test_mesh.wave_speeds == results_test_1
+test_mesh = None
 
-# Test 2
-test_mesh._define_wave_speeds(wave_speed_file='wavespeeds.csv')
-assert test_mesh.wave_speeds == result_test_2
+class MeshTests(unittest.TestCase):
+    def tests(self):
+        test_mesh = Mesh(
+            os.getcwd() + os.sep + 'models/LoopedNet.inp',
+            dt = 0.01,
+            default_wave_speed = 100)
 
-# Test 3
-test_mesh._define_wave_speeds(1500, wave_speed_file='wavespeeds.csv')
-assert test_mesh.wave_speeds == result_test_3
+        # Test 1
+        # Wave speeds are defined based on default wave speed value
+        self.assertEqual(test_mesh.wave_speeds, results_test_1)
+
+        # Test 2
+        # Wave speeds are redefined based on file and default wave speed value
+        test_mesh._define_wave_speeds(
+            default_wave_speed = 100, wave_speed_file='wavespeeds.csv')
+        self.assertEqual(test_mesh.wave_speeds, result_test_2)
+
+        # Test 3
+        # Incomplete file, no default wave speed
+        with self.assertRaises(Exception) as context:
+            test_mesh._define_wave_speeds(wave_speed_file='wavespeeds.csv')
+        self.assertTrue("""
+            The file does not specify wave speed values for all the pipes,
+            it is necessary to define a default wave speed value""" in str(context.exception))
+        self.assertEqual(test_mesh.wave_speeds, {})
+
+if __name__ == '__main__':
+    unittest.main()
