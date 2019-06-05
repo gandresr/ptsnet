@@ -106,5 +106,12 @@ class MeshTests(unittest.TestCase):
         #   of segments of the pipe
         self.assertEqual(real_segments, test_mesh.segments)
 
+    def test_partitioning(self):
+        test_mesh = Mesh(
+            os.getcwd() + os.sep + 'models/LoopedNet.inp',
+            dt = 0.01,
+            default_wave_speed = 10000)
+        test_mesh._define_partitions(4)
+
 if __name__ == '__main__':
     unittest.main()

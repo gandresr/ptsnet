@@ -2,14 +2,13 @@ import wntr
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
-from numba import njit
-
-from time import time
-from os.path import isdir
 import subprocess
 
-# Temporal
-import enum
+from numba import njit
+from time import time
+from os.path import isdir
+
+MOC_PATH = "/home/watsup/Documents/Github/hammer-net/parallel_moc/"
 
 class Simulation:
     """
@@ -30,7 +29,7 @@ class Simulation:
 
         # Enums
         self.Node = {
-            'id' : 0
+            'id' : 0,
             'node_type' : 1, # {none, reservoir, junction, end, valve_a, valve_b}
             'link_id' : 2, # {none (-1), link_id, valve_id}
             'processor' : 3,
@@ -39,11 +38,17 @@ class Simulation:
             'downstream_neighbors_num' : 6,
             # Neighbors
             'n1' : 7,
-            'n2' : 8,
-            'n3' : 9,
-            'n4' : 10,
-            'n5' : 11,
-            'n6' : 12,
+            'p1' : 8,
+            'n2' : 9,
+            'p2' : 10,
+            'n3' : 11,
+            'p3' : 12,
+            'n4' : 13,
+            'p4' : 14,
+            'n5' : 15,
+            'p5' : 16,
+            'n6' : 17,
+            'p6' : 18
         }
 
         self.Pipe = {
@@ -643,38 +648,40 @@ class Mesh:
                     fline += '\n'
                     f.write(fline)
 
-    def define_partitions(self, k):
+    def _define_partitions(self, k):
         """Defines network partitioning using parHIP (external lib)
 
         Arguments:
             k {integer} -- desired number of partitions
         """
 
-        if not isdir('partitionings'):
-            subprocess.call(['mkdir', 'partitionings'])
+        if not isdir(MOC_PATH + 'partitionings'):
+            subprocess.call(['mkdir', MOC_PATH + 'partitionings'])
 
         self._write_mesh()
-        script = './parHIP/kaffpa'
+        script = MOC_PATH + 'parHIP/kaffpa'
         subprocess.call([
             script, self.fname + '.graph',
             '--k=' + str(k),
             '--preconfiguration=strong',
-            '--output_filename=partitionings/p%d.graph' % k])
+            '--output_filename=' + MOC_PATH + 'partitionings/p%d.graph' % k],
+            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
         if k == 2:
-            script = './parHIP/node_separator'
+            script = MOC_PATH + 'parHIP/node_separator'
         else:
-            script = './parHIP/partition_to_vertex_separator'
+            script = MOC_PATH + 'parHIP/partition_to_vertex_separator'
 
         subprocess.call([
             script, self.fname + '.graph',
             '--k=' + str(k),
-            '--input_partition=partitionings/p%d.graph' % k,
-            '--output_filename=partitionings/s%d.graph' % k])
+            '--input_partition=' + MOC_PATH + 'partitionings/p%d.graph' % k,
+            '--output_filename=' + MOC_PATH + 'partitionings/s%d.graph' % k],
+            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
         self.num_processors = k
-        self.partition = np.loadtxt('partitionings/p%d.graph' % k, dtype=int)
-        self.separator = np.loadtxt('partitionings/s%d.graph' % k, dtype=int)
+        self.partition = np.loadtxt(MOC_PATH + 'partitionings/p%d.graph' % k, dtype=int)
+        self.separator = np.loadtxt(MOC_PATH + 'partitionings/s%d.graph' % k, dtype=int)
 
     def get_processor(self, node):
         """Returns the processor assigned to a node in the mesh graph
