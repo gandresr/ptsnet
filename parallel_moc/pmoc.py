@@ -4,11 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import subprocess
 
+from constants import *
 from numba import njit
 from time import time
 from os.path import isdir
-
-MOC_PATH = "/home/watsup/Documents/Github/hammer-net/parallel_moc/"
 
 class Simulation:
     """
@@ -27,72 +26,22 @@ class Simulation:
         T: total time steps
         """
 
-        # Enums
-        self.Node = {
-            'id' : 0,
-            'node_type' : 1, # {none, reservoir, junction, end, valve_a, valve_b}
-            'link_id' : 2, # {none (-1), link_id, valve_id}
-            'processor' : 3,
-            'is_ghost' : 4,
-            'upstream_neighbors_num' : 5,
-            'downstream_neighbors_num' : 6,
-            # Neighbors
-            'n1' : 7,
-            'p1' : 8,
-            'n2' : 9,
-            'p2' : 10,
-            'n3' : 11,
-            'p3' : 12,
-            'n4' : 13,
-            'p4' : 14,
-            'n5' : 15,
-            'p5' : 16,
-            'n6' : 17,
-            'p6' : 18
-        }
-
-        self.Pipe = {
-            'node_a' : 0,
-            'node_b' : 1,
-            'diameter' : 2,
-            'area' : 3,
-            'wave_speed' : 4,
-            'ffactor' : 5,
-            'length' : 6,
-            'dx' : 7
-        }
-
-        self.Valve = {
-            'node_a' : 0,
-            'node_b' : 1
-        }
-
-        self.node_types = {
-            'none' : 0,
-            'reservoir' : 1,
-            'interior' : 2,
-            # boundary nodes
-            'junction' : 3,
-            'valve' : 4,
-            'pump' : 5
-        }
-
         self.mesh = network
         self.time_steps = T
 
         boundaries_num = 2*network.wn.num_pipes
-        interior_num = len(network.mesh_graph) - len(network.sim_graph)
+        interior_num = len(network.mesh_graph) - len(network.network_graph)
 
         # Simulation results
-        self.steady_state_sim = wntr.sim.EpanetSimulator(network.wn).run_sim()
-        self.flow_results = np.zeros( (boundaries_num + interior_num, T) )
-        self.head_results = np.zeros( (boundaries_num + interior_num, T) )
+        self.steady_state_sim = wntr.sim.EpanetSimulator(self.wn).run_sim()
+        self.flow_results = np.full( (boundaries_num + interior_num, T), NULL )
+        self.head_results = np.full( (boundaries_num + interior_num, T), NULL )
 
         # a[a[:,self.Node['processor']].argsort()] - Sort by processor
 
-        self.nodes = np.zeros((boundaries_num + interior_num, len(self.Node)), dtype=int)
-        self.pipes = np.zeros((network.wn.num_pipes, len(self.Pipe)))
-        self.valves = np.zeros((network.wn.num_valves, len(self.Valve)))
+        self.nodes = np.full((boundaries_num + interior_num, len(self.Node)), NULL, dtype=int)
+        self.pipes = np.full((network.wn.num_pipes, len(self.Pipe)), NULL)
+        self.valves = np.full((network.wn.num_valves, len(self.Valve)), NULL)
 
         self._define_properties()
 
@@ -225,107 +174,6 @@ class Simulation:
                 for j in range(len(d_pipes)):
                     self.downstream_flow_results[junction_id][j][t] = (HH - Cm[j])/Bm[j]
 
-    def _define_properties(self):
-        self._define_nodes()
-        self._define_pipes()
-        self._define_valves()
-
-    def _define_nodes(self):
-        """[summary]
-
-        Types of nodes:
-            - interior
-            - junction
-            - valve_b
-            - reservoir
-        """
-
-        # List to count junction boundaries
-        junction_boundaries = []
-        # index to count nodes
-        i = 0
-        for node, node_id in self.mesh.node_ids.items():
-
-            ## TYPE & LINK_ID ARE DEFINED
-            # ----------------------------------------------------------------------------------------------------------------
-
-            # Remember that mesh_graph is an undirected networkx Graph
-            neighbors = list(self.mesh.mesh_graph.neighbors(node))
-
-            # Check if node is reservoir node
-            if node in self.mesh.wn.reservoir_name_list:
-                self.nodes[i, self.Node['node_type']] = self.node_types['reservoir']
-                self.nodes[i, self.Node['link_id']] = -1
-
-            # Check if the node belongs to a valve
-            if self.nodes[i, self.Node['node_type']] == self.node_types['none']: # Type not defined yet
-                if not '.' in node:
-                    for valve, valve_id in self.mesh.valve_ids.items():
-                        link = self.mesh.wn.get_link(valve)
-                        start = link.start_node_name
-                        end = link.end_node_name
-                        if node == start:
-                            self.nodes[i, self.Node['node_type']] = self.node_types['interior']
-                        elif node == end:
-                            self.nodes[i, self.Node['node_type']] = self.node_types['valve']
-                            # link_id is associated to a valve
-                            self.nodes[i, self.Node['link_id']] = valve_id
-                        if node in (start, end):
-                            break
-
-            # Check if the node is a junction
-            if self.nodes[i, self.Node['node_type']] == self.node_types['none']: # Type not defined yet
-                # Node is considered a junction if there is more than one pipe attached to it is not a valve or reservoir
-                if len(neighbors) > 1:
-                    if '.' in node: # interior points
-                        self.nodes[i, self.Node['node_type']] = self.node_types['interior']
-                        labels = node.split('.') # [n1, k, n2, p]
-                        pipe = labels[3]
-                        self.nodes[i, self.Node['link_id']] = self.mesh.link_ids[pipe]
-                    else:
-                        for boundary in neighbors:
-                            # self.nodes[i, self.Node['node_type']] = self.
-                            i += 1
-
-            i += 1
-
-
-
-            # ----------------------------------------------------------------------------------------------------------------
-
-            ## PROCESSOR & IS_GHOST ARE DEFINED
-            # ----------------------------------------------------------------------------------------------------------------
-
-            self.nodes[i, self.Node['processor']] = self.mesh.get_processor(node)
-            self.nodes[i, self.Node['is_ghost']] = (self.mesh.separator[node_id] == self.mesh.num_processors)
-
-            # ----------------------------------------------------------------------------------------------------------------
-
-            ## NODE UPSTREAM & DOWNSTREAM PIPES INFORMATION
-            # ----------------------------------------------------------------------------------------------------------------
-
-
-
-            # ----------------------------------------------------------------------------------------------------------------
-
-    def _define_valves(self):
-        for valve, valve_id in self.mesh.valve_ids.items():
-            link = self.mesh.wn.get_link(valve)
-            self.valves[valve_id, self.Valve['node_a']] = link.start_node_name
-            self.valves[valve_id, self.Valve['node_b']] = link.end_node_name
-
-    def _define_pipes(self):
-        for pipe, pipe_id in self.mesh.link_ids.items():
-            link = self.mesh.wn.get_link(pipe)
-            self.pipes[pipe_id, self.Pipe['node_a']] = self.mesh.node_ids[link.start_node_name]
-            self.pipes[pipe_id, self.Pipe['node_b']] = self.mesh.node_ids[link.end_node_name]
-            diameter = link.diameter
-            self.pipes[pipe_id, self.Pipe['diameter']] = diameter
-            self.pipes[pipe_id, self.Pipe['area']] = np.pi*diameter**2/4
-            self.pipes[pipe_id, self.Pipe['wave_speed']] = self.mesh.wave_speeds[pipe]
-            self.pipes[pipe_id, self.Pipe['ffactor']] = float(self.steady_state_sim.link['frictionfact'][pipe])
-            self.pipes[pipe_id, self.Pipe['length']] = link.length
-            self.pipes[pipe_id, self.Pipe['dx']] = link.length / self.mesh.segments[pipe]
 
     def define_valve_setting(self, valve_name, valve_file):
         """
@@ -346,7 +194,7 @@ class Simulation:
     def _define_initial_conditions(self):
         for node, node_id in self.mesh.node_ids.items():
             if '.' in node: # interior points
-                labels = node.split('.') # [n1, k, n2, p]
+                labels = node.split('.') # [n1, k, n2, p, ]
                 n1 = labels[0]
                 k = abs(int(labels[1]))
                 n2 = labels[2]
@@ -414,6 +262,7 @@ class Mesh:
             new nodes between pipes which are denominated interior points
         # * The nodes in the network graph are denominated junctions
         # * Indexes are considered ids and object names are EPANET identifiers
+        # * MOC nodes are labeled as follows: 'initial_node.k.end_node.link_name.segments_num'
     """
     def __init__(self, input_file, dt, wave_speed_file = None, default_wave_speed = None):
         """Creates a Mesh object from a .inp EPANET file
@@ -439,7 +288,7 @@ class Mesh:
 
         self.fname = input_file[:input_file.find('.inp')]
         self.wn = wntr.network.WaterNetworkModel(input_file)
-        self.sim_graph = self.wn.get_graph()
+        self.network_graph = self.wn.get_graph()
         self.mesh_graph = None
         self.time_step = None
         self.num_processors = None # number of processors
@@ -447,14 +296,22 @@ class Mesh:
         # Number of segments are only defined for pipes
         self.segments = None
 
-        # Ids for nodes, pipes, and valves
+        # Wavespeed values associated to each link
+        self.wave_speeds = None
+
+        # The MOC-mesh_graph graph can be traversed from a root node,
+        # i.e., a node whose degree is equal to 1
+        self.root_node = None
+
+        # Table with node properties (only boundary nodes and interior nodes)
+        self.nodes = None
         self.node_ids = None
         self.node_name_list = None
 
+        # Table with link properties (pipes, valves, pumps)
+        self.links = None
         self.link_ids = None
         self.link_name_list = None
-
-        self.wave_speeds = None
 
         # Create mesh
         if (default_wave_speed is None) and (wave_speed_file is None):
@@ -462,9 +319,16 @@ class Mesh:
         self._define_wave_speeds(default_wave_speed, wave_speed_file)
         self._define_segments(dt)
 
-        # Graph partitioning for distributed-memory
+        # self.partition: Contains graph partitioning info
+        #   to distribute work among processors
+        #
+        #   When created, it is a dictionary whose keys
+        #   are the names of the nodes in the mesh_graph
+        #   and the values are pairs (p, s) where p is
+        #   the processor to which the node belongs, and
+        #   s indicates if a node is a separator according
+        #   to parHIP
         self.partition = None
-        self.separator = None
 
     def _define_wave_speeds(self, default_wave_speed = None, wave_speed_file = None):
         """ Stores the values of the wave speeds for every pipe in the EPANET network
@@ -488,7 +352,7 @@ class Mesh:
             Exception: If default_wave_speed is not defined and the file with information
             of the wave speeds is incomplete
         """
-
+        # TODO : TEST IF TIME STEPS ARE THE SAME FOR ALL THE SEGMENTS/PIPES(?)
         self.wave_speeds = {}
 
         if default_wave_speed is not None:
@@ -568,27 +432,20 @@ class Mesh:
             for each pipe in the network
         """
 
-        G = self.sim_graph
-
         # The segmented MOC-mesh_graph graph is generated
         self.mesh_graph = nx.Graph()
-
-        # The MOC-mesh_graph graph will be traversed from a boundary node
-        #   Because of the nature of the WDS it is always guaranteed
-        #   to have a boundary node in the model.
-        boundary_node = None
 
         # parfor
         # nb : Node at the beginning of the edge
         # ne : Node at the end of the edge
-        for i, nb in enumerate(G):
-            # A boundary node is chosen
-            if not boundary_node:
-                if G.degree(nb) == 1:
-                    boundary_node = nb
+        for i, nb in enumerate(self.network_graph):
+            # A root node is chosen
+            if self.root_node is None:
+                if self.network_graph.degree(nb) == 1:
+                    self.root_node = nb
 
-            for neighbor in G[nb]:
-                for p in G[nb][neighbor]:
+            for neighbor in self.network_graph[nb]:
+                for p in self.network_graph[nb][neighbor]:
                     n1 = nb
                     link = self.wn.get_link(p)
                     if link.link_type == 'Pipe':
@@ -601,35 +458,8 @@ class Mesh:
                             n1 = ni
                     self.mesh_graph.add_edge(n1, neighbor)
 
-        # parfor
-        self._define_ids()
         if write_mesh:
             self._write_mesh()
-
-    def _define_ids(self):
-        """Defines dictionaries with names as keys and ids as values for links and nodes
-
-        Updates the values of the dictionary that maps object names
-        to indexes, and of the list that maps indexes to object names
-        for links, and nodes
-        """
-
-        self.node_ids = {}
-        self.node_name_list = []
-
-        self.link_ids = {}
-        self.link_name_list = []
-
-        for i, node in enumerate(self.mesh_graph):
-            self.node_ids[node] = i
-            self.node_name_list.append(node)
-        i = 0
-        for (n1, n2) in self.sim_graph.edges():
-            link_name = self.get_link_name(n1, n2)
-            link = self.wn.get_link(link_name)
-            self.link_ids[link_name] = i
-            self.link_name_list.append(link_name)
-            i += 1
 
     def _write_mesh(self):
         """ Saves the mesh graph in a file compatible with METIS
@@ -641,10 +471,10 @@ class Mesh:
         if G:
             with open(self.fname + '.graph', 'w') as f:
                 f.write("%d %d\n" % (len(G), len(G.edges())))
-                for node in self.node_ids:
+                for i, node in enumerate(self.mesh_graph):
                     fline = "" # file content
                     for neighbor in G[node]:
-                        fline += "%d " % (self.node_ids[neighbor] + 1)
+                        fline += "%d " % (i + 1)
                     fline += '\n'
                     f.write(fline)
 
@@ -680,8 +510,138 @@ class Mesh:
             stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
         self.num_processors = k
-        self.partition = np.loadtxt(MOC_PATH + 'partitionings/p%d.graph' % k, dtype=int)
-        self.separator = np.loadtxt(MOC_PATH + 'partitionings/s%d.graph' % k, dtype=int)
+        pp = zip(
+            np.loadtxt(MOC_PATH + 'partitionings/p%d.graph' % k, dtype=int),
+            np.loadtxt(MOC_PATH + 'partitionings/s%d.graph' % k, dtype=int))
+
+        # Stored in the same order of mesh_graph:
+        self.partition = dict(zip(self.mesh_graph.keys(), pp))
+
+    def _define_links(self):
+        """[summary]
+        """
+
+        self.link_ids = {}
+
+        i = 0
+        self.links = np.full((len(LINK), self.wn.num_links), NULL, dtype=int)
+        for link_name in self.wn.links:
+
+            link = self.wn.get_link(link_name)
+
+            if link_type == 'Pipe':
+                self.links[LINK['wave_speed'], i] = self.wave_speeds[link]
+                self.links[LINK['length', i] = link.length
+                self.links[LINK['dx', i] = link.length / self.segments[pipe]
+            elif link_type == 'Valve':
+                self.links[LINK['wave_speed'], i] = -1
+                self.links[LINK['ffactor'], i] = -1
+                self.links[LINK['length'], i] = -1
+                self.links[LINK['dx'], i] = -1
+            else:
+                continue
+
+            self.links[LINK['id'], i] = i
+            self.links[LINK['link_type'], i] = link.link_type
+            self.links[LINK['node_a'], i] = link.start_node
+            self.links[LINK['node_b'], i] = link.end_node
+            self.links[LINK['diameter'], i] = link.diameter
+            self.links[LINK['area'], i] = np.pi * link.diameter**2 /4
+
+            # The setting id is set in the Simulation class
+            self.links[LINK['setting'], i] = -1
+            # Pipes friction factor is set in the Simulation class
+            self.links[LINK['ffactor'], i] = -1
+            self.link_name_list[i] = link_name
+            self.link_ids[link_name] = i
+            i += 1
+
+    def _define_nodes(self):
+        """[summary]
+
+        Returns:
+            [type] -- [description]
+        """
+
+        # Total nodes in the analysis:
+        #  boundary nodes + interior nodes
+        total_nodes = len(self.mesh_graph) - len(self.network_graph)
+        self.nodes = np.full((len(NODE), total_nodes), NULL, dtype=int)
+
+        # Node information is stored in predorder
+        #   in order to preserve memory locality
+        dfs = nx.dfs_preorder_nodes(
+            self.mesh_graph,
+            G.degree(nb) == 1 # Boundary node
+            source = self.root_node)
+
+        i = 0
+        for idx, node in dfs:
+            # Remember that mesh_graph is an undirected networkx Graph
+            if '.' in node:
+                # Set default values for ni, pi
+                for j in range(1,7):
+                    self.nodes[NODE['n%d' % j], i] = -1
+                    self.nodes[NODE['p%d' % j], i] = -1
+
+                # Store node id
+                self.node_ids[node] = i
+
+                labels = node.split('.')
+                k = int(labels[1]) # internal index of node in pipe
+                link_name = labels[3]
+                N = int(labels[4]) # Total number of segments in pipe
+
+                self.nodes[NODE['id'], i] = i
+                self.nodes[NODE['link_id'], i] = self.link_ids[link_name]
+                self.nodes[NODE['processor'], i] = self.partition[node][0] # processor
+                # is separator? ... more details in parHIP user manual
+                self.nodes[NODE['is_ghost'], i] = self.partition[node][1] == self.num_processors
+
+                if k == 0 or k == N: # Boundary nodes
+                    neighbors = list(self.mesh.mesh_graph.neighbors(node))
+                    for neighbor in neighbors:
+                        if '.' not in neighbor:
+                            for valve_name, valve in self.wn.valves():
+                                end = valve.end_node_name
+                                if neighbor == end:
+                                    # TODO: throw exception if there are valves and no
+                                    #   nodes are assigned with valve type
+                                    self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['valve']
+                                    break
+                            if neighbor in self.wn.reservoir_name_list:
+                                self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['reservoir']
+                                self.nodes[self.NODE['link_id'], i] = -1
+
+                            second_neighbors = set(self.mesh_graph.neighbors(neighbor)) - {node}
+                            for second in second_neighbors:
+                                second_labels = second.split('.')
+                    if node in self.mesh.wn.reservoir_name_list:
+                        self.nodes[i, self.NODE['node_type']] = self.NODE_TYPES['reservoir']
+                        self.nodes[i, self.NODE['link_id']] = -1
+                else:
+                    up_node = labels[0] + '.' + str(k - 1) + '.' + '.'.join(labels[2:])
+                    down_node = labels[0] + '.' + str(k + 1) + '.' + '.'.join(labels[2:])
+                    self.nodes[NODE['node_type'], i] = NODE_TYPES['interior']
+                    self.nodes[NODE['upstream_neighbors_num'], i] = 1
+                    self.nodes[NODE['downstream_neighbors_num'], i] = 1
+                    if up_node in self.node_ids:
+                        # TODO: TEST IF ASSUMPTION IS VALID
+                        self.nodes[NODE['n1'], i] = self.node_ids[up_node]
+                    else:
+                        self.nodes[NODE['n1'], i] = i + 1
+
+                    if down_node in self.node_ids:
+                        self.nodes[NODE['n2'], i] = self.node_ids[down_node]
+                    else:
+                        self.nodes[NODE['n2'], i] = i + 1
+
+                    self.nodes[NODE['p1'], i] = self.partition[up_node][0]
+                    self.nodes[NODE['p2'], i] = self.partition[down_node][0]
+
+
+
+                i += 1
 
     def get_processor(self, node):
         """Returns the processor assigned to a node in the mesh graph
@@ -696,7 +656,7 @@ class Mesh:
 
     def get_link_name(self, n1, n2):
         try:
-            for p in self.sim_graph[n1][n2]:
+            for p in self.network_graph[n1][n2]:
                 return p
         except:
             return None
