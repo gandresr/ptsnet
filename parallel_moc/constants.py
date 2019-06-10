@@ -45,16 +45,17 @@ LINK = {
 }
 
 NODE_TYPES = {
-    'None' : 0,
-    'Interior' : 1,
+    'None' : NULL,
+    'Interior' : 0,
     # boundary nodes
-    'Reservoir' : 2,
-    'Junction' : 3,
-    'Valve' : 4,
-    'Pump' : 5
+    'Reservoir' : 1,
+    'Junction' : 2,
+    'Valve' : 3,
+    'Pump' : 4
 }
 
 LINK_TYPES = {
+    'None' : NULL,
     'Pipe': 0,
     'Valve': 1
 }

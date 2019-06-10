@@ -602,17 +602,56 @@ class Mesh:
                     neighbors = list(self.mesh.mesh_graph.neighbors(node))
                     for neighbor in neighbors:
                         if '.' not in neighbor:
+                            neighbor_links = self.wn.get_links_for_node(neighbors)
+                            if len(neighbor_links) > 2:
+                                self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['Junction']
+                            else:
+                                non_pipes_count = 0
+                                for n_link in neighbor_links:
+                                    if (n_link.link_type == 'Valve') \
+                                        and (n_link.end_node_name == neighbor):
+                                        self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['Valve']
+                                        non_pipes_count += 1
+                                    elif (n_link.link_type == 'Pump') \
+                                        and (n_link.end_node_name == neighbor): 
+                                        self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['Pump']
+                                        non_pipes_count += 1
+                                if non_pipes_count > 1:
+                                    raise Exception("More than one non-pipe element connected to %s" % neighbor)
+                                elif non_pipes_count == 0:
+                                    self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['Junction']
+                                    
+
+
+                            else:
+
+
+                            # Check if boundary node is valve
                             for valve_name, valve in self.wn.valves():
                                 end = valve.end_node_name
                                 if neighbor == end:
                                     # TODO: throw exception if there are valves and no
                                     #   nodes are assigned with valve type
                                     self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['valve']
+                                    self.nodes[self.NODE['link_id'], i] = self.link_ids[valve_name]
                                     break
-                            if neighbor in self.wn.reservoir_name_list:
-                                self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['reservoir']
-                                self.nodes[self.NODE['link_id'], i] = -1
-
+                            # Check if boundary node is pump
+                            if self.nodes[self.NODE['node_type'], i] == NULL:
+                                for pump_name, pump in self.wn.pumps():
+                                    end = pump.end_node_name
+                                    if neighbor == end:
+                                        # TODO: throw exception if there are pumps and no
+                                        #   nodes are assigned with pump type
+                                        self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['pump']
+                                        self.nodes[self.NODE['link_id'], i] = self.link_ids[pump_name]
+                                        break
+                            # Check if boundary node is reservoir
+                            if self.nodes[self.NODE['node_type'], i] == NULL:
+                                if neighbor in self.wn.reservoir_name_list:
+                                    self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['reservoir']
+                                    self.nodes[self.NODE['link_id'], i] = -1
+                            # Check if boundary node is junction
+ 
                             second_neighbors = set(self.mesh_graph.neighbors(neighbor)) - {node}
                             for second in second_neighbors:
                                 second_labels = second.split('.')
