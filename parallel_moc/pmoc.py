@@ -309,6 +309,11 @@ class Mesh:
         self.node_ids = None
         self.node_name_list = None
 
+        # Table with junction properties
+        self.junctions = None
+        self.junction_ids = None
+        self.junction_name_list = None
+
         # Table with link properties (pipes, valves, pumps)
         self.links = None
         self.link_ids = None
@@ -465,7 +470,7 @@ class Mesh:
     def _write_mesh(self):
         """ Saves the mesh graph in a file compatible with METIS
 
-        * This function should only be called after defining the mesh_graph
+        # * This function should only be called after defining the mesh_graph
         """
         G = self.mesh_graph
         # Network is stored in METIS format
@@ -544,7 +549,7 @@ class Mesh:
             self.links[LINK['node_b'], i] = link.end_node
             self.links[LINK['diameter'], i] = link.diameter
             self.links[LINK['area'], i] = np.pi * link.diameter**2 /4
-            self.link_name_list[i] = link_name
+            self.link_name_list.append(link_name)
             self.link_ids[link_name] = i
             i += 1
 
@@ -635,8 +640,13 @@ class Mesh:
                                 raise Exception('%s is an isolated node' % neighbor)
                 else:
                     self.nodes[NODE['node_type'], i] = NODE_TYPES['interior']
+                self.node_name_list.append(node)
+                self.node_ids[node] = i
                 i += 1
 
+    def _define_junctions(self):
+        self.junctions = np.full((len(JUNCTION), len(self.network_graph)), NULL, dtype = int)
+        self.junction_name_list = []
     def get_processor(self, node):
         """Returns the processor assigned to a node in the mesh graph
 
