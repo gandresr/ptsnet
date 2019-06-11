@@ -16,7 +16,7 @@ class Simulation:
     simulations in parallel are created
 
     In the meantime:
-    * valves are not valid in general junctions
+    * valves are not valid in junctions
     * it is not possible to connect one valve to another
     * valves should be 100% open for initial conditions
     """
@@ -265,6 +265,8 @@ class Mesh:
         # * Indexes are considered ids and object names are EPANET identifiers
         # * MOC nodes are labeled as follows: 'initial_node.k.end_node.link_name.segments_num'
         # * Two junctions cannot be connected by a non-pipe element
+        # * IDS are indexes associated to data structures
+        # * Junctions in EPANET are not the same as junctions in PMOC
     """
     def __init__(self, input_file, dt, wave_speed_file = None, default_wave_speed = None):
         """Creates a Mesh object from a .inp EPANET file
@@ -305,17 +307,17 @@ class Mesh:
         # i.e., a node whose degree is equal to 1
         self.root_node = None
 
-        # Table with node properties (only boundary nodes and interior nodes)
+        # Data structures associated to nodes (only boundary nodes and interior nodes)
         self.nodes = None
         self.node_ids = None
         self.node_name_list = None
 
-        # Table with junction properties
+        # Data structures associated to junctions
         self.junctions = None
         self.junction_ids = None
         self.junction_name_list = None
 
-        # Table with link properties (pipes, valves, pumps)
+        # Data structures associated to links (pipes, valves, pumps)
         self.links = None
         self.link_ids = None
         self.link_name_list = None
@@ -525,7 +527,14 @@ class Mesh:
         self.partition = dict(zip(self.mesh_graph.keys(), pp))
 
     def _define_links(self):
-        """[summary]
+        """Defines data structures associated to links
+
+        There are three data structures associated to links:
+        - self.links: table with properties of links (as defined in LINK)
+        - self.link_name_list: list with the names of links. The order directly
+            corresponds to the order of self.links
+        - self.link_ids: dict that maps link names to indexes associated to
+            data structures
         """
 
         self.link_ids = {}
@@ -538,8 +547,8 @@ class Mesh:
 
             if link_type == 'Pipe':
                 self.links[LINK['wave_speed'], i] = self.wave_speeds[link]
-                self.links[LINK['length', i] = link.length
-                self.links[LINK['dx', i] = link.length / self.segments[pipe]
+                self.links[LINK['length'], i] = link.length
+                self.links[LINK['dx'], i] = link.length / self.segments[pipe]
             else:
                 continue
 
@@ -555,10 +564,19 @@ class Mesh:
             i += 1
 
     def _define_nodes(self):
-        """[summary]
+        """Defines data structures associated to nodes
 
-        Returns:
-            [type] -- [description]
+        There are three data structures associated to nodes:
+        - self.nodes: table with properties of nodes (as defined in NODE)
+        - self.node_name_list: list with the names of nodes. The order directly
+            corresponds to the order of self.nodes
+        - self.node_ids: dict that maps node names to indexes associated to
+            data structures
+
+        Raises:
+            Exception: if there is a junction that has only non-pipe elements
+                attached to it
+            Exception: if there is an isolated node
         """
 
         # Total nodes in the analysis:
@@ -570,7 +588,7 @@ class Mesh:
         #   in order to preserve memory locality
         dfs = nx.dfs_preorder_nodes(
             self.mesh_graph,
-            G.degree(nb) == 1 # Boundary node
+            G.degree(nb) == 1, # Boundary node
             source = self.root_node)
 
         i = 0
@@ -646,6 +664,21 @@ class Mesh:
                 i += 1
 
     def _define_junctions(self):
+        """Defines data structures associated to junctions
+
+        There are three data structures associated to junctions:
+        - self.junctions: table with properties of junctions (as defined in JUNCTION)
+        - self.junction_name_list: list with the names of junctions. The order directly
+            corresponds to the order of self.junctions
+        - self.junction_ids: dict that maps junction names to indexes associated to
+            data structures
+
+        Raises:
+            Exception: if two junctions are connected by a non-pipe element
+            Exception: if a junction has more than MAX_NEIGHBORS_IN_JUNCTION links attached
+                to it
+        """
+
         self.junctions = np.full((len(JUNCTION), len(self.network_graph)), NULL, dtype = int)
 
         i = 0
@@ -654,7 +687,7 @@ class Mesh:
             upstream = []
             downstream = []
 
-            # The neighbors of a general junction node can be:
+            # The neighbors of a junction node can be:
             #   - Start/end nodes of a non-pipe element
             #   - Boundary nodes of a pipe
             for neighbor in neighbors:
@@ -668,8 +701,8 @@ class Mesh:
                         upstream.append(neighbor)
                 else: # Start/end nodes of a non-pipe element
                     second_neighbors = set(self.mesh_graph.neighbors(neighbor)) - {junction}
-                    # Since two general junctions cannot be connected by non-pipe elements,
-                    #   he neighbors of an start/end node, exluding the general junction
+                    # Since two junctions cannot be connected by non-pipe elements,
+                    #   he neighbors of an start/end node, exluding the junction
                     #   node connected to it, can only be boundary nodes of a pipe. Thus,
                     #   len(second_neighbors) == 1
                     if '.' not in second_neighbors[0]:
@@ -712,13 +745,6 @@ class Mesh:
             integer -- processor id
         """
         return self.nodes[NODE['processor'], self.node_ids[node]]
-
-    def get_link_name(self, n1, n2):
-        try:
-            for p in self.network_graph[n1][n2]:
-                return p
-        except:
-            return None
 
 class Clock:
     """Wall-clock time
