@@ -566,9 +566,6 @@ class Mesh:
 
                 self.nodes[NODE['id'], i] = i
                 self.nodes[NODE['link_id'], i] = link_name
-                self.nodes[NODE['processor'], i] = self.partitioning[node][0] # processor
-                # is separator? ... more details in parHIP user manual
-                self.nodes[NODE['is_ghost'], i] = self.partitioning[node][1] == self.num_processors
 
                 if k == 0 or k == N: # Boundary nodes
                     neighbors = list(self.mesh_graph.neighbors(node)) # len(neighbors) <= 2
@@ -751,6 +748,11 @@ class Mesh:
 
         # Stored in the same order of mesh_graph:
         self.partitioning = dict(zip(self.mesh_graph.keys(), pp))
+
+        for i, node in enumerate(self.node_name_list):
+            self.nodes[NODE['processor'], i] = self.partitioning[node][0] # processor
+            # is separator? ... more details in parHIP user manual
+            self.nodes[NODE['is_ghost'], i] = self.partitioning[node][1] == self.num_processors
 
     def get_processor(self, node):
         """Returns the processor assigned to a node in the mesh graph
