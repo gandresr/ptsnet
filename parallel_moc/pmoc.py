@@ -737,18 +737,17 @@ class Mesh:
             script, self.fname + '.graph',
             '--k=' + str(k),
             '--preconfiguration=strong',
-            '--output_filename=' + MOC_PATH + 'partitionings/p%d.graph' % k])
+            '--output_filename=' + MOC_PATH + 'partitionings/p%d.graph' % k],
+            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
-        if k == 2:
-            script = MOC_PATH + 'parHIP/node_separator'
-        else:
-            script = MOC_PATH + 'parHIP/partition_to_vertex_separator'
+        script = MOC_PATH + 'parHIP/partition_to_vertex_separator'
 
         subprocess.call([
             script, self.fname + '.graph',
             '--k=' + str(k),
             '--input_partition=' + MOC_PATH + 'partitionings/p%d.graph' % k,
-            '--output_filename=' + MOC_PATH + 'partitionings/s%d.graph' % k])
+            '--output_filename=' + MOC_PATH + 'partitionings/s%d.graph' % k],
+            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
         self.num_processors = k
         pp = zip(

@@ -8,7 +8,7 @@ clk = Clock()
 
 # Test segmentation and partitioning
 mesh = Mesh(MOC_PATH + "example_models/LoopedNet.inp", dt = 1, default_wave_speed = 1200)
-mesh.define_partitions(2)
+mesh.define_partitions(4)
 
 print(mesh.node_name_list)
 print(mesh.num_processors)
