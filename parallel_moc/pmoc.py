@@ -322,13 +322,12 @@ class Mesh:
         self.link_ids = None
         self.link_name_list = None
 
-        # Create mesh
+        # Initialize mesh
         if (default_wave_speed is None) and (wave_speed_file is None):
             raise Exception("It is necessary to define a wave speed value or waves speed file")
-        self._define_wave_speeds(default_wave_speed, wave_speed_file)
-        self._define_segments(dt)
+        self.initialize(dt, wave_speed_file, default_wave_speed)
 
-        # self.partition: Contains graph partitioning info
+        # self.partitioning: Contains graph partitioning info
         #   to distribute work among processors
         #
         #   When created, it is a dictionary whose keys
@@ -337,7 +336,7 @@ class Mesh:
         #   the processor to which the node belongs, and
         #   s indicates if a node is a separator according
         #   to parHIP
-        self.partition = None
+        self.partitioning = None
 
     def _define_wave_speeds(self, default_wave_speed = None, wave_speed_file = None):
         """ Stores the values of the wave speeds for every pipe in the EPANET network
@@ -349,7 +348,7 @@ class Mesh:
             pipe_name_n,wave_speed_n
 
         Pipes not specified in the file will have a wave_speed value
-        equal to the default_wave_speed.
+        equal to the default_wave_speed
 
         Keyword Arguments:
             default_wave_speed {float} -- default value of wave speed for all the pipes in
@@ -412,7 +411,7 @@ class Mesh:
         # It is necessary to redefine the mesh graph everytime the segments are redefined
         self._define_mesh()
 
-    def _define_mesh(self, write_mesh = True):
+    def _define_mesh(self, write_mesh = False):
         """Defines the mesh graph of the water network
 
         The physical network given by WNTR as a networkx Graph
@@ -486,45 +485,6 @@ class Mesh:
                         fline += "%d " % (i + 1)
                     fline += '\n'
                     f.write(fline)
-
-    def _define_partitions(self, k):
-        """Defines network partitioning using parHIP (external lib)
-
-        Arguments:
-            k {integer} -- desired number of partitions
-        """
-
-        if not isdir(MOC_PATH + 'partitionings'):
-            subprocess.call(['mkdir', MOC_PATH + 'partitionings'])
-
-        self._write_mesh()
-        script = MOC_PATH + 'parHIP/kaffpa'
-        subprocess.call([
-            script, self.fname + '.graph',
-            '--k=' + str(k),
-            '--preconfiguration=strong',
-            '--output_filename=' + MOC_PATH + 'partitionings/p%d.graph' % k],
-            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-
-        if k == 2:
-            script = MOC_PATH + 'parHIP/node_separator'
-        else:
-            script = MOC_PATH + 'parHIP/partition_to_vertex_separator'
-
-        subprocess.call([
-            script, self.fname + '.graph',
-            '--k=' + str(k),
-            '--input_partition=' + MOC_PATH + 'partitionings/p%d.graph' % k,
-            '--output_filename=' + MOC_PATH + 'partitionings/s%d.graph' % k],
-            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-
-        self.num_processors = k
-        pp = zip(
-            np.loadtxt(MOC_PATH + 'partitionings/p%d.graph' % k, dtype=int),
-            np.loadtxt(MOC_PATH + 'partitionings/s%d.graph' % k, dtype=int))
-
-        # Stored in the same order of mesh_graph:
-        self.partition = dict(zip(self.mesh_graph.keys(), pp))
 
     def _define_links(self):
         """Defines data structures associated to links
@@ -606,9 +566,9 @@ class Mesh:
 
                 self.nodes[NODE['id'], i] = i
                 self.nodes[NODE['link_id'], i] = link_name
-                self.nodes[NODE['processor'], i] = self.partition[node][0] # processor
+                self.nodes[NODE['processor'], i] = self.partitioning[node][0] # processor
                 # is separator? ... more details in parHIP user manual
-                self.nodes[NODE['is_ghost'], i] = self.partition[node][1] == self.num_processors
+                self.nodes[NODE['is_ghost'], i] = self.partitioning[node][1] == self.num_processors
 
                 if k == 0 or k == N: # Boundary nodes
                     neighbors = list(self.mesh_graph.neighbors(node)) # len(neighbors) <= 2
@@ -734,6 +694,63 @@ class Mesh:
             self.junction_name_list.append(junction)
             self.junction_ids[junction] = i
             i += 1
+
+    def initialize(self, dt, wave_speed_file, default_wave_speed):
+        """Initializes the Mesh object
+
+        Arguments:
+            dt {float} -- desired time step for the MOC simulation
+            wave_speed_file {string} -- path to the file that contains information
+                of the wave speed values for the pipes in the network
+            default_wave_speed {float} -- wave speed value for all the pipes in
+                the network
+        """
+        self._define_wave_speeds(default_wave_speed, wave_speed_file)
+        self._define_segments(dt)
+        self._define_mesh()
+        self._define_links()
+        self._define_nodes()
+        self._define_junctions()
+        self.partitioning = None
+
+    def define_partitions(self, k):
+        """Defines network partitioning using parHIP (external lib)
+
+        Arguments:
+            k {integer} -- desired number of partitions
+        """
+
+        if not isdir(MOC_PATH + 'partitionings'):
+            subprocess.call(['mkdir', MOC_PATH + 'partitionings'])
+
+        self._write_mesh()
+        script = MOC_PATH + 'parHIP/kaffpa'
+        subprocess.call([
+            script, self.fname + '.graph',
+            '--k=' + str(k),
+            '--preconfiguration=strong',
+            '--output_filename=' + MOC_PATH + 'partitionings/p%d.graph' % k],
+            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+
+        if k == 2:
+            script = MOC_PATH + 'parHIP/node_separator'
+        else:
+            script = MOC_PATH + 'parHIP/partition_to_vertex_separator'
+
+        subprocess.call([
+            script, self.fname + '.graph',
+            '--k=' + str(k),
+            '--input_partition=' + MOC_PATH + 'partitionings/p%d.graph' % k,
+            '--output_filename=' + MOC_PATH + 'partitionings/s%d.graph' % k],
+            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+
+        self.num_processors = k
+        pp = zip(
+            np.loadtxt(MOC_PATH + 'partitionings/p%d.graph' % k, dtype=int),
+            np.loadtxt(MOC_PATH + 'partitionings/s%d.graph' % k, dtype=int))
+
+        # Stored in the same order of mesh_graph:
+        self.partitioning = dict(zip(self.mesh_graph.keys(), pp))
 
     def get_processor(self, node):
         """Returns the processor assigned to a node in the mesh graph
