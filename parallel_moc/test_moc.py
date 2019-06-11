@@ -1,4 +1,4 @@
-from pmoc import Mesh, Simulation
+from pmoc import Mesh, Simulation, MOC_PATH
 from pmoc import Clock
 from time import time
 from multiprocessing import Process
@@ -7,9 +7,12 @@ from pprint import pprint
 clk = Clock()
 
 # Test segmentation and partitioning
-mesh = Mesh("parallel_moc/example_models/LoopedNet.inp", dt = 0.01, default_wave_speed = 1200)
-# mesh.define_partitions(4)
+mesh = Mesh(MOC_PATH + "example_models/LoopedNet.inp", dt = 1, default_wave_speed = 1200)
+mesh.define_partitions(2)
 
+print(mesh.node_name_list)
+print(mesh.num_processors)
+pprint(mesh.nodes)
 # # Test MOC
 # T = 2
 # sim = Simulation(mesh, T)

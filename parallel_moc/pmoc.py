@@ -477,14 +477,17 @@ class Mesh:
         Raises:
             Exception: if mesh graph has not been defined
         """
+        G = self.mesh_graph
+        ids = dict( zip( list(G), range(len(G)) ) )
+
         # Network is stored in METIS format
-        if self.mesh_graph:
+        if G:
             with open(self.fname + '.graph', 'w') as f:
                 f.write("%d %d\n" % (len(G), len(G.edges())))
-                for i, node in enumerate(self.mesh_graph):
+                for node in ids:
                     fline = "" # file content
                     for neighbor in G[node]:
-                        fline += "%d " % (i + 1)
+                        fline += "%d " % (ids[neighbor] + 1)
                     fline += '\n'
                     f.write(fline)
         else:
@@ -507,15 +510,12 @@ class Mesh:
         i = 0
         self.links = np.full((len(LINK), self.wn.num_links), NULL, dtype=int)
         for link_name in self.wn.links:
-
             link = self.wn.get_link(link_name)
 
             if link.link_type == 'Pipe':
                 self.links[LINK['wave_speed'], i] = self.wave_speeds[link_name]
                 self.links[LINK['length'], i] = link.length
                 self.links[LINK['dx'], i] = link.length / self.segments[link_name]
-            else:
-                continue
 
             # The setting id and Pipes friction factor are set in the Simulation class
             self.links[LINK['id'], i] = i
@@ -566,8 +566,8 @@ class Mesh:
                 self.node_ids[node] = i
 
                 labels = node.split('.')
-                k = int(labels[1]) # internal index of node in pipe
                 link_name = labels[3]
+                k = int(labels[1]) # internal index of node in pipe
                 N = int(labels[4]) # Total number of segments in pipe
 
                 self.nodes[NODE['id'], i] = i
@@ -579,45 +579,46 @@ class Mesh:
                         if '.' not in neighbor:
                             neighbor_links = self.wn.get_links_for_node(neighbor)
                             # Check if boundary node is reservoir
-                            if self.nodes[NODE['node_type'], i] == NULL:
-                                if neighbor in self.wn.reservoir_name_list:
-                                    self.nodes[NODE['node_type'], i] = NODE_TYPES['reservoir']
+                            if neighbor in self.wn.reservoir_name_list:
+                                self.nodes[NODE['node_type'], i] = NODE_TYPES['reservoir']
                             # TODO (TEST) ALL BOUNDARY NODES SHOULD HAVE AT MOST TWO NEIGHBORS AND ONE OF THEM
                             #   HAS TO BE A JUNCTION. I.E., NO '.' IN NEIGHBOR NAME
                             # Check if boundary node is junction
                             elif len(neighbor_links) > 2:
                                 non_pipes_count = 0
-                                for n_link in neighbor_links:
+                                for n_link_name in neighbor_links:
+                                    n_link = self.wn.get_link(n_link_name)
                                     if n_link.link_type in ('Valve', 'Pump'): # WNTR link types
                                         non_pipes_count += 1
                                 if non_pipes_count == len(neighbor_links):
                                     # TODO (TEST) IF A NODE'S NEIGHBOR HAS MORE THAN TWO NEIGHBORS
                                     #   THE NODE'S NEIGHBOR HAS TO HAVE AT LEAST ONE PIPE ELEMENT
                                     raise Exception('Only non-pipe elements connected to %s' % neighbor)
-                                self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['junction']
+                                self.nodes[NODE['node_type'], i] = NODE_TYPES['junction']
                             elif len(neighbor_links) > 0:
                                 non_pipes_count = 0
-                                for n_link_name, n_link in neighbor_links:
+                                for n_link_name in neighbor_links:
+                                    n_link = self.wn.get_link(n_link_name)
                                     # Check if boundary node is valve
                                     if n_link.link_type == 'Valve':
                                         if n_link.start_node_name == neighbor:
-                                            self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['valve_start']
+                                            self.nodes[NODE['node_type'], i] = NODE_TYPES['valve_start']
                                         elif n_link.end_node_name == neighbor:
-                                            self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['valve_end']
-                                        self.nodes[self.NODE['link_id'], i] = self.link_ids[n_link_name]
+                                            self.nodes[NODE['node_type'], i] = NODE_TYPES['valve_end']
+                                        self.nodes[NODE['link_id'], i] = self.link_ids[n_link_name]
                                         non_pipes_count += 1
                                     # Check if boundary node is pump
                                     elif n_link.link_type == 'Pump':
                                         if n_link.start_node_name == neighbor:
-                                            self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['pump_start']
+                                            self.nodes[NODE['node_type'], i] = NODE_TYPES['pump_start']
                                         elif n_link.end_node_name == neighbor:
-                                            self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['pump_end']
-                                        self.nodes[self.NODE['link_id'], i] = self.link_ids[n_link_name]
+                                            self.nodes[NODE['node_type'], i] = NODE_TYPES['pump_end']
+                                        self.nodes[NODE['link_id'], i] = self.link_ids[n_link_name]
                                         non_pipes_count += 1
                                 if non_pipes_count == 2:
                                     raise Exception('Only non-pipe elements connected to %s' % neighbor)
                                 elif non_pipes_count == 0:
-                                    self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['junction']
+                                    self.nodes[NODE['node_type'], i] = NODE_TYPES['junction']
                             else:
                                 raise Exception('%s is an isolated node' % neighbor)
                 else:
@@ -736,8 +737,7 @@ class Mesh:
             script, self.fname + '.graph',
             '--k=' + str(k),
             '--preconfiguration=strong',
-            '--output_filename=' + MOC_PATH + 'partitionings/p%d.graph' % k],
-            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+            '--output_filename=' + MOC_PATH + 'partitionings/p%d.graph' % k])
 
         if k == 2:
             script = MOC_PATH + 'parHIP/node_separator'
@@ -748,8 +748,7 @@ class Mesh:
             script, self.fname + '.graph',
             '--k=' + str(k),
             '--input_partition=' + MOC_PATH + 'partitionings/p%d.graph' % k,
-            '--output_filename=' + MOC_PATH + 'partitionings/s%d.graph' % k],
-            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+            '--output_filename=' + MOC_PATH + 'partitionings/s%d.graph' % k])
 
         self.num_processors = k
         pp = zip(
@@ -757,7 +756,8 @@ class Mesh:
             np.loadtxt(MOC_PATH + 'partitionings/s%d.graph' % k, dtype=int))
 
         # Stored in the same order of mesh_graph:
-        self.partitioning = dict(zip(self.mesh_graph.keys(), pp))
+        names = list(self.mesh_graph)
+        self.partitioning = dict(zip(names, pp))
 
         for i, node in enumerate(self.node_name_list):
             self.nodes[NODE['processor'], i] = self.partitioning[node][0] # processor
