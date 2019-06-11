@@ -2,6 +2,7 @@
 MOC_PATH = "/home/watsup/Documents/Github/hammer-net/parallel_moc/"
 
 NULL = -9876543210
+MAX_NEIGHBORS_IN_JUNCTION = 6
 
 # Enums
 NODE = {

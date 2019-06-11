@@ -264,6 +264,7 @@ class Mesh:
         # * The nodes in the network graph are denominated junctions
         # * Indexes are considered ids and object names are EPANET identifiers
         # * MOC nodes are labeled as follows: 'initial_node.k.end_node.link_name.segments_num'
+        # * Two junctions cannot be connected by a non-pipe element
     """
     def __init__(self, input_file, dt, wave_speed_file = None, default_wave_speed = None):
         """Creates a Mesh object from a .inp EPANET file
@@ -646,7 +647,61 @@ class Mesh:
 
     def _define_junctions(self):
         self.junctions = np.full((len(JUNCTION), len(self.network_graph)), NULL, dtype = int)
-        self.junction_name_list = []
+
+        i = 0
+        for junction in self.network_graph:
+            neighbors = self.mesh_graph.neighbors(junction)
+            upstream = []
+            downstream = []
+
+            # The neighbors of a general junction node can be:
+            #   - Start/end nodes of a non-pipe element
+            #   - Boundary nodes of a pipe
+            for neighbor in neighbors:
+                if '.' in neighbor: # Boundary nodes of a pipe
+                    labels = neighbor.split('.')
+                    k = int(labels[1])
+                    N = int(labels[4])
+                    if k == 0:
+                        downstream.append(neighbor)
+                    elif k == N:
+                        upstream.append(neighbor)
+                else: # Start/end nodes of a non-pipe element
+                    second_neighbors = set(self.mesh_graph.neighbors(neighbor)) - {junction}
+                    # Since two general junctions cannot be connected by non-pipe elements,
+                    #   he neighbors of an start/end node, exluding the general junction
+                    #   node connected to it, can only be boundary nodes of a pipe. Thus,
+                    #   len(second_neighbors) == 1
+                    if '.' not in second_neighbors[0]:
+                        raise Exception('Internal error, assumptions are not satisfied')
+                    labels = second_neighbors.split('.')
+                    k = int(labels[1])
+                    N = int(labels[4])
+                    if k == N:
+                        upstream.append(second_neighbors[0])
+                    else:
+                        downstream.append(second_neighbors[0])
+
+            if len(upstream) + len(downstream) > MAX_NEIGHBORS_IN_JUNCTION:
+                raise Exception('Junction %s has too many links (max %d)' % (junction, MAX_NEIGHBORS_IN_JUNCTION))
+
+            self.junctions[JUNCTION['upstream_neighbors_num'], i] = len(upstream)
+            self.junctions[JUNCTION['downstream_neighbors_num'], i] = len(downstream)
+
+            j = 0
+            for node_name in upstream:
+                self.junctions[JUNCTION['n%d' % j], i] = self.node_ids[node_name]
+                self.junctions[JUNCTION['p%d' % j], i] = self.get_processor(node_name)
+                j += 1
+            for node_name in downstream:
+                self.junctions[JUNCTION['n%d' % j], i] = self.node_ids[node_name]
+                self.junctions[JUNCTION['p%d' % j], i] = self.get_processor(node_name)
+                j += 1
+
+            self.junction_name_list.append(junction)
+            self.junction_ids[junction] = i
+            i += 1
+
     def get_processor(self, node):
         """Returns the processor assigned to a node in the mesh graph
 
@@ -656,7 +711,7 @@ class Mesh:
         Returns:
             integer -- processor id
         """
-        return self.partition[self.node_ids[node]]
+        return self.nodes[NODE['processor'], self.node_ids[node]]
 
     def get_link_name(self, n1, n2):
         try:
