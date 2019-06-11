@@ -38,15 +38,13 @@ JUNCTION = {
 LINK = {
     'id': 0,
     'link_type': 1,
-    'node_a' : 2,
-    'node_b' : 3,
-    'diameter' : 4,
-    'area' : 5,
-    'wave_speed' : 6,
-    'ffactor' : 7,
-    'length' : 8,
-    'dx' : 9,
-    'setting': 10
+    'diameter' : 2,
+    'area' : 3,
+    'wave_speed' : 4,
+    'ffactor' : 5,
+    'length' : 6,
+    'dx' : 7,
+    'setting': 8
 }
 
 NODE_TYPES = {

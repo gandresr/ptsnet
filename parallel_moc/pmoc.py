@@ -502,6 +502,7 @@ class Mesh:
         """
 
         self.link_ids = {}
+        self.link_name_list = []
 
         i = 0
         self.links = np.full((len(LINK), self.wn.num_links), NULL, dtype=int)
@@ -509,18 +510,16 @@ class Mesh:
 
             link = self.wn.get_link(link_name)
 
-            if link_type == 'Pipe':
-                self.links[LINK['wave_speed'], i] = self.wave_speeds[link]
+            if link.link_type == 'Pipe':
+                self.links[LINK['wave_speed'], i] = self.wave_speeds[link_name]
                 self.links[LINK['length'], i] = link.length
-                self.links[LINK['dx'], i] = link.length / self.segments[pipe]
+                self.links[LINK['dx'], i] = link.length / self.segments[link_name]
             else:
                 continue
 
             # The setting id and Pipes friction factor are set in the Simulation class
             self.links[LINK['id'], i] = i
-            self.links[LINK['link_type'], i] = link.link_type
-            self.links[LINK['node_a'], i] = link.start_node
-            self.links[LINK['node_b'], i] = link.end_node
+            self.links[LINK['link_type'], i] = LINK_TYPES[link.link_type]
             self.links[LINK['diameter'], i] = link.diameter
             self.links[LINK['area'], i] = np.pi * link.diameter**2 /4
             self.link_name_list.append(link_name)
@@ -543,20 +542,23 @@ class Mesh:
             Exception: if there is an isolated node
         """
 
+
         # Total nodes in the analysis:
         #  boundary nodes + interior nodes
         total_nodes_num = len(self.mesh_graph) - len(self.network_graph)
+
         self.nodes = np.full((len(NODE), total_nodes_num), NULL, dtype=int)
+        self.node_ids = {}
+        self.node_name_list = []
 
         # Node information is stored in predorder
         #   in order to preserve memory locality
         dfs = nx.dfs_preorder_nodes(
             self.mesh_graph,
-            G.degree(nb) == 1, # Boundary node
-            source = self.root_node)
+            source = self.root_node) # Boundary node
 
         i = 0
-        for idx, node in dfs:
+        for node in dfs:
             # Remember that mesh_graph is an undirected networkx Graph
             if '.' in node:
 
@@ -575,11 +577,11 @@ class Mesh:
                     neighbors = list(self.mesh_graph.neighbors(node)) # len(neighbors) <= 2
                     for neighbor in neighbors:
                         if '.' not in neighbor:
-                            neighbor_links = self.wn.get_links_for_node(neighbors)
+                            neighbor_links = self.wn.get_links_for_node(neighbor)
                             # Check if boundary node is reservoir
-                            if self.nodes[self.NODE['node_type'], i] == NULL:
+                            if self.nodes[NODE['node_type'], i] == NULL:
                                 if neighbor in self.wn.reservoir_name_list:
-                                    self.nodes[self.NODE['node_type'], i] = self.NODE_TYPES['reservoir']
+                                    self.nodes[NODE['node_type'], i] = NODE_TYPES['reservoir']
                             # TODO (TEST) ALL BOUNDARY NODES SHOULD HAVE AT MOST TWO NEIGHBORS AND ONE OF THEM
                             #   HAS TO BE A JUNCTION. I.E., NO '.' IN NEIGHBOR NAME
                             # Check if boundary node is junction
@@ -641,6 +643,8 @@ class Mesh:
         """
 
         self.junctions = np.full((len(JUNCTION), len(self.network_graph)), NULL, dtype = int)
+        self.junction_ids = {}
+        self.junction_name_list = []
 
         i = 0
         for junction in self.network_graph:
@@ -661,14 +665,16 @@ class Mesh:
                     elif k == N:
                         upstream.append(neighbor)
                 else: # Start/end nodes of a non-pipe element
-                    second_neighbors = set(self.mesh_graph.neighbors(neighbor)) - {junction}
+                    second_neighbors = list(set(self.mesh_graph.neighbors(neighbor)) - {junction})
                     # Since two junctions cannot be connected by non-pipe elements,
-                    #   he neighbors of an start/end node, exluding the junction
+                    #   the neighbors of an start/end node, exluding the junction
                     #   node connected to it, can only be boundary nodes of a pipe. Thus,
-                    #   len(second_neighbors) == 1
+                    #   len(second_neighbors) \in {0,1}
+                    if len(second_neighbors) == 0: # Terminal junction
+                        continue
                     if '.' not in second_neighbors[0]:
                         raise Exception('Internal error, assumptions are not satisfied')
-                    labels = second_neighbors.split('.')
+                    labels = second_neighbors[0].split('.')
                     k = int(labels[1])
                     N = int(labels[4])
                     if k == N:
@@ -682,7 +688,7 @@ class Mesh:
             self.junctions[JUNCTION['upstream_neighbors_num'], i] = len(upstream)
             self.junctions[JUNCTION['downstream_neighbors_num'], i] = len(downstream)
 
-            j = 0
+            j = 1
             for node_name in upstream:
                 self.junctions[JUNCTION['n%d' % j], i] = self.node_ids[node_name]
                 self.junctions[JUNCTION['p%d' % j], i] = self.get_processor(node_name)
