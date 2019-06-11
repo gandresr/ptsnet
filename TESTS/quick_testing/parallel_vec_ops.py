@@ -1,6 +1,7 @@
 import numpy as np
 from time import time
 from numba import njit
+import matplotlib.pyplot as plt
 
 class Clock:
     """Wall-clock time
@@ -19,23 +20,33 @@ class Clock:
         print('Elapsed time: %f seconds' % (time() - self.clk))
 
 N = int(5000)
-H = np.random.rand(N).astype('float64')
-H2 = np.random.rand(N).astype('float64')
-Q = np.random.rand(N).astype('float64')
-B = np.random.rand(N).astype('float64')
-R = np.random.rand(N).astype('float64')
+T = int(2)
+HH = [np.ones(N).astype('float64')*1e-6]
+for i in range(T-1):
+    HH.append(np.zeros(N).astype('float64'))
+QQ = [np.ones(N).astype('float64')*1e-6]
+for i in range(T-1):
+    QQ.append(np.zeros(N).astype('float64'))
+B = np.ones(N).astype('float64')
+R = np.ones(N).astype('float64')
 
-@njit(nopython=True, parallel=True)
-def calc(H2):
-    for i in range(1,len(H)-1):
-        H2[i] = (H[i-1] + B[i]*Q[i-1]) * (B[i] + R[i]*abs(Q[i+1])) + (H[i-1] - B[i]*Q[i+1]) * (B[i] + R[i]*abs(Q[i-1]))
+@njit(parallel=True)
+def calc(H1, H2, Q1, Q2):
+    for i in range(1,N-1):
+        H2[i] = (H1[i-1] + B[i]*Q1[i-1]) * (B[i] + R[i]*abs(Q1[i+1])) + (H1[i-1] - B[i]*Q1[i+1]) * (B[i] + R[i]*abs(Q1[i-1]))
+        Q2[i] = (H1[i-1] - B[i]*Q1[i+1]) * (B[i] + R[i]*abs(Q1[i-1]))
 
 clk = Clock()
 
-calc(H2)
+calc(HH[0], HH[1], QQ[0], QQ[1])
 
+tt = 0
 clk.tic()
-for i in range(4000):
-    calc(H2)
+for t in range(1,T-1):
+    calc(HH[t], HH[t+1], QQ[t], QQ[t+1])
 clk.toc()
+
+print(HH[T-1])
+plt.plot(HH[T-1])
+plt.show()
 

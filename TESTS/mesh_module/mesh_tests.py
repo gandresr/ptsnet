@@ -108,6 +108,7 @@ class MeshTests(unittest.TestCase):
         self.assertEqual(real_segments, test_mesh.segments)
 
     def test_partitioning(self):
+        # TODO: FINISH THE TEST
         test_mesh = Mesh(
             PATH + 'example_models/LoopedNet.inp',
             dt = 0.01,
