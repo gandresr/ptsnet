@@ -473,10 +473,12 @@ class Mesh:
         """ Saves the mesh graph in a file compatible with METIS
 
         # * This function should only be called after defining the mesh_graph
+
+        Raises:
+            Exception: if mesh graph has not been defined
         """
-        G = self.mesh_graph
         # Network is stored in METIS format
-        if G:
+        if self.mesh_graph:
             with open(self.fname + '.graph', 'w') as f:
                 f.write("%d %d\n" % (len(G), len(G.edges())))
                 for i, node in enumerate(self.mesh_graph):
@@ -485,6 +487,8 @@ class Mesh:
                         fline += "%d " % (i + 1)
                     fline += '\n'
                     f.write(fline)
+        else:
+            raise Exception("It is necessary to define the mesh graph")
 
     def _define_links(self):
         """Defines data structures associated to links
