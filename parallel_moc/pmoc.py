@@ -10,11 +10,12 @@ from numba import njit, jit, prange
 from time import time
 from os.path import isdir
 
+# Parallel does not perform well in sandy-bridge architectures
 @njit(parallel = False)
 def run_interior_step(Q1, Q2, H1, H2, B, R):
     # Keep in mind that the first and last nodes in mesh.nodes will
     #   always be a boundary node
-    for i in prange(1,len(H1)-1):
+    for i in prange(1, len(H1)-1):
         H2[i] = ((H1[i-1] + B[i]*Q1[i-1])*(B[i] + R[i]*abs(Q1[i+1])) \
             + (H1[i+1] - B[i]*Q1[i+1])*(B[i] + R[i]*abs(Q1[i-1]))) \
             / ((B[i] + R[i]*abs(Q1[i-1])) + (B[i] + R[i]*abs(Q1[i+1])))
@@ -34,23 +35,51 @@ class Simulation:
     """
     def __init__(self, mesh, T):
         self.mesh = mesh
-        self.flow_results = [np.zeros(len(mesh.node_name_list), dtype='float64') for i in range(T)]
-        self.head_results = [np.zeros(len(mesh.node_name_list), dtype='float64') for i in range(T)]
+        self.steady_state_sim = wntr.sim.EpanetSimulator(self.mesh.wn).run_sim()
+        self.flow_results = [
+            np.zeros(len(mesh.node_name_list), dtype='float64') for i in range(T)]
+        self.head_results = [
+            np.zeros(len(mesh.node_name_list), dtype='float64') for i in range(T)]
+
+    def _define_initial_conditions(self):
+        for i, node in enumerate(self.mesh.node_name_list):
+            labels = node.split('.')
+            n1 = labels[0]
+            n2 = labels[2]
+            pipe = labels[3]
+
+            k = int(labels[1])
+            N = int(labels[4])
+
+            if k == 0 or k == N: # Boundary node
+                if k == 0:
+                    head = float(self.steady_state_sim.node['head'][n1])
+                if k == N:
+                    head = float(self.steady_state_sim.node['head'][n2])
+                self.flow_results[0][i] = float(self.steady_state_sim.link['flowrate'][pipe])
+            else: # Interior node
+                head_1 = float(self.steady_state_sim.node['head'][n2])
+                head_2 = float(self.steady_state_sim.node['head'][n1])
+                hl = head_1 - head_2
+                L = self.mesh.wn.get_link(pipe).length
+                dx = k * L / self.mesh.segments[pipe]
+                self.head_results[0][i] = head_1 - (hl*(1 - dx/L))
+                self.flow_results[0][i] = float(self.steady_state_sim.link['flowrate'][pipe])
 
     def _define_node_constants(self):
-        # ! INITIAL CONDITIONS HAVE TO BE RUN FIRST!!!
+        # ! ESTIMATE INITIAL CONDITIONS FIRST!!!
         for i in range(len(self.mesh.node_name_list)):
-            link_id = self.nodes[NODE['link_id'], i]
+            link_id = self.mesh.nodes[NODE['link_id'], i]
 
-            wave_speed = self.links[LINK['wave_speed'], link_id]
-            area = self.links[LINK['area'], link_id]
+            wave_speed = self.mesh.links[LINK['wave_speed'], link_id]
+            area = self.mesh.links[LINK['area'], link_id]
 
-            ffactor = self.links[LINK['ffactor'], link_id]
-            dx = self.links[LINK['dx'], link_id]
-            diameter = self.links[LINK['diameter'], link_id]
+            ffactor = self.mesh.links[LINK['ffactor'], link_id]
+            dx = self.mesh.links[LINK['dx'], link_id]
+            diameter = self.mesh.links[LINK['diameter'], link_id]
 
-            self.nodes[NODE['B'], i] = wave_speed / (G*area)
-            self.nodes[NODE['R'], i] = ffactor*dx / (2*G*diameter*area**2)
+            self.mesh.nodes[NODE['B'], i] = wave_speed / (G*area)
+            self.mesh.nodes[NODE['R'], i] = ffactor*dx / (2*G*diameter*area**2)
 
         # clk = Clock()
         # for t in range(1,T):
