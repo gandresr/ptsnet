@@ -3,15 +3,18 @@ import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
 import subprocess
+import dis
 
 from constants import *
-from numba import njit, jit
+from numba import njit, jit, prange
 from time import time
 from os.path import isdir
 
-@jit
+@njit(parallel = False)
 def run_interior_step(Q1, Q2, H1, H2, B, R):
-    for i in range(len(H1)):
+    # Keep in mind that the first and last nodes in mesh.nodes will
+    #   always be a boundary node
+    for i in prange(1,len(H1)-1):
         H2[i] = ((H1[i-1] + B[i]*Q1[i-1])*(B[i] + R[i]*abs(Q1[i+1])) \
             + (H1[i+1] - B[i]*Q1[i+1])*(B[i] + R[i]*abs(Q1[i-1]))) \
             / ((B[i] + R[i]*abs(Q1[i-1])) + (B[i] + R[i]*abs(Q1[i+1])))
@@ -30,26 +33,47 @@ class Simulation:
     * valves should be 100% open for initial conditions
     """
     def __init__(self, mesh, T):
-        self.flow_results = [np.zeros(len(mesh.node_name_list)) for i in range(T)]
-        self.head_results = [np.zeros(len(mesh.node_name_list)) for i in range(T)]
-        self.B = np.ones(len(mesh.node_name_list))
-        self.R = np.ones(len(mesh.node_name_list))
+        self.mesh = mesh
+        self.flow_results = [np.zeros(len(mesh.node_name_list), dtype='float64') for i in range(T)]
+        self.head_results = [np.zeros(len(mesh.node_name_list), dtype='float64') for i in range(T)]
 
-        clk = Clock()
-        clk.tic()
-        for t in range(1,T):
-            run_interior_step(
-                self.flow_results[t-1],
-                self.flow_results[t],
-                self.head_results[t-1],
-                self.head_results[t],
-                self.B,
-                self.R)
-        clk.toc()
+    def _define_node_constants(self):
+        # ! INITIAL CONDITIONS HAVE TO BE RUN FIRST!!!
+        for i in range(len(self.mesh.node_name_list)):
+            link_id = self.nodes[NODE['link_id'], i]
 
+            wave_speed = self.links[LINK['wave_speed'], link_id]
+            area = self.links[LINK['area'], link_id]
 
+            ffactor = self.links[LINK['ffactor'], link_id]
+            dx = self.links[LINK['dx'], link_id]
+            diameter = self.links[LINK['diameter'], link_id]
 
+            self.nodes[NODE['B'], i] = wave_speed / (G*area)
+            self.nodes[NODE['R'], i] = ffactor*dx / (2*G*diameter*area**2)
 
+        # clk = Clock()
+        # for t in range(1,T):
+        #     clk.tic()
+        #     # HECK YEAH! THIS THING GOES AT WARP SPEED
+        #     run_interior_step(
+        #         self.flow_results[t-1],
+        #         self.flow_results[t],
+        #         self.head_results[t-1],
+        #         self.head_results[t],
+        #         self.B,
+        #         self.R)
+        #     clk.toc()
+        #     # run_junction_step(
+
+        #     # )
+        #     # run_reservoir_step(
+
+        #     # )
+        #     # run_valve_step(
+
+        #     # )
+        #     # run_
 
 class Mesh:
     """ Defines the mesh for an EPANET network to solve the 1D MOC
@@ -122,7 +146,7 @@ class Mesh:
         # Data structures associated to nodes (only boundary nodes and interior nodes)
         self.nodes = None
         self.node_ids = None
-        self.interior_ids = None
+        self.boundary_ids = None
         self.node_name_list = None
 
         # Data structures associated to junctions
@@ -362,7 +386,7 @@ class Mesh:
 
         self.nodes = np.full((len(NODE), total_nodes_num), NULL, dtype=int)
         self.node_ids = {}
-        self.interior_ids = []
+        self.boundary_ids = []
         self.node_name_list = []
 
         # Node information is stored in predorder
@@ -385,7 +409,7 @@ class Mesh:
                 N = int(labels[4]) # Total number of segments in pipe
 
                 self.nodes[NODE['id'], i] = i
-                self.nodes[NODE['link_id'], i] = link_name
+                self.nodes[NODE['link_id'], i] = self.link_ids[link_name]
 
                 if k == 0 or k == N: # Boundary nodes
                     neighbors = list(self.mesh_graph.neighbors(node)) # len(neighbors) <= 2
@@ -395,6 +419,7 @@ class Mesh:
                             # Check if boundary node is reservoir
                             if neighbor in self.wn.reservoir_name_list:
                                 self.nodes[NODE['node_type'], i] = NODE_TYPES['reservoir']
+                                self.boundary_ids.append(i)
                             # TODO (TEST) ALL BOUNDARY NODES SHOULD HAVE AT MOST TWO NEIGHBORS AND ONE OF THEM
                             #   HAS TO BE A JUNCTION. I.E., NO '.' IN NEIGHBOR NAME
                             # Check if boundary node is junction
@@ -409,6 +434,7 @@ class Mesh:
                                     #   THE NODE'S NEIGHBOR HAS TO HAVE AT LEAST ONE PIPE ELEMENT
                                     raise Exception('Only non-pipe elements connected to %s' % neighbor)
                                 self.nodes[NODE['node_type'], i] = NODE_TYPES['junction']
+                                self.boundary_ids.append(i)
                             elif len(neighbor_links) > 0:
                                 non_pipes_count = 0
                                 for n_link_name in neighbor_links:
@@ -417,27 +443,31 @@ class Mesh:
                                     if n_link.link_type == 'Valve':
                                         if n_link.start_node_name == neighbor:
                                             self.nodes[NODE['node_type'], i] = NODE_TYPES['valve_start']
+                                            self.boundary_ids.append(i)
                                         elif n_link.end_node_name == neighbor:
                                             self.nodes[NODE['node_type'], i] = NODE_TYPES['valve_end']
+                                            self.boundary_ids.append(i)
                                         self.nodes[NODE['link_id'], i] = self.link_ids[n_link_name]
                                         non_pipes_count += 1
                                     # Check if boundary node is pump
                                     elif n_link.link_type == 'Pump':
                                         if n_link.start_node_name == neighbor:
                                             self.nodes[NODE['node_type'], i] = NODE_TYPES['pump_start']
+                                            self.boundary_ids.append(i)
                                         elif n_link.end_node_name == neighbor:
                                             self.nodes[NODE['node_type'], i] = NODE_TYPES['pump_end']
+                                            self.boundary_ids.append(i)
                                         self.nodes[NODE['link_id'], i] = self.link_ids[n_link_name]
                                         non_pipes_count += 1
                                 if non_pipes_count == 2:
                                     raise Exception('Only non-pipe elements connected to %s' % neighbor)
                                 elif non_pipes_count == 0:
                                     self.nodes[NODE['node_type'], i] = NODE_TYPES['junction']
+                                    self.boundary_ids.append(i)
                             else:
                                 raise Exception('%s is an isolated node' % neighbor)
                 else:
                     self.nodes[NODE['node_type'], i] = NODE_TYPES['interior']
-                    self.interior_ids.append(i)
                 self.node_name_list.append(node)
                 self.node_ids[node] = i
                 i += 1
@@ -603,4 +633,4 @@ class Clock:
     def toc(self):
         """Ends timer and prints time elapsed
         """
-        print('Elapsed time: %f seconds' % (time() - self.clk))
+        print('Elapsed time: %.8f seconds' % (time() - self.clk))
