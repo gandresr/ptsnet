@@ -6,7 +6,7 @@ import subprocess
 import dis
 
 from constants import *
-from numba import njit, jit, prange
+from numba import njit
 from time import time
 from os.path import isdir
 
@@ -15,12 +15,26 @@ from os.path import isdir
 def run_interior_step(Q1, Q2, H1, H2, B, R):
     # Keep in mind that the first and last nodes in mesh.nodes will
     #   always be a boundary node
-    for i in prange(1, len(H1)-1):
+    for i in range(1, len(H1)-1):
         H2[i] = ((H1[i-1] + B[i]*Q1[i-1])*(B[i] + R[i]*abs(Q1[i+1])) \
             + (H1[i+1] - B[i]*Q1[i+1])*(B[i] + R[i]*abs(Q1[i-1]))) \
             / ((B[i] + R[i]*abs(Q1[i-1])) + (B[i] + R[i]*abs(Q1[i+1])))
         Q2[i] = ((H1[i-1] + B[i]*Q1[i-1]) - (H1[i+1] - B[i]*Q1[i+1])) \
             / ((B[i] + R[i]*abs(Q1[i-1])) + (B[i] + R[i]*abs(Q1[i+1])))
+
+def run_junction_step(junction_ids, Q1, Q2, H1, H2, B, R):
+    pass
+
+def run_reservoir_step(reservoir_ids, Q1, Q2, H1, H2, B, R):
+    for i in reservoir_ids:
+        H2[i] = H1[0]
+        Q2[i] = 1
+
+def run_valve_step(valve_ids, Q1, Q2, H1, H2, B, R):
+    pass
+
+def run_pump_step(pump_ids, Q1, Q2, H1, H2, B, R):
+    pass
 
 class Simulation:
     """
@@ -43,6 +57,66 @@ class Simulation:
         self.T = T
         self._define_initial_conditions()
         self._define_node_constants()
+
+    def run_simulation(self):
+        clk = Clock()
+
+        clk.tic()
+        for t in range(1, self.T):
+            # HECK YEAH! THIS THING RUNS AT WARP SPEED
+            run_interior_step(
+                self.flow_results[t-1],
+                self.flow_results[t],
+                self.head_results[t-1],
+                self.head_results[t],
+                self.mesh.nodes_float[NODE_FLOAT['B'],:],
+                self.mesh.nodes_float[NODE_FLOAT['R'],:])
+        clk.toc()
+        #     # run_junction_step(
+
+        #     # )
+        #     # run_reservoir_step(
+
+        #     # )
+        #     # run_valve_step(
+
+        #     # )
+        #     # run_
+
+    def _define_node_sim_constants(self):
+        # ! ESTIMATE INITIAL CONDITIONS FIRST!!!
+        for i, node_name in enumerate(self.mesh.node_name_list):
+            link_id = self.mesh.nodes_int[NODE_INT['link_id'], i]
+
+            wave_speed = self.mesh.links_float[LINK_FLOAT['wave_speed'], link_id]
+            area = self.mesh.links_float[LINK_FLOAT['area'], link_id]
+
+            ffactor = self.mesh.links_float[LINK_FLOAT['ffactor'], link_id]
+            dx = self.mesh.links_float[LINK_FLOAT['dx'], link_id]
+            diameter = self.mesh.links_float[LINK_FLOAT['diameter'], link_id]
+
+            # Determine upstream and downstream nodes
+            labels = node_name.split('.')
+            n1 = labels[0]
+            k = int(labels[1])
+            n2 = labels[2]
+            N = int(labels[4])
+
+            upstream_node = n1 + '.' + str(k - 1) + '.' + '.'.join(labels[2:])
+            downstream_node = n1 + '.' + str(k + 1) + '.' + '.'.join(labels[2:])
+
+            if k == N: # end boundary node
+                self.mesh.nodes_int[NODE_INT['upstream_node'], i] = self.mesh.node_ids[upstream_node]
+                # Notice that downstream_node == NULL
+            elif k == 0: # start boundary node
+                self.mesh.nodes_int[NODE_INT['downstream_node'], i] = self.mesh.node_ids[downstream_node]
+                # Notice that upstream_node == NULL
+            else: # interior node
+                self.mesh.nodes_int[NODE_INT['upstream_node'], i] = self.mesh.node_ids[upstream_node]
+                self.mesh.nodes_int[NODE_INT['downstream_node'], i] = self.mesh.node_ids[downstream_node]
+
+            self.mesh.nodes_float[NODE_FLOAT['B'], i] = wave_speed / (G*area)
+            self.mesh.nodes_float[NODE_FLOAT['R'], i] = ffactor*dx / (2*G*diameter*area**2)
 
     def _define_initial_conditions(self):
         for i, node in enumerate(self.mesh.node_name_list):
@@ -68,45 +142,6 @@ class Simulation:
                 dx = k * L / self.mesh.segments[pipe]
                 self.head_results[0][i] = head_1 - (hl*(1 - dx/L))
                 self.flow_results[0][i] = float(self.steady_state_sim.link['flowrate'][pipe])
-
-    def _define_node_constants(self):
-        # ! ESTIMATE INITIAL CONDITIONS FIRST!!!
-        for i in range(len(self.mesh.node_name_list)):
-            link_id = self.mesh.nodes_int[NODE_INT['link_id'], i]
-
-            wave_speed = self.mesh.links_float[LINK_FLOAT['wave_speed'], link_id]
-            area = self.mesh.links_float[LINK_FLOAT['area'], link_id]
-
-            ffactor = self.mesh.links_float[LINK_FLOAT['ffactor'], link_id]
-            dx = self.mesh.links_float[LINK_FLOAT['dx'], link_id]
-            diameter = self.mesh.links_float[LINK_FLOAT['diameter'], link_id]
-
-            self.mesh.nodes_float[NODE_FLOAT['B'], i] = wave_speed / (G*area)
-            self.mesh.nodes_float[NODE_FLOAT['R'], i] = ffactor*dx / (2*G*diameter*area**2)
-
-    def run_simulation(self):
-        clk = Clock()
-        for t in range(1,self.T):
-            clk.tic()
-            # HECK YEAH! THIS THING GOES AT WARP SPEED
-            run_interior_step(
-                self.flow_results[t-1],
-                self.flow_results[t],
-                self.head_results[t-1],
-                self.head_results[t],
-                self.mesh.nodes_float[NODE_FLOAT['B'],:],
-                self.mesh.nodes_float[NODE_FLOAT['R'],:])
-            clk.toc()
-        #     # run_junction_step(
-
-        #     # )
-        #     # run_reservoir_step(
-
-        #     # )
-        #     # run_valve_step(
-
-        #     # )
-        #     # run_
 
 class Mesh:
     """ Defines the mesh for an EPANET network to solve the 1D MOC

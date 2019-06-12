@@ -11,7 +11,9 @@ NODE_INT = {
     'node_type' : 1,
     'link_id' : 2,
     'processor' : 3,
-    'is_ghost' : 4
+    'is_ghost' : 4,
+    'upstream_node' : 5,
+    'downstream_node' : 6,
 }
 
 NODE_FLOAT = {

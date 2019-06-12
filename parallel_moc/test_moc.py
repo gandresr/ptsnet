@@ -19,7 +19,7 @@ print(len(mesh.node_ids))
 print(mesh.num_processors)
 # pprint(mesh.nodes)
 # Test MOC
-T = 4
+T = 100000
 sim = Simulation(mesh, T)
 sim.run_simulation()
 plt.plot(sim.flow_results[T-1])
