@@ -5,9 +5,18 @@ import matplotlib.pyplot as plt
 import subprocess
 
 from constants import *
-from numba import njit
+from numba import njit, jit
 from time import time
 from os.path import isdir
+
+@jit
+def run_interior_step(Q1, Q2, H1, H2, B, R):
+    for i in range(len(H1)):
+        H2[i] = ((H1[i-1] + B[i]*Q1[i-1])*(B[i] + R[i]*abs(Q1[i+1])) \
+            + (H1[i+1] - B[i]*Q1[i+1])*(B[i] + R[i]*abs(Q1[i-1]))) \
+            / ((B[i] + R[i]*abs(Q1[i-1])) + (B[i] + R[i]*abs(Q1[i+1])))
+        Q2[i] = ((H1[i-1] + B[i]*Q1[i-1]) - (H1[i+1] - B[i]*Q1[i+1])) \
+            / ((B[i] + R[i]*abs(Q1[i-1])) + (B[i] + R[i]*abs(Q1[i+1])))
 
 class Simulation:
     """
@@ -20,224 +29,27 @@ class Simulation:
     * it is not possible to connect one valve to another
     * valves should be 100% open for initial conditions
     """
-    def __init__(self, network, T):
-        """
-        Requires a Mesh
-        T: total time steps
-        """
+    def __init__(self, mesh, T):
+        self.flow_results = [np.zeros(len(mesh.node_name_list)) for i in range(T)]
+        self.head_results = [np.zeros(len(mesh.node_name_list)) for i in range(T)]
+        self.B = np.ones(len(mesh.node_name_list))
+        self.R = np.ones(len(mesh.node_name_list))
 
-        # TODO: ADD Qn VECTOR FOR EACH JUNCTION
-        self.mesh = network
-        self.time_steps = T
-
-        boundaries_num = 2*network.wn.num_pipes
-        interior_num = len(network.mesh_graph) - len(network.network_graph)
-
-        # Simulation results
-        self.steady_state_sim = wntr.sim.EpanetSimulator(self.wn).run_sim()
-        self.flow_results = np.full( (boundaries_num + interior_num, T), NULL )
-        self.head_results = np.full( (boundaries_num + interior_num, T), NULL )
-
-        # a[a[:,self.Node['processor']].argsort()] - Sort by processor
-
-        self.nodes = np.full((boundaries_num + interior_num, len(self.Node)), NULL, dtype=int)
-        self.pipes = np.full((network.wn.num_pipes, len(self.Pipe)), NULL)
-        self.valves = np.full((network.wn.num_valves, len(self.Valve)), NULL)
-
-        self._define_properties()
-
-        # Simulation inputs
-        self._define_initial_conditions()
-        self.valve_settings = np.ones( (network.wn.num_valves, T) )
-
-    def run_step(self, t, thread_id, N):
-        g = 9.81
-        for i in range(thread_id, thread_id+N):
-            node_type = self.nodes[i, self.Node['node_type']]
-            node_name = self.mesh.node_name_list[i]
-            u_pipes = self.upstream_pipes[i]
-            d_pipes = self.downstream_pipes[i]
-            u_nodes = self.upstream_nodes[i]
-            d_nodes = self.downstream_nodes[i]
-
-            if node_type == self.node_types['reservoir']:
-                pass
-            elif node_type == self.node_types['interior']:
-                if len(u_pipes) != 1 or len(d_pipes) != 1:
-                    raise Exception("There is an error with the data structures")
-
-                u_node_id = self.mesh.node_ids[u_nodes[0]]
-                d_node_id = self.mesh.node_ids[d_nodes[0]]
-                pipe_id = self.nodes[i, self.Node['link_id']]
-
-                u_node_type = self.nodes[u_node_id, self.Node['node_type']]
-                d_node_type = self.nodes[d_node_id, self.Node['node_type']]
-
-                # Extract heads
-                H1 = self.head_results[u_node_id, t-1]
-                H2 = self.head_results[d_node_id, t-1]
-
-                Q1 = None; Q2 = None
-                # Extract flows
-                if u_node_type == self.node_types['junction']:
-                    j = self.junction_ids[u_nodes[0]]
-                    Q1 = self.downstream_flow_results[j][self.downstream_nodes[u_node_id].index(node_name)][t-1]
-                else:
-                    Q1 = self.flow_results[u_node_id, t-1]
-                if d_node_type == self.node_types['junction']:
-                    j = self.junction_ids[d_nodes[0]]
-                    Q2 = self.upstream_flow_results[j][self.upstream_nodes[d_node_id].index(node_name)][t-1]
-                else:
-                    Q2 = self.flow_results[d_node_id, t-1]
-
-                wave_speed = self.pipes[pipe_id, self.Pipe['wave_speed']]
-                area = self.pipes[pipe_id, self.Pipe['area']]
-                ffactor = self.pipes[pipe_id, self.Pipe['ffactor']]
-                diameter = self.pipes[pipe_id, self.Pipe['diameter']]
-                dx = self.pipes[pipe_id, self.Pipe['dx']]
-
-                B = wave_speed/(g*area)
-                R = ffactor*dx/(2*g*diameter*area**2)
-
-                Cp = H1 + B*Q1
-                Cm = H2 - B*Q2
-                Bp = B + R*abs(Q1)
-                Bm = B + R*abs(Q2)
-
-                # Save head and flow results at node
-                self.head_results[i, t] = (Cp*Bm + Cm*Bp)/(Bp + Bm)
-                self.flow_results[i, t] = (Cp - Cm)/(Bp + Bm)
-
-            elif node_type == self.node_types['junction']:
-
-                sc = 0
-                sb = 0
-
-                Cp = np.zeros(len(u_pipes))
-                Bp = np.zeros_like(Cp)
-
-                Cm = np.zeros(len(d_pipes))
-                Bm = np.zeros_like(Cm)
-
-                for j, u_pipe in enumerate(u_pipes):
-                    u_node = u_nodes[j]
-
-                    u_pipe_id = self.mesh.link_ids[u_pipe]
-                    u_node_id = self.mesh.node_ids[u_node]
-
-                    wave_speed = self.pipes[u_pipe_id, self.Pipe['wave_speed']]
-                    area = self.pipes[u_pipe_id, self.Pipe['area']]
-                    ffactor = self.pipes[u_pipe_id, self.Pipe['ffactor']]
-                    diameter = self.pipes[u_pipe_id, self.Pipe['diameter']]
-                    dx = self.pipes[u_pipe_id, self.Pipe['dx']]
-
-                    B = wave_speed/(g*area)
-                    R = ffactor*dx/(2*g*diameter*area**2)
-                    H1 = self.head_results[u_node_id, t-1]
-                    Q1 = self.flow_results[u_node_id, t-1]
-
-                    Cp[j] = H1 + B*Q1
-                    Bp[j] = B + R*abs(Q1)
-                    sc += Cp[j]/Bp[j]
-                    sb += 1/Bp[j]
-
-                for j, d_pipe in enumerate(d_pipes):
-                    d_node = d_nodes[j]
-
-                    d_pipe_id = self.mesh.link_ids[d_pipe]
-                    d_node_id = self.mesh.node_ids[d_node]
-
-                    wave_speed = self.pipes[d_pipe_id, self.Pipe['wave_speed']]
-                    area = self.pipes[d_pipe_id, self.Pipe['area']]
-                    ffactor = self.pipes[d_pipe_id, self.Pipe['ffactor']]
-                    diameter = self.pipes[d_pipe_id, self.Pipe['diameter']]
-                    dx = self.pipes[d_pipe_id, self.Pipe['dx']]
-
-                    B = wave_speed/(g*area)
-                    R = ffactor*dx/(2*g*diameter*area**2)
-                    H1 = self.head_results[d_node_id, t-1]
-                    Q1 = self.flow_results[d_node_id, t-1]
-                    Cm[j] = H1 - B*Q1
-                    Bm[j] = B + R*abs(Q1)
-                    sc += Cm[j]/Bm[j]
-                    sb += 1/Bm[j]
-
-                # Update new head at node
-                HH = sc/sb
-                self.head_results[i, t] = HH
-
-                node_name = self.mesh.node_name_list[i]
-                junction_id = self.junction_ids[node_name]
-
-                # Update new flows at node
-                for j in range(len(u_pipes)):
-                    self.upstream_flow_results[junction_id][j][t] = (Cp[j] - HH)/Bp[j]
-                for j in range(len(d_pipes)):
-                    self.downstream_flow_results[junction_id][j][t] = (HH - Cm[j])/Bm[j]
+        clk = Clock()
+        clk.tic()
+        for t in range(1,T):
+            run_interior_step(
+                self.flow_results[t-1],
+                self.flow_results[t],
+                self.head_results[t-1],
+                self.head_results[t],
+                self.B,
+                self.R)
+        clk.toc()
 
 
-    def define_valve_setting(self, valve_name, valve_file):
-        """
-        The valve_file has to be a file with T <= self.time_steps lines
-        The i-th of the file has the value of the valve setting at
-        the i-th time step. If the valve setting is not defined in the file
-        for a certain time step, it is assumed that the valve will be
-        fully open at that time step.
-        """
-        settings = np.loadtxt(valve_file, dtype=float)
-        valve_id = self.mesh.valve_ids[valve_name]
 
-        T = min(len(settings), self.time_steps)
 
-        for t in range(T):
-            self.valve_settings[valve_id, t] = settings[t]
-
-    def _define_initial_conditions(self):
-        for node, node_id in self.mesh.node_ids.items():
-            if '.' in node: # interior points
-                labels = node.split('.') # [n1, k, n2, p, ]
-                n1 = labels[0]
-                k = abs(int(labels[1]))
-                n2 = labels[2]
-                pipe = labels[3]
-
-                head_1 = float(self.steady_state_sim.node['head'][n2])
-                head_2 = float(self.steady_state_sim.node['head'][n1])
-                hl = head_1 - head_2
-                L = self.mesh.wn.get_link(pipe).length
-                dx = k * L / self.mesh.segments[pipe]
-
-                self.head_results[node_id, 0] = head_1 - (hl*(1 - dx/L))
-                self.flow_results[node_id, 0] = float(self.steady_state_sim.link['flowrate'][pipe])
-            else:
-                head = float(self.steady_state_sim.node['head'][node])
-                for j, neighbor in enumerate(self.upstream_nodes[node_id]):
-                    link_name = None
-                    neighbor_id = self.mesh.node_ids[neighbor]
-                    if self.nodes[neighbor_id, self.Node['node_type']] in (self.node_types.valve_a, self.node_types.valve_b):
-                        link_name = self.mesh.valve_names[self.nodes[neighbor_id, self.Node['link_id']]]
-                    else:
-                        idx = int(self.nodes[neighbor_id, self.Node['link_id']])
-                        link_name = self.mesh.link_name_list[idx]
-
-                    if len(list(self.mesh.mesh_graph.neighbors(node))) > 2:
-                        junction_id = self.junction_ids[node]
-                        self.upstream_flow_results[junction_id][j][0] = float(
-                            self.steady_state_sim.link['flowrate'][link_name])
-                for j, neighbor in enumerate(self.downstream_nodes[node_id]):
-                    link_name = None
-                    neighbor_id = self.mesh.node_ids[neighbor]
-                    if self.nodes[neighbor_id, self.Node['node_type']] in (self.node_types.valve_a, self.node_types.valve_b):
-                        link_name = self.mesh.valve_names[self.nodes[neighbor_id, self.Node['link_id']]]
-                    else:
-                        link_name = self.mesh.link_name_list[int(self.nodes[neighbor_id, self.Node['link_id']])]
-
-                    if len(list(self.mesh.mesh_graph.neighbors(node))) > 2:
-                        junction_id = self.junction_ids[node]
-                        self.downstream_flow_results[junction_id][j][0] = float(
-                            self.steady_state_sim.link['flowrate'][link_name])
-
-                self.head_results[node_id, 0] = head
 
 class Mesh:
     """ Defines the mesh for an EPANET network to solve the 1D MOC
@@ -310,6 +122,7 @@ class Mesh:
         # Data structures associated to nodes (only boundary nodes and interior nodes)
         self.nodes = None
         self.node_ids = None
+        self.interior_ids = None
         self.node_name_list = None
 
         # Data structures associated to junctions
@@ -549,6 +362,7 @@ class Mesh:
 
         self.nodes = np.full((len(NODE), total_nodes_num), NULL, dtype=int)
         self.node_ids = {}
+        self.interior_ids = []
         self.node_name_list = []
 
         # Node information is stored in predorder
@@ -623,6 +437,7 @@ class Mesh:
                                 raise Exception('%s is an isolated node' % neighbor)
                 else:
                     self.nodes[NODE['node_type'], i] = NODE_TYPES['interior']
+                    self.interior_ids.append(i)
                 self.node_name_list.append(node)
                 self.node_ids[node] = i
                 i += 1
