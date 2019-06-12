@@ -6,17 +6,20 @@ MAX_NEIGHBORS_IN_JUNCTION = 6
 G = 9.81 # m/s
 
 # Enums
-NODE = {
+NODE_INT = {
     'id' : 0,
     'node_type' : 1,
     'link_id' : 2,
-    'B': 3,
-    'R': 4,
-    'processor' : 5,
-    'is_ghost' : 6
+    'processor' : 3,
+    'is_ghost' : 4
 }
 
-JUNCTION = {
+NODE_FLOAT = {
+    'B': 0,
+    'R': 1
+}
+
+JUNCTION_INT = {
     'upstream_neighbors_num' : 0, # between [0,6]
     'downstream_neighbors_num' : 1, # between [0,6]
     # Neighbors
@@ -38,16 +41,19 @@ JUNCTION = {
     'p6' : 13
 }
 
-LINK = {
+LINK_INT = {
     'id': 0,
-    'link_type': 1,
-    'diameter' : 2,
-    'area' : 3,
-    'wave_speed' : 4,
-    'ffactor' : 5,
-    'length' : 6,
-    'dx' : 7,
-    'setting': 8
+    'link_type': 1
+}
+
+LINK_FLOAT = {
+    'diameter' : 0,
+    'area' : 1,
+    'wave_speed' : 2,
+    'ffactor' : 3,
+    'length' : 4,
+    'dx' : 5,
+    'setting': 6
 }
 
 NODE_TYPES = {
