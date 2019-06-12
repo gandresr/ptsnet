@@ -25,15 +25,26 @@ def run_interior_step(Q1, Q2, H1, H2, B, R):
 def run_junction_step(junction_ids, Q1, Q2, H1, H2, B, R):
     pass
 
-def run_reservoir_step(reservoir_ids, Q1, Q2, H1, H2, B, R):
+@njit
+def run_reservoir_step(
+    reservoir_ids, upstream_nodes, downstream_nodes, Q1, Q2, H1, H2, B, R):
     for i in reservoir_ids:
-        H2[i] = H1[0]
-        Q2[i] = 1
+        H2[i] = H1[i]
+        if upstream_nodes[i] == NULL:
+            # C- characteristic
+            Q2[i] = (H1[i] - H1[downstream_nodes[i]] + B[i]*Q1[downstream_nodes[i]]) \
+                / (B[i] + R[i]*abs(Q1[downstream_nodes[i]]))
+        elif downstream_nodes[i] == NULL:
+            # C+ characteristic
+            Q2[i] = (H1[upstream_nodes[i]] + B[i]*Q1[upstream_nodes[i]] - H1[i]) \
+                / (B[i] + R[i]*abs(Q1[upstream_nodes[i]]))
 
-def run_valve_step(valve_ids, Q1, Q2, H1, H2, B, R):
+def run_valve_step(
+    valve_ids, upstream_nodes, downstream_nodes, Q1, Q2, H1, H2, B, R):
     pass
 
-def run_pump_step(pump_ids, Q1, Q2, H1, H2, B, R):
+def run_pump_step(
+    pump_ids, upstream_nodes, downstream_nodes, Q1, Q2, H1, H2, B, R):
     pass
 
 class Simulation:
@@ -56,7 +67,7 @@ class Simulation:
             np.zeros(len(mesh.node_name_list), dtype='float64') for i in range(T)]
         self.T = T
         self._define_initial_conditions()
-        self._define_node_constants()
+        self._define_node_sim_constants()
 
     def run_simulation(self):
         clk = Clock()
@@ -71,17 +82,11 @@ class Simulation:
                 self.head_results[t],
                 self.mesh.nodes_float[NODE_FLOAT['B'],:],
                 self.mesh.nodes_float[NODE_FLOAT['R'],:])
+            # run_junction_step()
+            # run_reservoir_step()
+            # run_valve_step()
+            # run_pump_step()
         clk.toc()
-        #     # run_junction_step(
-
-        #     # )
-        #     # run_reservoir_step(
-
-        #     # )
-        #     # run_valve_step(
-
-        #     # )
-        #     # run_
 
     def _define_node_sim_constants(self):
         # ! ESTIMATE INITIAL CONDITIONS FIRST!!!
