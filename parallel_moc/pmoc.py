@@ -25,44 +25,45 @@ def run_interior_step(Q1, Q2, H1, H2, B, R):
 @njit
 def run_junction_step(
     nodes_up, nodes_down,
-    junctions, upstream_num, downstream_num, Q1, Q2, H1, H2, B, R):
+    junctions, Q1, Q2, H1, H2, B, R):
+    # junctions is a matrix that contains neighbors info for each boundary node
+    #   bare in mind that neighbors of boundary nodes are also boundary nodes!
     for i in range(junctions.shape[1]):
         sc = 0
         sb = 0
-        for j in range(upstream_num[i]):
-            n1 = nodes_up[junctions[i,j]]
-            n2 = nodes_up[junctions[i,j]]
+        for j in range(junctions[0,i]): # junctions[0,i] == upstream_neigh_num[i]
+            k = junctions[j+2,i]-1
             sc += (H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
             sb += 1 / (B[k] + R[k]*abs(Q1[k]))
 
-        for j in range(upstream_num[i], upstream_num[i]+downstream_num[i]):
-            k = junctions[i,j]
+        for j in range(junctions[0,i], junctions[0,i]+junctions[1,i]):
+            k = junctions[j+2,i]+1
             sc += (H1[k] - B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
             sb += 1 / (B[k] + R[k]*abs(Q1[k]))
 
-        for j in range(upstream_num[i]):
-            k = junctions[i,j]
+        for j in range(junctions[0,i]):
+            k = junctions[j+2,i]-1
             H2[j] = sc/sb
             Q2[j] = (H1[k] + B[k]*Q1[k] - H2[k]) / (B[k] + R[k]*abs(Q1[k]))
 
-        for j in range(upstream_num[i], upstream_num[i]+downstream_num[i]):
-            k = junctions[i,j]
+        for j in range(junctions[0,i], junctions[0,i]+junctions[1,i]):
+            k = junctions[j+2,i]+1
             H2[j] = sc/sb
             Q2[j] = (H2[j] - H1[j] + B[j]*Q1[j]) / (B[j] + R[j]*abs(Q1[j]))
 
 @njit
 def run_reservoir_step(
-    reservoir_ids, upstream_nodes, downstream_nodes, Q1, Q2, H1, H2, B, R):
+    reservoir_ids, is_start, Q1, Q2, H1, H2, B, R):
     for i in reservoir_ids:
         H2[i] = H1[i]
-        if upstream_nodes[i] == NULL:
+        if is_start[i] == True: # Start boundary node
             # C- characteristic
-            Q2[i] = (H1[i] - H1[downstream_nodes[i]] + B[i]*Q1[downstream_nodes[i]]) \
-                / (B[i] + R[i]*abs(Q1[downstream_nodes[i]]))
-        elif downstream_nodes[i] == NULL:
+            Q2[i] = (H1[i] - H1[i+1] + B[i-1]*Q1[i+1]) \
+                / (B[i-1] + R[i-1]*abs(Q1[i+1]))
+        elif is_start[i] == False: # End boundary node
             # C+ characteristic
-            Q2[i] = (H1[upstream_nodes[i]] + B[i]*Q1[upstream_nodes[i]] - H1[i]) \
-                / (B[i] + R[i]*abs(Q1[upstream_nodes[i]]))
+            Q2[i] = (H1[i-1] + B[i-1]*Q1[i-1] - H1[i]) \
+                / (B[i-1] + R[i-1]*abs(Q1[i-1]))
 
 def run_valve_step(
     valve_ids, upstream_nodes, downstream_nodes, Q1, Q2, H1, H2, B, R):
@@ -115,7 +116,7 @@ class Simulation:
 
     def _define_node_sim_constants(self):
         # ! ESTIMATE INITIAL CONDITIONS FIRST!!!
-        for i, node_name in enumerate(self.mesh.node_name_list):
+        for i in range(len(self.mesh.node_name_list)):
             link_id = self.mesh.nodes_int[NODE_INT['link_id'], i]
 
             wave_speed = self.mesh.links_float[LINK_FLOAT['wave_speed'], link_id]
@@ -124,26 +125,6 @@ class Simulation:
             ffactor = self.mesh.links_float[LINK_FLOAT['ffactor'], link_id]
             dx = self.mesh.links_float[LINK_FLOAT['dx'], link_id]
             diameter = self.mesh.links_float[LINK_FLOAT['diameter'], link_id]
-
-            # Determine upstream and downstream nodes
-            labels = node_name.split('.')
-            n1 = labels[0]
-            k = int(labels[1])
-            n2 = labels[2]
-            N = int(labels[4])
-
-            upstream_node = n1 + '.' + str(k - 1) + '.' + '.'.join(labels[2:])
-            downstream_node = n1 + '.' + str(k + 1) + '.' + '.'.join(labels[2:])
-
-            if k == N: # end boundary node
-                self.mesh.nodes_int[NODE_INT['upstream_node'], i] = self.mesh.node_ids[upstream_node]
-                # Notice that downstream_node == NULL
-            elif k == 0: # start boundary node
-                self.mesh.nodes_int[NODE_INT['downstream_node'], i] = self.mesh.node_ids[downstream_node]
-                # Notice that upstream_node == NULL
-            else: # interior node
-                self.mesh.nodes_int[NODE_INT['upstream_node'], i] = self.mesh.node_ids[upstream_node]
-                self.mesh.nodes_int[NODE_INT['downstream_node'], i] = self.mesh.node_ids[downstream_node]
 
             self.mesh.nodes_float[NODE_FLOAT['B'], i] = wave_speed / (G*area)
             self.mesh.nodes_float[NODE_FLOAT['R'], i] = ffactor*dx / (2*G*diameter*area**2)
@@ -512,6 +493,8 @@ class Mesh:
                 self.nodes_int[NODE_INT['link_id'], i] = self.link_ids[link_name]
 
                 if k == 0 or k == N: # Boundary nodes
+                    self.nodes_int[NODE_INT['is_start'], i] = 1 if k == 0 else 0
+
                     neighbors = list(self.mesh_graph.neighbors(node)) # len(neighbors) <= 2
                     for neighbor in neighbors:
                         if '.' not in neighbor:
