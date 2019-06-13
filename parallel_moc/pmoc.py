@@ -22,8 +22,33 @@ def run_interior_step(Q1, Q2, H1, H2, B, R):
         Q2[i] = ((H1[i-1] + B[i]*Q1[i-1]) - (H1[i+1] - B[i]*Q1[i+1])) \
             / ((B[i] + R[i]*abs(Q1[i-1])) + (B[i] + R[i]*abs(Q1[i+1])))
 
-def run_junction_step(junction_ids, Q1, Q2, H1, H2, B, R):
-    pass
+@njit
+def run_junction_step(
+    nodes_up, nodes_down,
+    junctions, upstream_num, downstream_num, Q1, Q2, H1, H2, B, R):
+    for i in range(junctions.shape[1]):
+        sc = 0
+        sb = 0
+        for j in range(upstream_num[i]):
+            n1 = nodes_up[junctions[i,j]]
+            n2 = nodes_up[junctions[i,j]]
+            sc += (H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+            sb += 1 / (B[k] + R[k]*abs(Q1[k]))
+
+        for j in range(upstream_num[i], upstream_num[i]+downstream_num[i]):
+            k = junctions[i,j]
+            sc += (H1[k] - B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+            sb += 1 / (B[k] + R[k]*abs(Q1[k]))
+
+        for j in range(upstream_num[i]):
+            k = junctions[i,j]
+            H2[j] = sc/sb
+            Q2[j] = (H1[k] + B[k]*Q1[k] - H2[k]) / (B[k] + R[k]*abs(Q1[k]))
+
+        for j in range(upstream_num[i], upstream_num[i]+downstream_num[i]):
+            k = junctions[i,j]
+            H2[j] = sc/sb
+            Q2[j] = (H2[j] - H1[j] + B[j]*Q1[j]) / (B[j] + R[j]*abs(Q1[j]))
 
 @njit
 def run_reservoir_step(

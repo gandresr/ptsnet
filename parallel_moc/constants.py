@@ -10,10 +10,8 @@ NODE_INT = {
     'id' : 0,
     'node_type' : 1,
     'link_id' : 2,
-    'upstream_node' : 3,
-    'downstream_node' : 4,
-    'processor' : 5,
-    'is_ghost' : 6,
+    'processor' : 3,
+    'is_ghost' : 4,
 }
 
 NODE_FLOAT = {
@@ -30,16 +28,16 @@ JUNCTION_INT = {
     #   * ni: neighbor id
     #   * pi: processor assigned to node with id ni
     'n1' : 2,
-    'p1' : 3,
-    'n2' : 4,
-    'p2' : 5,
-    'n3' : 6,
-    'p3' : 7,
-    'n4' : 8,
-    'p4' : 9,
-    'n5' : 10,
-    'p5' : 11,
-    'n6' : 12,
+    'n2' : 3,
+    'n3' : 4,
+    'n4' : 5,
+    'n5' : 6,
+    'n6' : 7,
+    'p1' : 8,
+    'p2' : 9,
+    'p3' : 10,
+    'p4' : 11,
+    'p5' : 12,
     'p6' : 13
 }
 
