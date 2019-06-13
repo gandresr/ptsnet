@@ -237,10 +237,6 @@ class Mesh:
         # Wavespeed values associated to each link
         self.wave_speeds = None
 
-        # The MOC-mesh_graph graph can be traversed from a root node,
-        # i.e., a node whose degree is equal to 1
-        self.root_node = None
-
         # Data structures associated to nodes (only boundary nodes and interior nodes)
         self.nodes_int = None
         self.nodes_float = None
@@ -384,11 +380,6 @@ class Mesh:
         # nb : Node at the beginning of the edge
         # ne : Node at the end of the edge
         for i, nb in enumerate(self.network_graph):
-            # A root node is chosen
-            if self.root_node is None:
-                if self.network_graph.degree(nb) == 1:
-                    self.root_node = nb
-
             for neighbor in self.network_graph[nb]:
                 for p in self.network_graph[nb][neighbor]:
                     n1 = nb
@@ -465,6 +456,17 @@ class Mesh:
             self.link_ids[link_name] = i
             i += 1
 
+    def _get_mesh_nodes(self):
+        # TODO: DOCUMENTATION
+        for pipe_name, pipe in self.wn.pipes():
+            for i in range(self.segments[pipe_name]+1):
+                yield "{n1}.{k}.{n2}.{p}.{N}".format(
+                    n1 = pipe.start_node_name,
+                    k = i,
+                    n2 = pipe.end_node_name,
+                    p = pipe_name,
+                    N = self.segments[pipe_name])
+
     def _define_nodes(self):
         """Defines data structures associated to nodes
 
@@ -493,14 +495,8 @@ class Mesh:
         self.boundary_ids = []
         self.node_name_list = []
 
-        # Node information is stored in predorder
-        #   in order to preserve memory locality
-        dfs = nx.dfs_preorder_nodes(
-            self.mesh_graph,
-            source = self.root_node) # Boundary node
-
         i = 0
-        for node in dfs:
+        for node in self._get_mesh_nodes():
             # Remember that mesh_graph is an undirected networkx Graph
             if '.' in node:
 
