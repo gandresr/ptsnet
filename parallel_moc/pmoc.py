@@ -23,9 +23,7 @@ def run_interior_step(Q1, Q2, H1, H2, B, R):
             / ((B[i] + R[i]*abs(Q1[i-1])) + (B[i] + R[i]*abs(Q1[i+1])))
 
 @njit
-def run_junction_step(
-    nodes_up, nodes_down,
-    junctions, Q1, Q2, H1, H2, B, R):
+def run_junction_step(junctions, Q1, Q2, H1, H2, B, R):
     # junctions is a matrix that contains neighbors info for each boundary node
     #   bare in mind that neighbors of boundary nodes are also boundary nodes!
     for i in range(junctions.shape[1]):
@@ -49,7 +47,7 @@ def run_junction_step(
         for j in range(junctions[0,i], junctions[0,i]+junctions[1,i]):
             k = junctions[j+2,i]+1
             H2[j] = sc/sb
-            Q2[j] = (H2[j] - H1[j] + B[j]*Q1[j]) / (B[j] + R[j]*abs(Q1[j]))
+            Q2[j] = (H2[k] - H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
 
 @njit
 def run_reservoir_step(
@@ -85,13 +83,11 @@ class Simulation:
     * valves should be 100% open for initial conditions
     """
     def __init__(self, mesh, T):
+        self.T = T
         self.mesh = mesh
         self.steady_state_sim = wntr.sim.EpanetSimulator(self.mesh.wn).run_sim()
-        self.flow_results = [
-            np.zeros(len(mesh.node_name_list), dtype='float64') for i in range(T)]
-        self.head_results = [
-            np.zeros(len(mesh.node_name_list), dtype='float64') for i in range(T)]
-        self.T = T
+        self.flow_results = np.zeros((T, len(mesh.node_name_list)), dtype='float64')
+        self.head_results = np.zeros((T, len(mesh.node_name_list)), dtype='float64')
         self._define_initial_conditions()
         self._define_node_sim_constants()
 
@@ -102,14 +98,29 @@ class Simulation:
         for t in range(1, self.T):
             # HECK YEAH! THIS THING RUNS AT WARP SPEED
             run_interior_step(
-                self.flow_results[t-1],
-                self.flow_results[t],
-                self.head_results[t-1],
-                self.head_results[t],
+                self.flow_results[t-1,:],
+                self.flow_results[t,:],
+                self.head_results[t-1,:],
+                self.head_results[t,:],
                 self.mesh.nodes_float[NODE_FLOAT['B'],:],
                 self.mesh.nodes_float[NODE_FLOAT['R'],:])
-            # run_junction_step()
-            # run_reservoir_step()
+            run_junction_step(
+                self.mesh.junctions_int,
+                self.flow_results[t-1,:],
+                self.flow_results[t,:],
+                self.head_results[t-1,:],
+                self.head_results[t,:],
+                self.mesh.nodes_float[NODE_FLOAT['B'],:],
+                self.mesh.nodes_float[NODE_FLOAT['R'],:])
+            run_reservoir_step(
+                self.mesh.reservoir_ids,
+                self.mesh.nodes_int[NODE_INT['is_start'],:],
+                self.flow_results[t-1,:],
+                self.flow_results[t,:],
+                self.head_results[t-1,:],
+                self.head_results[t,:],
+                self.mesh.nodes_float[NODE_FLOAT['B'],:],
+                self.mesh.nodes_float[NODE_FLOAT['R'],:])
             # run_valve_step()
             # run_pump_step()
         clk.toc()
@@ -153,6 +164,9 @@ class Simulation:
                 dx = k * L / self.mesh.segments[pipe]
                 self.head_results[0][i] = head_1 - (hl*(1 - dx/L))
                 self.flow_results[0][i] = float(self.steady_state_sim.link['flowrate'][pipe])
+
+        for pipe_name in self.mesh.wn.pipe_name_list:
+            self.mesh.links_float[LINK_FLOAT['ffactor'], self.mesh.link_ids[pipe_name]] = float(self.steady_state_sim.link['frictionfact'][pipe_name])
 
 class Mesh:
     """ Defines the mesh for an EPANET network to solve the 1D MOC
@@ -222,11 +236,18 @@ class Mesh:
         self.nodes_int = None
         self.nodes_float = None
         self.node_ids = None
-        self.boundary_ids = None
         self.node_name_list = None
+        # Boundary nodes
+        self.reservoir_ids = None
+        self.junction_ids = None
+        self.valve_start_ids = None
+        self.valve_end_ids = None
+        self.pump_start_ids = None
+        self.pump_end_ids = None
 
         # Data structures associated to junctions
-        self.junctions = None
+        self.junctions_int = None
+        self.junctions_float = None
         self.junction_ids = None
         self.junction_name_list = None
 
@@ -473,7 +494,14 @@ class Mesh:
         self.nodes_float = np.full((len(NODE_FLOAT), total_nodes_num), NULL, dtype='float64')
 
         self.node_ids = {}
-        self.boundary_ids = []
+
+        self.reservoir_ids = []
+        self.junction_ids = []
+        self.valve_start_ids = []
+        self.valve_end_ids = []
+        self.pump_start_ids = []
+        self.pump_end_ids = []
+
         self.node_name_list = []
 
         i = 0
@@ -502,7 +530,7 @@ class Mesh:
                             # Check if boundary node is reservoir
                             if neighbor in self.wn.reservoir_name_list:
                                 self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['reservoir']
-                                self.boundary_ids.append(i)
+                                self.reservoir_ids.append(i)
                             # TODO (TEST) ALL BOUNDARY NODES SHOULD HAVE AT MOST TWO NEIGHBORS AND ONE OF THEM
                             #   HAS TO BE A JUNCTION. I.E., NO '.' IN NEIGHBOR NAME
                             # Check if boundary node is junction
@@ -517,7 +545,7 @@ class Mesh:
                                     #   THE NODE'S NEIGHBOR HAS TO HAVE AT LEAST ONE PIPE ELEMENT
                                     raise Exception('Only non-pipe elements connected to %s' % neighbor)
                                 self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['junction']
-                                self.boundary_ids.append(i)
+                                self.junction_ids.append(i)
                             elif len(neighbor_links) > 0:
                                 non_pipes_count = 0
                                 for n_link_name in neighbor_links:
@@ -526,27 +554,27 @@ class Mesh:
                                     if n_link.link_type == 'Valve':
                                         if n_link.start_node_name == neighbor:
                                             self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['valve_start']
-                                            self.boundary_ids.append(i)
+                                            self.valve_start_ids.append(i)
                                         elif n_link.end_node_name == neighbor:
                                             self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['valve_end']
-                                            self.boundary_ids.append(i)
+                                            self.valve_end_ids.append(i)
                                         self.nodes_int[NODE_INT['link_id'], i] = self.link_ids[n_link_name]
                                         non_pipes_count += 1
                                     # Check if boundary node is pump
                                     elif n_link.link_type == 'Pump':
                                         if n_link.start_node_name == neighbor:
                                             self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['pump_start']
-                                            self.boundary_ids.append(i)
+                                            self.pump_start_ids.append(i)
                                         elif n_link.end_node_name == neighbor:
                                             self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['pump_end']
-                                            self.boundary_ids.append(i)
+                                            self.pump_end_ids.append(i)
                                         self.nodes_int[NODE_INT['link_id'], i] = self.link_ids[n_link_name]
                                         non_pipes_count += 1
                                 if non_pipes_count == 2:
                                     raise Exception('Only non-pipe elements connected to %s' % neighbor)
                                 elif non_pipes_count == 0:
                                     self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['junction']
-                                    self.boundary_ids.append(i)
+                                    self.junction_ids.append(i)
                             else:
                                 raise Exception('%s is an isolated node' % neighbor)
                 else:
@@ -571,7 +599,7 @@ class Mesh:
                 to it
         """
 
-        self.junctions = np.full((len(JUNCTION_INT), len(self.network_graph)), NULL, dtype = int)
+        self.junctions_int = np.full((len(JUNCTION_INT), len(self.network_graph)), NULL, dtype = int)
         self.junction_ids = {}
         self.junction_name_list = []
 
@@ -614,17 +642,17 @@ class Mesh:
             if len(upstream) + len(downstream) > MAX_NEIGHBORS_IN_JUNCTION:
                 raise Exception('Junction %s has too many links (max %d)' % (junction, MAX_NEIGHBORS_IN_JUNCTION))
 
-            self.junctions[JUNCTION_INT['upstream_neighbors_num'], i] = len(upstream)
-            self.junctions[JUNCTION_INT['downstream_neighbors_num'], i] = len(downstream)
+            self.junctions_int[JUNCTION_INT['upstream_neighbors_num'], i] = len(upstream)
+            self.junctions_int[JUNCTION_INT['downstream_neighbors_num'], i] = len(downstream)
 
             j = 1
             for node_name in upstream:
-                self.junctions[JUNCTION_INT['n%d' % j], i] = self.node_ids[node_name]
-                self.junctions[JUNCTION_INT['p%d' % j], i] = self.get_processor(node_name)
+                self.junctions_int[JUNCTION_INT['n%d' % j], i] = self.node_ids[node_name]
+                self.junctions_int[JUNCTION_INT['p%d' % j], i] = self.get_processor(node_name)
                 j += 1
             for node_name in downstream:
-                self.junctions[JUNCTION_INT['n%d' % j], i] = self.node_ids[node_name]
-                self.junctions[JUNCTION_INT['p%d' % j], i] = self.get_processor(node_name)
+                self.junctions_int[JUNCTION_INT['n%d' % j], i] = self.node_ids[node_name]
+                self.junctions_int[JUNCTION_INT['p%d' % j], i] = self.get_processor(node_name)
                 j += 1
 
             self.junction_name_list.append(junction)
