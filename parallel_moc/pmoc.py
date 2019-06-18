@@ -129,17 +129,21 @@ class Simulation:
             link_id = self.mesh.nodes_int[NODE_INT['link_id'], i]
             link_name = self.mesh.link_name_list[link_id]
             link = self.mesh.wn.get_link(link_name)
-            self.flow_results[0][i] = float(self.steady_state_sim.link['flowrate'][link_name])
 
+            self.flow_results[0][i] = float(self.steady_state_sim.link['flowrate'][link_name])
             start_node_name = link.start_node_name
             end_node_name = link.end_node_name
-
-            head_1 = float(self.steady_state_sim.node['head'][start_node_name])
-            head_2 = float(self.steady_state_sim.node['head'][end_node_name])
             k = self.mesh.nodes_int[NODE_INT['index'], i]
-            hl = head_1 - head_2
-            dx = k * link.length / self.mesh.segments[link_name]
-            self.head_results[0][i] = head_1 - (hl*(1 - dx/link.length))
+
+            if k == NULL:
+                self.head_results[0][i] = float(self.steady_state_sim.node['head'][start_node_name])
+
+            else:
+                head_1 = float(self.steady_state_sim.node['head'][start_node_name])
+                head_2 = float(self.steady_state_sim.node['head'][end_node_name])
+                hl = head_1 - head_2
+                dx = k * link.length / self.mesh.segments[link_name]
+                self.head_results[0][i] = head_1 - (hl*(1 - dx/link.length))
 
 class Mesh:
     """ Defines the mesh for an EPANET network to solve the 1D MOC
