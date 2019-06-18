@@ -10,7 +10,6 @@ NODE_INT = {
     'id' : 0,
     'node_type' : 1,
     'link_id' : 2,
-    'is_start': 3, # START: 1, END: 0, INTERIOR: NULL
     'processor' : 4,
     'is_ghost' : 5,
 
@@ -22,11 +21,11 @@ NODE_FLOAT = {
 }
 
 JUNCTION_INT = {
-    'upstream_neighbors_num' : 0, # between [0,6]
-    'downstream_neighbors_num' : 1, # between [0,6]
+    'downstream_neighbors_num' : 0, # between [0,6]
+    'upstream_neighbors_num' : 1, # between [0,6]
     # Neighbors
-    #   first, upstream neighbors are stored and then
-    #   downstream neighbors.
+    #   first, downstream neighbors are stored and then
+    #   upstream neighbors.
     #   * ni: neighbor id
     #   * pi: processor assigned to node with id ni
     'n1' : 2,
@@ -41,6 +40,11 @@ JUNCTION_INT = {
     'p4' : 11,
     'p5' : 12,
     'p6' : 13
+}
+
+JUNCTION_FLOAT = {
+    'demand' : 0,
+    'head': 1
 }
 
 LINK_INT = {
@@ -64,14 +68,13 @@ NODE_TYPES = {
     # boundary nodes
     'reservoir' : 1,
     'junction' : 2,
-    'valve_start' : 3,
-    'valve_end' : 4,
-    'pump_start' : 5,
-    'pump_end' : 6
+    'valve' : 3,
+    'pump' : 4,
 }
 
 LINK_TYPES = {
     'None' : NULL,
     'Pipe': 0,
-    'Valve': 1
+    'Valve': 1,
+    'Pump': 2
 }
