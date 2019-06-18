@@ -1,7 +1,7 @@
 
 MOC_PATH = "/home/watsup/Documents/Github/hammer-net/parallel_moc/"
 
-NULL = 0
+NULL = -1
 MAX_NEIGHBORS_IN_JUNCTION = 6
 G = 9.81 # m/s
 
@@ -9,8 +9,8 @@ G = 9.81 # m/s
 NODE_INT = {
     'id' : 0,
     'index': 1,
-    'node_type' : 1,
-    'link_id' : 2,
+    'node_type' : 2,
+    'link_id' : 3,
     'processor' : 4,
     'is_ghost' : 5
 }

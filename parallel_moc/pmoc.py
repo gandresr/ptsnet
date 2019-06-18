@@ -137,7 +137,6 @@ class Simulation:
 
             if k == NULL:
                 self.head_results[0][i] = float(self.steady_state_sim.node['head'][start_node_name])
-
             else:
                 head_1 = float(self.steady_state_sim.node['head'][start_node_name])
                 head_2 = float(self.steady_state_sim.node['head'][end_node_name])
@@ -356,21 +355,21 @@ class Mesh:
             sum(self.segments.values()) + len(self.segments) \
                 + self.wn.num_pumps + self.wn.num_valves
         self.nodes_int = np.full(
-            (len(NODE_INT), num_total_nodes), NULL)
+            (len(NODE_INT), num_total_nodes), NULL, dtype = 'int')
         self.nodes_float = np.full(
-            (len(NODE_FLOAT), num_total_nodes), NULL)
+            (len(NODE_FLOAT), num_total_nodes), NULL, dtype = 'float64')
 
         self.links_int = np.full(
-            (len(LINK_INT), len(self.wn.num_links)), NULL)
+            (len(LINK_INT), self.wn.num_links), NULL, dtype = 'int')
         self.links_float = np.full(
-            (len(LINK_FLOAT), len(self.wn.num_links)), NULL)
+            (len(LINK_FLOAT), self.wn.num_links), NULL, dtype = 'float64')
         self.link_ids = {}
         self.link_name_list = []
 
         self.junctions_int = np.full(
-            (len(JUNCTION_INT), len(self.wn.num_nodes)), NULL)
+            (len(JUNCTION_INT), self.wn.num_nodes), NULL, dtype = 'int')
         self.junctions_float = np.full(
-            (len(JUNCTION_FLOAT), len(self.wn.num_nodes)), NULL)
+            (len(JUNCTION_FLOAT), self.wn.num_nodes), NULL, dtype = 'float64')
         self.junction_ids = {}
         self.junction_name_list = []
 
@@ -429,10 +428,10 @@ class Mesh:
                         self.nodes_int[NODE_INT['link_id'], i] = k
                         if idx == 0:
                             self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['junction']
-                            self.junctions_int[JUNCTION_INT['n%d' % ii+1], start_id] = i
+                            self.junctions_int[JUNCTION_INT['n%d' % (ii+1)], start_id] = i
                         elif idx == self.segments[link_name]:
                             self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['junction']
-                            self.junctions_int[JUNCTION_INT['n%d' % jj+1], end_id] = i
+                            self.junctions_int[JUNCTION_INT['n%d' % (jj+1)], end_id] = i
                         else:
                             self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['interior']
                         pipe_diameter = link.diameter
@@ -445,8 +444,8 @@ class Mesh:
                 elif link.link_type in ('Valve', 'Pump'):
                     self.nodes_int[NODE_INT['id'], i] = i
                     self.nodes_int[NODE_INT['link_id'], i] = k
-                    self.junctions_int[JUNCTION_INT['n%d' % ii+1], start_id] = i
-                    self.junctions_int[JUNCTION_INT['n%d' % jj+1], end_id] = i
+                    self.junctions_int[JUNCTION_INT['n%d' % (ii+1)], start_id] = i
+                    self.junctions_int[JUNCTION_INT['n%d' % (jj+1)], end_id] = i
                     if link.link_type == 'Valve':
                         self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['valve']
                     elif link.link_type == 'Pump':
@@ -486,7 +485,7 @@ class Mesh:
         else:
             raise Exception("It is necessary to define the mesh graph")
 
-    def initialize_mesh(self, dt, wave_speed_file, default_wave_speed):
+    def initialize(self, dt, wave_speed_file, default_wave_speed):
         """Initializes the Mesh object
 
         Arguments:
