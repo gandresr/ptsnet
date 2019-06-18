@@ -8,6 +8,7 @@ G = 9.81 # m/s
 # Enums
 NODE_INT = {
     'id' : 0,
+    'index': 1,
     'node_type' : 1,
     'link_id' : 2,
     'processor' : 4,
@@ -66,10 +67,9 @@ NODE_TYPES = {
     'none' : NULL,
     'interior' : 0,
     # boundary nodes
-    'reservoir' : 1,
-    'junction' : 2,
-    'valve' : 3,
-    'pump' : 4,
+    'junction' : 1,
+    'valve' : 2,
+    'pump' : 3
 }
 
 LINK_TYPES = {

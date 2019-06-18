@@ -85,11 +85,10 @@ class Simulation:
     def __init__(self, mesh, T):
         self.T = T
         self.mesh = mesh
-        self.steady_state_sim = wntr.sim.EpanetSimulator(self.mesh.wn).run_sim()
-        self.flow_results = np.zeros((T, len(mesh.node_name_list)), dtype='float64')
-        self.head_results = np.zeros((T, len(mesh.node_name_list)), dtype='float64')
-        self._define_initial_conditions()
-        self._define_node_sim_constants()
+        self.steady_state_sim = mesh.steady_state_sim
+        self.flow_results = np.zeros((T, mesh.num_nodes), dtype='float64')
+        self.head_results = np.zeros((T, mesh.num_nodes), dtype='float64')
+        self.define_initial_conditions()
 
     def run_simulation(self):
         clk = Clock()
@@ -125,48 +124,22 @@ class Simulation:
             # run_pump_step()
         clk.toc()
 
-    def _define_node_sim_constants(self):
-        # ! ESTIMATE INITIAL CONDITIONS FIRST!!!
-        for i in range(len(self.mesh.node_name_list)):
+    def define_initial_conditions(self):
+        for i in range(self.mesh.num_nodes):
             link_id = self.mesh.nodes_int[NODE_INT['link_id'], i]
+            link_name = self.mesh.link_name_list[link_id]
+            link = self.mesh.wn.get_link(link_name)
+            self.flow_results[0][i] = float(self.steady_state_sim.link['flowrate'][link_name])
 
-            wave_speed = self.mesh.links_float[LINK_FLOAT['wave_speed'], link_id]
-            area = self.mesh.links_float[LINK_FLOAT['area'], link_id]
+            start_node_name = link.start_node_name
+            end_node_name = link.end_node_name
 
-            ffactor = self.mesh.links_float[LINK_FLOAT['ffactor'], link_id]
-            dx = self.mesh.links_float[LINK_FLOAT['dx'], link_id]
-            diameter = self.mesh.links_float[LINK_FLOAT['diameter'], link_id]
-
-            self.mesh.nodes_float[NODE_FLOAT['B'], i] = wave_speed / (G*area)
-            self.mesh.nodes_float[NODE_FLOAT['R'], i] = ffactor*dx / (2*G*diameter*area**2)
-
-    def _define_initial_conditions(self):
-        for i, node in enumerate(self.mesh.node_name_list):
-            labels = node.split('.')
-            n1 = labels[0]
-            n2 = labels[2]
-            pipe = labels[3]
-
-            k = int(labels[1])
-            N = int(labels[4])
-
-            if k == 0 or k == N: # Boundary node
-                if k == 0:
-                    head = float(self.steady_state_sim.node['head'][n1])
-                if k == N:
-                    head = float(self.steady_state_sim.node['head'][n2])
-                self.flow_results[0][i] = float(self.steady_state_sim.link['flowrate'][pipe])
-            else: # Interior node
-                head_1 = float(self.steady_state_sim.node['head'][n2])
-                head_2 = float(self.steady_state_sim.node['head'][n1])
-                hl = head_1 - head_2
-                L = self.mesh.wn.get_link(pipe).length
-                dx = k * L / self.mesh.segments[pipe]
-                self.head_results[0][i] = head_1 - (hl*(1 - dx/L))
-                self.flow_results[0][i] = float(self.steady_state_sim.link['flowrate'][pipe])
-
-        for pipe_name in self.mesh.wn.pipe_name_list:
-            self.mesh.links_float[LINK_FLOAT['ffactor'], self.mesh.link_ids[pipe_name]] = float(self.steady_state_sim.link['frictionfact'][pipe_name])
+            head_1 = float(self.steady_state_sim.node['head'][start_node_name])
+            head_2 = float(self.steady_state_sim.node['head'][end_node_name])
+            k = self.mesh.nodes_int[NODE_INT['index'], i]
+            hl = head_1 - head_2
+            dx = k * link.length / self.mesh.segments[link_name]
+            self.head_results[0][i] = head_1 - (hl*(1 - dx/link.length))
 
 class Mesh:
     """ Defines the mesh for an EPANET network to solve the 1D MOC
@@ -221,8 +194,9 @@ class Mesh:
 
         self.fname = input_file[:input_file.find('.inp')]
         self.wn = wntr.network.WaterNetworkModel(input_file)
-        self.steady_state_sim = wntr.sim.EpanetSimulator(self.mesh.wn).run_sim()
+        self.steady_state_sim = wntr.sim.EpanetSimulator(self.wn).run_sim()
         self.network_graph = self.wn.get_graph()
+
         self.mesh_graph = None
         self.time_step = None
         self.num_processors = None # number of processors
@@ -237,30 +211,26 @@ class Mesh:
         self.nodes_int = None
         self.nodes_float = None
         self.node_ids = None
-        self.node_name_list = None
-        # Boundary nodes
-        self.reservoir_ids = None
-        self.junction_ids = None
-        self.valve_start_ids = None
-        self.valve_end_ids = None
-        self.pump_start_ids = None
-        self.pump_end_ids = None
+        self.num_nodes = 0
 
         # Data structures associated to junctions
         self.junctions_int = None
         self.junctions_float = None
         self.junction_ids = None
         self.junction_name_list = None
+        self.num_junctions = 0
 
         # Data structures associated to links (pipes, valves, pumps)
         self.links_int = None
         self.links_float = None
         self.link_ids = None
         self.link_name_list = None
+        self.num_links = 0
 
         # Initialize mesh
         if (default_wave_speed is None) and (wave_speed_file is None):
             raise Exception("It is necessary to define a wave speed value or waves speed file")
+
         self.initialize(dt, wave_speed_file, default_wave_speed)
 
         # self.partitioning: Contains graph partitioning info
@@ -370,14 +340,35 @@ class Mesh:
         segments_num: total number of segments in pipe
 
         # * network_graph is a directed graph
-        #  * There are sp-1 interior points for every pipe (sp is the
+        # * There are sp-1 interior points for every pipe (sp is the
             number of segments in which a pipe is going to be divided
-        # * Every pipe has 2 junction boundary nodes
-        # * This function should be called only after defining the segments
+        # * Every pipe has 2 boundary nodes
+        # * Every non-pipe element has 1 boundary node
+        # * This function should only be called after defining the segments
             for each pipe in the network
         """
 
-        visited_nodes = {}
+        num_total_nodes = \
+            sum(self.segments.values()) + len(self.segments) \
+                + self.wn.num_pumps + self.wn.num_valves
+        self.nodes_int = np.full(
+            (len(NODE_INT), num_total_nodes), NULL)
+        self.nodes_float = np.full(
+            (len(NODE_FLOAT), num_total_nodes), NULL)
+
+        self.links_int = np.full(
+            (len(LINK_INT), len(self.wn.num_links)), NULL)
+        self.links_float = np.full(
+            (len(LINK_FLOAT), len(self.wn.num_links)), NULL)
+        self.link_ids = {}
+        self.link_name_list = []
+
+        self.junctions_int = np.full(
+            (len(JUNCTION_INT), len(self.wn.num_nodes)), NULL)
+        self.junctions_float = np.full(
+            (len(JUNCTION_FLOAT), len(self.wn.num_nodes)), NULL)
+        self.junction_ids = {}
+        self.junction_name_list = []
 
         i = 0 # nodes index
         j = 0 # junctions index
@@ -395,6 +386,7 @@ class Mesh:
             # Update start_node as junction
             if start_node_name not in self.junction_ids:
                 self.junction_ids[start_node_name] = j
+                self.junction_name_list.append(start_node_name)
                 j += 1
 
             start_id = self.junction_ids[start_node_name] # start junction id
@@ -408,6 +400,7 @@ class Mesh:
                 # Define downstream node as junction
                 if downstream_node_name not in self.junction_ids:
                     self.junction_ids[downstream_node_name] = j
+                    self.junction_name_list.append(downstream_node_name)
                     j += 1
 
                 end_id = self.junction_ids[downstream_node_name] # end junction id
@@ -420,10 +413,6 @@ class Mesh:
                 # Index of last upstream node of end junction
                 jj = len(self.network_graph[downstream_node_name]) + self.junctions_int[JUNCTION_INT['upstream_neighbors_num'], end_id] - 1
 
-                # Link definition
-                self.links_int[LINK_INT['id'], k] = k
-                self.links_int[LINK_INT['link_type'], k] = LINK_TYPES[link.link_type]
-
                 # Node definition
                 if link.link_type == 'Pipe':
                     # * Nodes are stored in order, such that the i-1 and the i+1
@@ -432,18 +421,19 @@ class Mesh:
                     for idx in range(self.segments[link_name]+1):
                         # Pipe nodes definition
                         self.nodes_int[NODE_INT['id'], i] = i
+                        self.nodes_int[NODE_INT['index'], i] = idx
                         self.nodes_int[NODE_INT['link_id'], i] = k
                         if idx == 0:
                             self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['junction']
-                            self.junctions_int[JUNCTION_INT['n%d' % ii], start_id] = i
+                            self.junctions_int[JUNCTION_INT['n%d' % ii+1], start_id] = i
                         elif idx == self.segments[link_name]:
                             self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['junction']
-                            self.junctions_int[JUNCTION_INT['n%d' % jj], end_id] = i
+                            self.junctions_int[JUNCTION_INT['n%d' % jj+1], end_id] = i
                         else:
                             self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['interior']
                         pipe_diameter = link.diameter
                         pipe_area = (np.pi * link.diameter ** 2 / 4)
-                        ffactor = float(self.steady_state_sim.link['frictionfact'][pipe_name])
+                        ffactor = float(self.steady_state_sim.link['frictionfact'][link_name])
                         dx = link.length / self.segments[link_name]
                         self.nodes_float[NODE_FLOAT['B'], i] = self.wave_speeds[link_name] / (G*pipe_area)
                         self.nodes_float[NODE_FLOAT['R'], i] = ffactor*dx / (2*G*pipe_diameter*pipe_area**2)
@@ -451,19 +441,22 @@ class Mesh:
                 elif link.link_type in ('Valve', 'Pump'):
                     self.nodes_int[NODE_INT['id'], i] = i
                     self.nodes_int[NODE_INT['link_id'], i] = k
-                    self.junctions_int[JUNCTION_INT['n%d' % ii], start_id] = i
-                    self.junctions_int[JUNCTION_INT['n%d' % jj], end_id] = i
+                    self.junctions_int[JUNCTION_INT['n%d' % ii+1], start_id] = i
+                    self.junctions_int[JUNCTION_INT['n%d' % jj+1], end_id] = i
                     if link.link_type == 'Valve':
                         self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['valve']
                     elif link.link_type == 'Pump':
                         self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['pump']
                     i += 1
                 else:
-                    raise Exception("Link %s of type %s is not supported" % (start_links[0], link.link_type))
-                k += 1
+                    raise Exception("Link %s of type %s is not supported" % (link_name, link.link_type))
 
-        if write_mesh:
-            self._write_mesh()
+                # Link definition
+                self.links_int[LINK_INT['id'], k] = k
+                self.links_int[LINK_INT['link_type'], k] = LINK_TYPES[link.link_type]
+                self.link_name_list.append(link_name)
+                self.link_ids[link_name] = k
+                k += 1
 
     def _write_mesh(self):
         """ Saves the mesh graph in a file compatible with METIS
@@ -489,83 +482,7 @@ class Mesh:
         else:
             raise Exception("It is necessary to define the mesh graph")
 
-    def _define_junctions(self):
-        """Defines data structures associated to junctions
-
-        There are three data structures associated to junctions:
-        - self.junctions: table with properties of junctions (as defined in JUNCTION)
-        - self.junction_name_list: list with the names of junctions. The order directly
-            corresponds to the order of self.junctions
-        - self.junction_ids: dict that maps junction names to indexes associated to
-            data structures
-
-        Raises:
-            Exception: if two junctions are connected by a non-pipe element
-            Exception: if a junction has more than MAX_NEIGHBORS_IN_JUNCTION links attached
-                to it
-        """
-
-        self.junctions_int = np.full((len(JUNCTION_INT), len(self.network_graph)), NULL, dtype = int)
-        self.junction_ids = {}
-        self.junction_name_list = []
-
-        i = 0
-        for junction in self.network_graph:
-            neighbors = self.mesh_graph.neighbors(junction)
-            upstream = []
-            downstream = []
-
-            # The neighbors of a junction node can be:
-            #   - Start/end nodes of a non-pipe element
-            #   - Boundary nodes of a pipe
-            for neighbor in neighbors:
-                if '.' in neighbor: # Boundary nodes of a pipe
-                    labels = neighbor.split('.')
-                    k = int(labels[1])
-                    N = int(labels[4])
-                    if k == 0:
-                        downstream.append(neighbor)
-                    elif k == N:
-                        upstream.append(neighbor)
-                else: # Start/end nodes of a non-pipe element
-                    second_neighbors = list(set(self.mesh_graph.neighbors(neighbor)) - {junction})
-                    # Since two junctions cannot be connected by non-pipe elements,
-                    #   the neighbors of an start/end node, exluding the junction
-                    #   node connected to it, can only be boundary nodes of a pipe. Thus,
-                    #   len(second_neighbors) \in {0,1}
-                    if len(second_neighbors) == 0: # Terminal junction
-                        continue
-                    if '.' not in second_neighbors[0]:
-                        raise Exception('Internal error, assumptions are not satisfied')
-                    labels = second_neighbors[0].split('.')
-                    k = int(labels[1])
-                    N = int(labels[4])
-                    if k == N:
-                        upstream.append(second_neighbors[0])
-                    else:
-                        downstream.append(second_neighbors[0])
-
-            if len(upstream) + len(downstream) > MAX_NEIGHBORS_IN_JUNCTION:
-                raise Exception('Junction %s has too many links (max %d)' % (junction, MAX_NEIGHBORS_IN_JUNCTION))
-
-            self.junctions_int[JUNCTION_INT['upstream_neighbors_num'], i] = len(upstream)
-            self.junctions_int[JUNCTION_INT['downstream_neighbors_num'], i] = len(downstream)
-
-            j = 1
-            for node_name in upstream:
-                self.junctions_int[JUNCTION_INT['n%d' % j], i] = self.node_ids[node_name]
-                self.junctions_int[JUNCTION_INT['p%d' % j], i] = self.get_processor(node_name)
-                j += 1
-            for node_name in downstream:
-                self.junctions_int[JUNCTION_INT['n%d' % j], i] = self.node_ids[node_name]
-                self.junctions_int[JUNCTION_INT['p%d' % j], i] = self.get_processor(node_name)
-                j += 1
-
-            self.junction_name_list.append(junction)
-            self.junction_ids[junction] = i
-            i += 1
-
-    def initialize(self, dt, wave_speed_file, default_wave_speed):
+    def initialize_mesh(self, dt, wave_speed_file, default_wave_speed):
         """Initializes the Mesh object
 
         Arguments:
@@ -575,12 +492,14 @@ class Mesh:
             default_wave_speed {float} -- wave speed value for all the pipes in
                 the network
         """
+
         self._define_wave_speeds(default_wave_speed, wave_speed_file)
         self._define_segments(dt)
         self._define_mesh()
-        self._define_links()
-        self._define_nodes()
-        self._define_junctions()
+        self.num_nodes = self.nodes_int.shape[1]
+        self.num_links = self.links_int.shape[1]
+        self.num_junctions = self.junctions_int.shape[1]
+
         self.partitioning = None
 
     def define_partitions(self, k):
