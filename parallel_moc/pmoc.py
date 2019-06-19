@@ -140,9 +140,13 @@ class Simulation:
             else:
                 head_1 = float(self.steady_state_sim.node['head'][start_node_name])
                 head_2 = float(self.steady_state_sim.node['head'][end_node_name])
-                hl = head_1 - head_2
                 dx = k * link.length / self.mesh.segments[link_name]
-                self.head_results[0][i] = head_1 - (hl*(1 - dx/link.length))
+                if head_1 > head_2:
+                    hl = head_1 - head_2
+                    self.head_results[0][i] = head_1 - hl*dx/link.length
+                else:
+                    hl = head_2 - head_1
+                    self.head_results[0][i] = head_1 + hl*dx/link.length
 
 class Mesh:
     """ Defines the mesh for an EPANET network to solve the 1D MOC
