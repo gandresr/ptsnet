@@ -100,6 +100,8 @@ class Simulation:
         self.flow_results = np.zeros((T, mesh.num_nodes), dtype='float64')
         self.head_results = np.zeros((T, mesh.num_nodes), dtype='float64')
         self.settings = []
+        self.discharge_coefficients = []
+        self.curves = []
         self.define_initial_conditions()
 
     def run_simulation(self):
@@ -128,6 +130,61 @@ class Simulation:
             # run_pump_step()
         clk.toc()
 
+    def define_curve(self, link_name, curve_type, curve = None,
+        curve_file = None):
+        """Defines curve values for a link
+
+        If curve_type == 'Valve', then it corresponds to a Discharge
+        coefficient vs setting. If a curve is defined, it should be
+        a 2D array such that the first column contains setting values
+        and the second column discharge coefficient values (it should be
+        similarly done if a CSV file is defined)
+
+        e.g.,
+
+        curve = [[0.8, 1],
+                 [0.6, 0.55],
+                 [0.4, 0.28],
+                 [0.2, 0.1],
+                 [0, 0]]
+
+        => setting = [0.8, 0.6, 0.4, 0.2, 0]
+        => discharge_coefficients = [1, 0.55, 0.28, 0.1, 0]
+
+        Arguments:
+            link_name {string} -- [description]
+            curve_type {string} -- [description]
+
+        Keyword Arguments:
+            curve {2D array} -- 2D array with curve values (default: {None})
+            curve_file {string} -- path to curve file (default: {None})
+
+        Raises:
+            Exception: If curve or curve_file is not defined
+            Exception: If curve_type is not compatible with link type
+        """
+
+        if curve is None and curve_file is None:
+            raise Exception("It is necessary to define either a curve iterable or a curve_file")
+
+        link_id = self.mesh.link_ids[link_name]
+
+        if self.mesh.links_int[LINK_INT['link_type'], link_id] == LINK_TYPES['Valve']:
+            if curve_type != 'Valve':
+                raise Exception("Type of curve is not compatible with valve %s" % link_name)
+
+        # TODO: Incorporate other types of curves
+
+        if curve is not None:
+            cc = curve
+        elif curve_file is not None:
+            cc = np.loadtxt(curve_file, delimiter=',')
+
+        self.mesh.curves.append(cc)
+        curve_id = len(mesh.curves) - 1
+        self.mesh.links_int[LINK_INT['curve'], link_id] = curve_id
+        self.mesh.links_int[LINK_INT['curve_type'], link_id] = CURVE_TYPES[curve_type]
+
     def define_valve_setting(self, valve_name, setting = None,
         setting_file = None, default_setting = 1):
         """Defines setting values for a valve during the simulation time
@@ -147,6 +204,11 @@ class Simulation:
                 first T steps of the simulation, T <= self.time_steps. The i-th
                 line of the file has the value of the valve setting at the i-th
                 time step (default: {None})
+            default_setting {int} -- default value assigned to not setting
+                values that are not defined (default: {1})
+
+        Raises:
+            Exception: If setting iterable or setting file is not defined
         """
         if setting is None and setting_file is None:
             raise Exception("It is necessary to define either a setting iterable or a setting_file")
@@ -163,11 +225,13 @@ class Simulation:
         # [:N] in case that len(settings) > N
         self.settings.append(np.array(settings[:N], dtype='float64'))
 
-        setting_id = len(self.settings)
+        setting_id = len(self.settings) - 1
         valve_id = self.mesh.junction_ids[valve_name]
         self.mesh.links_int[LINK_INT['setting'], valve_id] = setting_id
 
     def define_initial_conditions(self):
+        """Extracts initial conditions from EPANET
+        """
         for i in range(self.mesh.num_nodes):
             link_id = self.mesh.nodes_int[NODE_INT['link_id'], i]
             link_name = self.mesh.link_name_list[link_id]

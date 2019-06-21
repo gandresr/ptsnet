@@ -50,7 +50,9 @@ JUNCTION_FLOAT = {
 LINK_INT = {
     'id': 0,
     'link_type': 1,
-    'setting': 2
+    'setting': 2,
+    'curve': 3,
+    'curve_type': 4
 }
 
 LINK_FLOAT = {
@@ -76,4 +78,8 @@ LINK_TYPES = {
     'Pipe': 0,
     'Valve': 1,
     'Pump': 2
+}
+
+CURVE_TYPES = {
+    'Valve': 0 # Cd vs % open
 }
