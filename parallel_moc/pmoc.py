@@ -26,44 +26,44 @@ def run_interior_step(Q1, Q2, H1, H2, B, R):
 def run_valve_step():
     pass
 
-@njit
-def run_junction_step(junctions_int, junctions_float,
-    nodes_int, nodes_float, Q1, Q2, H1, H2, B, R, settings):
-    # junctions is a matrix that contains neighbors info for each boundary node
-    #   bare in mind that neighbors of boundary nodes are also boundary nodes!
-    for i in range(junctions_int.shape[1]):
-        if junctions_int[0, i] == 0 and junctions_int[1,i] == 0:
-            continue
+# @njit
+# def run_junction_step(junctions_int, junctions_float,
+#     nodes_int, nodes_float, Q1, Q2, H1, H2, B, R, settings):
+#     # junctions is a matrix that contains neighbors info for each boundary node
+#     #   bare in mind that neighbors of boundary nodes are also boundary nodes!
+#     for i in range(junctions_int.shape[1]):
+#         if junctions_int[0, i] == 0 and junctions_int[1,i] == 0:
+#             continue
 
-        sc = 0
-        sb = 0
+#         sc = 0
+#         sb = 0
 
-        # downstream_neighbors_num
-        for j in range(junctions_int[0,i]):
-            k = junctions_int[j+2,i]-1
-            if nodes_int[2, k] == 1: # node_type == junction
-                sc += (H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
-                sb += 1 / (B[k] + R[k]*abs(Q1[k]))
-            elif nodes_int[2, k] == 2: # valve node
-                end_junction = nodes_int[1, k]
-                if
+#         # downstream_neighbors_num
+#         for j in range(junctions_int[0,i]):
+#             k = junctions_int[j+2,i]-1
+#             if nodes_int[2, k] == 1: # node_type == junction
+#                 sc += (H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+#                 sb += 1 / (B[k] + R[k]*abs(Q1[k]))
+#             elif nodes_int[2, k] == 2: # valve node
+#                 end_junction = nodes_int[1, k]
+#                 if
 
-        # upstream_neighbors_num
-        for j in range(junctions_int[0,i], junctions[0,i]+junctions[1,i]):
-            k = junctions[j+2,i]+1
-            if nodes_int[2, k] == 1: # node_type == junction
-                sc += (H1[k] - B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
-                sb += 1 / (B[k] + R[k]*abs(Q1[k]))
+#         # upstream_neighbors_num
+#         for j in range(junctions_int[0,i], junctions[0,i]+junctions[1,i]):
+#             k = junctions[j+2,i]+1
+#             if nodes_int[2, k] == 1: # node_type == junction
+#                 sc += (H1[k] - B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+#                 sb += 1 / (B[k] + R[k]*abs(Q1[k]))
 
-        for j in range(junctions[0,i]):
-            k = junctions[j+2,i]-1
-            H2[j] = sc/sb
-            Q2[j] = (H1[k] + B[k]*Q1[k] - H2[k]) / (B[k] + R[k]*abs(Q1[k]))
+#         for j in range(junctions[0,i]):
+#             k = junctions[j+2,i]-1
+#             H2[j] = sc/sb
+#             Q2[j] = (H1[k] + B[k]*Q1[k] - H2[k]) / (B[k] + R[k]*abs(Q1[k]))
 
-        for j in range(junctions[0,i], junctions[0,i]+junctions[1,i]):
-            k = junctions[j+2,i]+1
-            H2[j] = sc/sb
-            Q2[j] = (H2[k] - H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+#         for j in range(junctions[0,i], junctions[0,i]+junctions[1,i]):
+#             k = junctions[j+2,i]+1
+#             H2[j] = sc/sb
+#             Q2[j] = (H2[k] - H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
 
 @njit
 def run_reservoir_step(
@@ -95,7 +95,7 @@ class Simulation:
     * valves should be 100% open for initial conditions
     """
     def __init__(self, mesh, T):
-        self.T = T
+        self.time_steps = T
         self.mesh = mesh
         self.steady_state_sim = mesh.steady_state_sim
         self.flow_results = np.zeros((T, mesh.num_nodes), dtype='float64')
@@ -107,7 +107,7 @@ class Simulation:
     def run_simulation(self):
         clk = Clock()
 
-        for t in range(1, self.T):
+        for t in range(1, self.time_steps):
             if t == 2:
                 clk.tic()
             # HECK YEAH! THIS THING RUNS AT WARP SPEED
@@ -130,8 +130,7 @@ class Simulation:
             # run_pump_step()
         clk.toc()
 
-    def define_curve(self, link_name, curve_type, curve = None,
-        curve_file = None):
+    def define_curve(self, link_name, curve_type, curve = None, curve_file = None):
         """Defines curve values for a link
 
         If curve_type == 'Valve', then it corresponds to a Discharge
@@ -180,13 +179,14 @@ class Simulation:
         elif curve_file is not None:
             cc = np.loadtxt(curve_file, delimiter=',')
 
-        self.mesh.curves.append(cc)
-        curve_id = len(mesh.curves) - 1
+        cc = cc[np.argsort(cc[:,0])] # order by x-axis
+        self.curves.append(cc)
+
+        curve_id = len(self.curves) - 1
         self.mesh.links_int[LINK_INT['curve_id'], link_id] = curve_id
         self.mesh.links_int[LINK_INT['curve_type'], link_id] = CURVE_TYPES[curve_type]
 
-    def define_valve_setting(self, valve_name, setting = None,
-        setting_file = None, default_setting = 1):
+    def define_valve_setting(self, valve_name, setting = None, setting_file = None, default_setting = 1):
         """Defines setting values for a valve during the simulation time
 
         If the valve setting is not defined for a certain time step, the
@@ -214,7 +214,7 @@ class Simulation:
         if setting is None and setting_file is None:
             raise Exception("It is necessary to define either a setting iterable or a setting_file")
 
-        valve_id = self.mesh.junction_ids[valve_name]
+        valve_id = self.mesh.link_ids[valve_name]
         curve_id = self.mesh.links_int[LINK_INT['curve_id'], valve_id]
 
         if curve_id == NULL:
@@ -222,24 +222,21 @@ class Simulation:
 
         ss = []
         if setting is not None:
-            ss = setting
+            ss = np.array(setting)
         elif setting_file is not None:
-            ss = np.loadtxt(valve_file, dtype=float)
+            ss = np.loadtxt(setting_file, dtype=float)
 
-        N = len(setting)
+        N = len(ss)
         if N < self.time_steps:
-            setting += [default_setting for i in range(self.time_steps - T)]
-        # [:N] in case that len(settings) > N
+            ss = np.concatenate((ss, np.full((self.time_steps - N, 1), default_setting)), axis = None)
 
-        curve_setting = self.curves[curve_id][:,0]
-        curve_dcoeff = self.curves[curve_id][:,1]
-
-        spl = splrep(curve_setting, curve_dcoeff)
-        dcoeffs = splev(ss, spl)
+        spl = splrep(self.curves[curve_id][:,0], self.curves[curve_id][:,1])
+        # [:self.time_steps] in case that len(ss) > self.time_steps
+        dcoeffs = splev(ss[:self.time_steps], spl)
 
         self.discharge_coefficients.append(dcoeffs)
 
-        dcoeff_id = len(self.settings) - 1
+        dcoeff_id = len(self.discharge_coefficients) - 1
         self.mesh.links_int[LINK_INT['dcoeff_id'], valve_id] = dcoeff_id
 
     def define_initial_conditions(self):
