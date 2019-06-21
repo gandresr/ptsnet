@@ -8,11 +8,11 @@ G = 9.81 # m/s
 # Enums
 NODE_INT = {
     'id' : 0,
-    'index': 1,
+    'subindex': 1,
     'node_type' : 2,
     'link_id' : 3,
     'processor' : 4,
-    'is_ghost' : 5
+    'is_ghost' : 5,
 }
 
 NODE_FLOAT = {
@@ -49,7 +49,8 @@ JUNCTION_FLOAT = {
 
 LINK_INT = {
     'id': 0,
-    'link_type': 1
+    'link_type': 1,
+    'setting': 2
 }
 
 LINK_FLOAT = {
@@ -58,8 +59,7 @@ LINK_FLOAT = {
     'wave_speed' : 2,
     'ffactor' : 3,
     'length' : 4,
-    'dx' : 5,
-    'setting': 6
+    'dx' : 5
 }
 
 NODE_TYPES = {
