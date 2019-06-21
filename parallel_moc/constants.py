@@ -50,8 +50,8 @@ JUNCTION_FLOAT = {
 LINK_INT = {
     'id': 0,
     'link_type': 1,
-    'setting': 2,
-    'curve': 3,
+    'dcoeff_id': 2,
+    'curve_id': 3,
     'curve_type': 4
 }
 

@@ -6,6 +6,7 @@ import subprocess
 import dis
 
 from constants import *
+from scipy.interpolate import splev, splrep
 from numba import njit
 from time import time
 from os.path import isdir
@@ -99,7 +100,6 @@ class Simulation:
         self.steady_state_sim = mesh.steady_state_sim
         self.flow_results = np.zeros((T, mesh.num_nodes), dtype='float64')
         self.head_results = np.zeros((T, mesh.num_nodes), dtype='float64')
-        self.settings = []
         self.discharge_coefficients = []
         self.curves = []
         self.define_initial_conditions()
@@ -176,13 +176,13 @@ class Simulation:
         # TODO: Incorporate other types of curves
 
         if curve is not None:
-            cc = curve
+            cc = np.array(curve, dtype='float64')
         elif curve_file is not None:
             cc = np.loadtxt(curve_file, delimiter=',')
 
         self.mesh.curves.append(cc)
         curve_id = len(mesh.curves) - 1
-        self.mesh.links_int[LINK_INT['curve'], link_id] = curve_id
+        self.mesh.links_int[LINK_INT['curve_id'], link_id] = curve_id
         self.mesh.links_int[LINK_INT['curve_type'], link_id] = CURVE_TYPES[curve_type]
 
     def define_valve_setting(self, valve_name, setting = None,
@@ -209,9 +209,16 @@ class Simulation:
 
         Raises:
             Exception: If setting iterable or setting file is not defined
+            Exception: If valve curve has not been defined
         """
         if setting is None and setting_file is None:
             raise Exception("It is necessary to define either a setting iterable or a setting_file")
+
+        valve_id = self.mesh.junction_ids[valve_name]
+        curve_id = self.mesh.links_int[LINK_INT['curve_id'], valve_id]
+
+        if curve_id == NULL:
+            raise Exception("It is necessary to define the valve curve first")
 
         ss = []
         if setting is not None:
@@ -223,11 +230,17 @@ class Simulation:
         if N < self.time_steps:
             setting += [default_setting for i in range(self.time_steps - T)]
         # [:N] in case that len(settings) > N
-        self.settings.append(np.array(settings[:N], dtype='float64'))
 
-        setting_id = len(self.settings) - 1
-        valve_id = self.mesh.junction_ids[valve_name]
-        self.mesh.links_int[LINK_INT['setting'], valve_id] = setting_id
+        curve_setting = self.curves[curve_id][:,0]
+        curve_dcoeff = self.curves[curve_id][:,1]
+
+        spl = splrep(curve_setting, curve_dcoeff)
+        dcoeffs = splev(ss, spl)
+
+        self.discharge_coefficients.append(dcoeffs)
+
+        dcoeff_id = len(self.settings) - 1
+        self.mesh.links_int[LINK_INT['dcoeff_id'], valve_id] = dcoeff_id
 
     def define_initial_conditions(self):
         """Extracts initial conditions from EPANET
