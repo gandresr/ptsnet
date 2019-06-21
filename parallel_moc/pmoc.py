@@ -22,32 +22,51 @@ def run_interior_step(Q1, Q2, H1, H2, B, R):
         Q2[i] = ((H1[i-1] + B[i]*Q1[i-1]) - (H1[i+1] - B[i]*Q1[i+1])) \
             / ((B[i] + R[i]*abs(Q1[i-1])) + (B[i] + R[i]*abs(Q1[i+1])))
 
-@njit
-def run_junction_step(junctions, Q1, Q2, H1, H2, B, R):
-    # junctions is a matrix that contains neighbors info for each boundary node
-    #   bare in mind that neighbors of boundary nodes are also boundary nodes!
-    for i in range(junctions.shape[1]):
-        sc = 0
-        sb = 0
-        for j in range(junctions[0,i]): # junctions[0,i] == upstream_neigh_num[i]
-            k = junctions[j+2,i]-1
-            sc += (H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
-            sb += 1 / (B[k] + R[k]*abs(Q1[k]))
+def run_valve_step():
+    pass
 
-        for j in range(junctions[0,i], junctions[0,i]+junctions[1,i]):
-            k = junctions[j+2,i]+1
-            sc += (H1[k] - B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
-            sb += 1 / (B[k] + R[k]*abs(Q1[k]))
+# @njit
+# def run_junction_step(junctions_int, junctions_float,
+#     nodes_int, nodes_float, Q1, Q2, H1, H2, B, R):
+#     # junctions is a matrix that contains neighbors info for each boundary node
+#     #   bare in mind that neighbors of boundary nodes are also boundary nodes!
+#     for i in range(junctions_int.shape[1]):
+#         if junctions_int[0, i] == 0 and junctions_int[1,i] == 0:
+#             raise Exception("There is an isolated node")
 
-        for j in range(junctions[0,i]):
-            k = junctions[j+2,i]-1
-            H2[j] = sc/sb
-            Q2[j] = (H1[k] + B[k]*Q1[k] - H2[k]) / (B[k] + R[k]*abs(Q1[k]))
+#         if junctions_int[0, i] == 0: # downstream_neighbors_num
+#             if junctions_float[0, i] != NULL: # Fixed flow (demand)
 
-        for j in range(junctions[0,i], junctions[0,i]+junctions[1,i]):
-            k = junctions[j+2,i]+1
-            H2[j] = sc/sb
-            Q2[j] = (H2[k] - H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+#             elif junctions_float[1, i] != NULL: # Fixed head (reservoir)
+
+#         if junctions_int[1, i] == 0: # upstream_neighbors_num
+
+#         sc = 0
+#         sb = 0
+
+#         # downstream_neighbors_num
+#         for j in range(junctions[0,i]):
+#             k = junctions[j+2,i]-1
+#             if nodes_int[2, k] == 1: # node_type == junction
+#                 sc += (H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+#                 sb += 1 / (B[k] + R[k]*abs(Q1[k]))
+
+#         # upstream_neighbors_num
+#         for j in range(junctions[0,i], junctions[0,i]+junctions[1,i]):
+#             k = junctions[j+2,i]+1
+#             if nodes_int[2, k] == 1: # node_type == junction
+#                 sc += (H1[k] - B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+#                 sb += 1 / (B[k] + R[k]*abs(Q1[k]))
+
+#         for j in range(junctions[0,i]):
+#             k = junctions[j+2,i]-1
+#             H2[j] = sc/sb
+#             Q2[j] = (H1[k] + B[k]*Q1[k] - H2[k]) / (B[k] + R[k]*abs(Q1[k]))
+
+#         for j in range(junctions[0,i], junctions[0,i]+junctions[1,i]):
+#             k = junctions[j+2,i]+1
+#             H2[j] = sc/sb
+#             Q2[j] = (H2[k] - H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
 
 @njit
 def run_reservoir_step(
@@ -93,8 +112,9 @@ class Simulation:
     def run_simulation(self):
         clk = Clock()
 
-        clk.tic()
         for t in range(1, self.T):
+            if t == 2:
+                clk.tic()
             # HECK YEAH! THIS THING RUNS AT WARP SPEED
             run_interior_step(
                 self.flow_results[t-1,:],
@@ -103,23 +123,14 @@ class Simulation:
                 self.head_results[t,:],
                 self.mesh.nodes_float[NODE_FLOAT['B'],:],
                 self.mesh.nodes_float[NODE_FLOAT['R'],:])
-            run_junction_step(
-                self.mesh.junctions_int,
-                self.flow_results[t-1,:],
-                self.flow_results[t,:],
-                self.head_results[t-1,:],
-                self.head_results[t,:],
-                self.mesh.nodes_float[NODE_FLOAT['B'],:],
-                self.mesh.nodes_float[NODE_FLOAT['R'],:])
-            run_reservoir_step(
-                self.mesh.reservoir_ids,
-                self.mesh.nodes_int[NODE_INT['is_start'],:],
-                self.flow_results[t-1,:],
-                self.flow_results[t,:],
-                self.head_results[t-1,:],
-                self.head_results[t,:],
-                self.mesh.nodes_float[NODE_FLOAT['B'],:],
-                self.mesh.nodes_float[NODE_FLOAT['R'],:])
+            # run_junction_step(
+            #     self.mesh.junctions_int,
+            #     self.flow_results[t-1,:],
+            #     self.flow_results[t,:],
+            #     self.head_results[t-1,:],
+            #     self.head_results[t,:],
+            #     self.mesh.nodes_float[NODE_FLOAT['B'],:],
+            #     self.mesh.nodes_float[NODE_FLOAT['R'],:])
             # run_valve_step()
             # run_pump_step()
         clk.toc()
@@ -449,7 +460,7 @@ class Mesh:
                     self.nodes_int[NODE_INT['id'], i] = i
                     self.nodes_int[NODE_INT['link_id'], i] = k
                     self.junctions_int[JUNCTION_INT['n%d' % (ii+1)], start_id] = i
-                    self.junctions_int[JUNCTION_INT['n%d' % (jj+1)], end_id] = i
+                    self.junctions_int[JUNCTION_INT['upstream_neighbors_num'], end_id] -= 1
                     if link.link_type == 'Valve':
                         self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['valve']
                     elif link.link_type == 'Pump':
