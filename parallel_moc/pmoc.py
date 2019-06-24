@@ -23,66 +23,6 @@ def run_interior_step(Q1, Q2, H1, H2, B, R):
         Q2[i] = ((H1[i-1] + B[i]*Q1[i-1]) - (H1[i+1] - B[i]*Q1[i+1])) \
             / ((B[i] + R[i]*abs(Q1[i-1])) + (B[i] + R[i]*abs(Q1[i+1])))
 
-def run_valve_step():
-    pass
-
-# @njit
-# def run_junction_step(junctions_int, junctions_float,
-#     nodes_int, nodes_float, Q1, Q2, H1, H2, B, R, settings):
-#     # junctions is a matrix that contains neighbors info for each boundary node
-#     #   bare in mind that neighbors of boundary nodes are also boundary nodes!
-#     for i in range(junctions_int.shape[1]):
-#         if junctions_int[0, i] == 0 and junctions_int[1,i] == 0:
-#             continue
-
-#         sc = 0
-#         sb = 0
-
-#         # downstream_neighbors_num
-#         for j in range(junctions_int[0,i]):
-#             k = junctions_int[j+2,i]-1
-#             if nodes_int[2, k] == 1: # node_type == junction
-#                 sc += (H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
-#                 sb += 1 / (B[k] + R[k]*abs(Q1[k]))
-#             elif nodes_int[2, k] == 2: # valve node
-#                 end_junction = nodes_int[1, k]
-#                 if
-
-#         # upstream_neighbors_num
-#         for j in range(junctions_int[0,i], junctions[0,i]+junctions[1,i]):
-#             k = junctions[j+2,i]+1
-#             if nodes_int[2, k] == 1: # node_type == junction
-#                 sc += (H1[k] - B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
-#                 sb += 1 / (B[k] + R[k]*abs(Q1[k]))
-
-#         for j in range(junctions[0,i]):
-#             k = junctions[j+2,i]-1
-#             H2[j] = sc/sb
-#             Q2[j] = (H1[k] + B[k]*Q1[k] - H2[k]) / (B[k] + R[k]*abs(Q1[k]))
-
-#         for j in range(junctions[0,i], junctions[0,i]+junctions[1,i]):
-#             k = junctions[j+2,i]+1
-#             H2[j] = sc/sb
-#             Q2[j] = (H2[k] - H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
-
-@njit
-def run_reservoir_step(
-    reservoir_ids, is_start, Q1, Q2, H1, H2, B, R):
-    for i in reservoir_ids:
-        H2[i] = H1[i]
-        if is_start[i] == True: # Start boundary node
-            # C- characteristic
-            Q2[i] = (H1[i] - H1[i+1] + B[i-1]*Q1[i+1]) \
-                / (B[i-1] + R[i-1]*abs(Q1[i+1]))
-        elif is_start[i] == False: # End boundary node
-            # C+ characteristic
-            Q2[i] = (H1[i-1] + B[i-1]*Q1[i-1] - H1[i]) \
-                / (B[i-1] + R[i-1]*abs(Q1[i-1]))
-
-def run_pump_step(
-    pump_ids, upstream_nodes, downstream_nodes, Q1, Q2, H1, H2, B, R):
-    pass
-
 class Simulation:
     """
     Here all the tables and properties required to
@@ -100,13 +40,11 @@ class Simulation:
         self.steady_state_sim = mesh.steady_state_sim
         self.flow_results = np.zeros((T, mesh.num_nodes), dtype='float64')
         self.head_results = np.zeros((T, mesh.num_nodes), dtype='float64')
-        self.discharge_coefficients = []
-        self.curves = []
+        self.settings = []
         self.define_initial_conditions()
 
     def run_simulation(self):
         clk = Clock()
-
         for t in range(1, self.time_steps):
             if t == 2:
                 clk.tic()
@@ -118,73 +56,56 @@ class Simulation:
                 self.head_results[t,:],
                 self.mesh.nodes_float[NODE_FLOAT['B'],:],
                 self.mesh.nodes_float[NODE_FLOAT['R'],:])
-            # run_junction_step(
-            #     self.mesh.junctions_int,
-            #     self.flow_results[t-1,:],
-            #     self.flow_results[t,:],
-            #     self.head_results[t-1,:],
-            #     self.head_results[t,:],
-            #     self.mesh.nodes_float[NODE_FLOAT['B'],:],
-            #     self.mesh.nodes_float[NODE_FLOAT['R'],:])
-            # run_valve_step()
-            # run_pump_step()
+            self.run_junction_step(t)
         clk.toc()
 
-    def define_curve(self, link_name, curve_type, curve = None, curve_file = None):
-        """Defines curve values for a link
+    def solve_valve(self):
+        pass
 
-        If curve_type == 'Valve', then it corresponds to a Discharge
-        coefficient vs setting. If a curve is defined, it should be
-        a 2D array such that the first column contains setting values
-        and the second column discharge coefficient values (it should be
-        similarly done if a CSV file is defined)
+    def run_junction_step(self, t):
 
-        e.g.,
+        junctions = self.mesh.junctions_int
+        B = self.mesh.nodes_float[NODE_FLOAT['B'], :]
+        R = self.mesh.nodes_float[NODE_FLOAT['R'], :]
+        Q1 = self.flow_results[t-1, :]
+        H1 = self.flow_results[t-1, :]
 
-        curve = [[0.8, 1],
-                 [0.6, 0.55],
-                 [0.4, 0.28],
-                 [0.2, 0.1],
-                 [0, 0]]
+        for j_id in range(self.mesh.num_junctions):
 
-        => setting = [0.8, 0.6, 0.4, 0.2, 0]
-        => discharge_coefficients = [1, 0.55, 0.28, 0.1, 0]
+            sc = 0
+            sb = 0
 
-        Arguments:
-            link_name {string} -- [description]
-            curve_type {string} -- [description]
+            downstream_num = junctions[JUNCTION_INT['downstream_neighbors_num'], j_id]
+            upstream_num = junctions[JUNCTION_INT['upstream_neighbors_num'], j_id]
 
-        Keyword Arguments:
-            curve {2D array} -- 2D array with curve values (default: {None})
-            curve_file {string} -- path to curve file (default: {None})
+            for j in range(downstream_num):
+                k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
+                if self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['junction']:
+                    sc += (H1[k] - B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+                    sb += 1 / (B[k] + R[k]*abs(Q1[k]))
+                # Solve the valve
+                elif self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['valve']:
+                    continue
+                else:
+                    raise Exception("Junction not supported yet")
 
-        Raises:
-            Exception: If curve or curve_file is not defined
-            Exception: If curve_type is not compatible with link type
-        """
+            # Only junction nodes after this point
 
-        if curve is None and curve_file is None:
-            raise Exception("It is necessary to define either a curve iterable or a curve_file")
+            for j in range(downstream_num, upstream_num+downstream_num):
+                k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
+                sc += (H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+                sb += 1 / (B[k] + R[k]*abs(Q1[k]))
 
-        link_id = self.mesh.link_ids[link_name]
+            for j in range(downstream_num):
+                k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
+                if self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['junction']:
+                    self.head_results[t, k] = sc/sb
+                    self.flow_results[t, k] = (self.head_results[t, k] - H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
 
-        if self.mesh.links_int[LINK_INT['link_type'], link_id] == LINK_TYPES['Valve']:
-            if curve_type != 'Valve':
-                raise Exception("Type of curve is not compatible with valve %s" % link_name)
-
-        # TODO: Incorporate other types of curves
-
-        if curve is not None:
-            cc = np.array(curve, dtype='float64')
-        elif curve_file is not None:
-            cc = np.loadtxt(curve_file, delimiter=',')
-
-        cc = cc[np.argsort(cc[:,0])] # order by x-axis
-        self.curves.append(cc)
-
-        curve_id = len(self.curves) - 1
-        self.mesh.links_int[LINK_INT['curve_id'], link_id] = curve_id
-        self.mesh.links_int[LINK_INT['curve_type'], link_id] = CURVE_TYPES[curve_type]
+            for j in range(downstream_num, upstream_num+downstream_num):
+                k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
+                self.head_results[t, k] = sc/sb
+                self.flow_results[t, k] = (H1[k] + B[k]*Q1[k] - self.head_results[t, k]) / (B[k] + R[k]*abs(Q1[k]))
 
     def define_valve_setting(self, valve_name, setting = None, setting_file = None, default_setting = 1):
         """Defines setting values for a valve during the simulation time
@@ -215,10 +136,10 @@ class Simulation:
             raise Exception("It is necessary to define either a setting iterable or a setting_file")
 
         valve_id = self.mesh.link_ids[valve_name]
-        curve_id = self.mesh.links_int[LINK_INT['curve_id'], valve_id]
+        # curve_id = self.mesh.links_int[LINK_INT['curve_id'], valve_id]
 
-        if curve_id == NULL:
-            raise Exception("It is necessary to define the valve curve first")
+        # if curve_id == NULL:
+        #     raise Exception("It is necessary to define the valve curve first")
 
         ss = []
         if setting is not None:
@@ -226,18 +147,22 @@ class Simulation:
         elif setting_file is not None:
             ss = np.loadtxt(setting_file, dtype=float)
 
+        setting_id = len(self.settings)
+
         N = len(ss)
         if N < self.time_steps:
             ss = np.concatenate((ss, np.full((self.time_steps - N, 1), default_setting)), axis = None)
 
-        spl = splrep(self.curves[curve_id][:,0], self.curves[curve_id][:,1])
+        # spl = splrep(self.curves[curve_id][:,0], self.curves[curve_id][:,1])
         # [:self.time_steps] in case that len(ss) > self.time_steps
-        dcoeffs = splev(ss[:self.time_steps], spl)
+        # dcoeffs = splev(ss[:self.time_steps], spl)
 
-        self.discharge_coefficients.append(dcoeffs)
+        # self.discharge_coefficients.append(dcoeffs)
+        self.settings.append(ss[:self.time_steps])
+        self.mesh.links_int[LINK_INT['setting_id'], valve_id] = setting_id
 
-        dcoeff_id = len(self.discharge_coefficients) - 1
-        self.mesh.links_int[LINK_INT['dcoeff_id'], valve_id] = dcoeff_id
+        # dcoeff_id = len(self.discharge_coefficients) - 1
+        # self.mesh.links_int[LINK_INT['dcoeff_id'], valve_id] = dcoeff_id
 
     def define_initial_conditions(self):
         """Extracts initial conditions from EPANET
@@ -337,6 +262,7 @@ class Mesh:
         self.nodes_float = None
         self.node_ids = None
         self.num_nodes = 0
+        self.num_valves = self.wn.num_valves
 
         # Data structures associated to junctions
         self.junctions_int = None
@@ -490,6 +416,7 @@ class Mesh:
 
         self.junctions_int = np.full(
             (len(JUNCTION_INT), self.wn.num_nodes), NULL, dtype = 'int')
+        self.junctions_int[0:2,:] = 0
         self.junctions_float = np.full(
             (len(JUNCTION_FLOAT), self.wn.num_nodes), NULL, dtype = 'float64')
         self.junction_ids = {}
