@@ -68,44 +68,101 @@ class Simulation:
         B = self.mesh.nodes_float[NODE_FLOAT['B'], :]
         R = self.mesh.nodes_float[NODE_FLOAT['R'], :]
         Q1 = self.flow_results[t-1, :]
-        H1 = self.flow_results[t-1, :]
+        H1 = self.head_results[t-1, :]
+        Q2 = self.flow_results[t, :]
+        H2 = self.head_results[t, :]
+        VALVE_SOLVED = False
 
         for j_id in range(self.mesh.num_junctions):
-
-            sc = 0
-            sb = 0
 
             downstream_num = junctions[JUNCTION_INT['downstream_neighbors_num'], j_id]
             upstream_num = junctions[JUNCTION_INT['upstream_neighbors_num'], j_id]
 
-            for j in range(downstream_num):
-                k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                if self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['junction']:
-                    sc += (H1[k] - B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
-                    sb += 1 / (B[k] + R[k]*abs(Q1[k]))
-                # Solve the valve
-                elif self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['valve']:
+            reservoir_head = self.mesh.junctions_float[JUNCTION_FLOAT['head'], j_id]
+            demand = self.mesh.junctions_float[JUNCTION_FLOAT['demand'], j_id]
+
+            # Junction is a reservoir
+            if reservoir_head != 0:
+                for j in range(downstream_num):
+                    k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
+                    if self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['junction']:
+                        H2[k] = H1[k]
+                        Q2[k] = (H1[k] - H1[k+1] + B[k+1]*Q1[k+1]) \
+                              / (B[k+1] + R[k+1]*abs(Q1[k+1]))
+                    else:
+                        raise Exception("Option not supported")
+                for j in range(downstream_num, upstream_num+downstream_num):
+                    k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
+                    if self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['junction']:
+                        H2[k] = H1[k]
+                        Q2[k] = (H1[k-1] + B[k-1]*Q1[k-1] - H1[k]) \
+                              / (B[k-1] + R[k-1]*abs(Q1[k-1]))
+            else:
+                sc = 0
+                sb = 0
+                for j in range(downstream_num):
+                    k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
+                    if self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['junction']:
+                        sc += (H1[k] - B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+                        sb += 1 / (B[k] + R[k]*abs(Q1[k]))
+                    # Solve the valve
+                    elif self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['valve']:
+                        if downstream_num > 2:
+                            raise Exception("Connection not supported")
+                        end_junction = self.mesh.nodes_int[NODE_INT['subindex'], k]
+                        end_unum = junctions[JUNCTION_INT['upstream_neighbors_num'], end_junction]
+                        end_dnum = junctions[JUNCTION_INT['downstream_neighbors_num'], end_junction]
+                        if end_unum > 2:
+                            raise Exception("Connection not supported")
+                        if end_dnum == 0:
+                            end_head = self.mesh.junctions_float[JUNCTION_FLOAT['head'], end_junction]
+                            end_demand = self.mesh.junctions_float[JUNCTION_FLOAT['demand'], end_junction]
+                            valve_id = self.mesh.nodes_int[NODE_INT['link_id'], k]
+                            setting_id = self.mesh.links_int[LINK_INT['setting_id'], valve_id]
+                            tau = self.settings[setting_id][t]
+                            cv = self.flow_results[0][k]/(self.head_results[0][k] ** 0.5) * tau
+                            if end_head != 0: # End junction is a reservoir
+                                pass
+                            elif end_demand > 0: # End junction has demand
+                                if downstream_num == 2: # C-
+                                    jj = j
+                                    if (j+1) % 2 == 0:
+                                        jj = 0
+                                    else:
+                                        jj = 1
+                                    kk = junctions[JUNCTION_INT['n%d' % (jj+1)], j_id]
+                                    H2[kk] = H1[kk+1] - B[kk+1]*Q1[kk+1] + (B[kk+1] + R[kk+1]*abs(Q1[kk+1]))*end_demand
+                                    Q2[kk] = -end_demand
+                                    VALVE_SOLVED = True
+                                    break
+                                elif downstream_num == 1 and upstream_num == 1: # C+
+                                    kk = junctions[JUNCTION_INT['n2'], j_id]
+                                    H2[kk] = H1[kk-1] + B[kk-1] - (B[kk-1] + R[kk-1]*abs(Q1[kk-1]))*end_demand
+                                    Q2[kk] = end_demand
+                        if upstream_num != 0:
+                            pass
+                    else:
+                        raise Exception("Junction not supported yet")
+
+                if VALVE_SOLVED:
                     continue
-                else:
-                    raise Exception("Junction not supported yet")
+                # Only junction nodes after this point
 
-            # Only junction nodes after this point
+                for j in range(downstream_num, upstream_num+downstream_num):
+                    k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
+                    sc += (H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+                    sb += 1 / (B[k] + R[k]*abs(Q1[k]))
 
-            for j in range(downstream_num, upstream_num+downstream_num):
-                k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                sc += (H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
-                sb += 1 / (B[k] + R[k]*abs(Q1[k]))
+                for j in range(downstream_num):
+                    k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
+                    if self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['junction']:
+                        H2[k] = sc/sb
+                        Q2[k] = (self.head_results[t, k] - H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
 
-            for j in range(downstream_num):
-                k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                if self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['junction']:
-                    self.head_results[t, k] = sc/sb
-                    self.flow_results[t, k] = (self.head_results[t, k] - H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
-
-            for j in range(downstream_num, upstream_num+downstream_num):
-                k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                self.head_results[t, k] = sc/sb
-                self.flow_results[t, k] = (H1[k] + B[k]*Q1[k] - self.head_results[t, k]) / (B[k] + R[k]*abs(Q1[k]))
+                for j in range(downstream_num, upstream_num+downstream_num):
+                    k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
+                    H2[k] = sc/sb
+                    Q2[k] = (H1[k] + B[k]*Q1[k] - self.head_results[t, k]) / (B[k] + R[k]*abs(Q1[k]))
 
     def define_valve_setting(self, valve_name, setting = None, setting_file = None, default_setting = 1):
         """Defines setting values for a valve during the simulation time
@@ -418,7 +475,7 @@ class Mesh:
             (len(JUNCTION_INT), self.wn.num_nodes), NULL, dtype = 'int')
         self.junctions_int[0:2,:] = 0
         self.junctions_float = np.full(
-            (len(JUNCTION_FLOAT), self.wn.num_nodes), NULL, dtype = 'float64')
+            (len(JUNCTION_FLOAT), self.wn.num_nodes), 0, dtype = 'float64')
         self.junction_ids = {}
         self.junction_name_list = []
 
@@ -442,6 +499,11 @@ class Mesh:
                 j += 1
 
             start_id = self.junction_ids[start_node_name] # start junction id
+            # Define start junction demand
+            self.junctions_float[JUNCTION_FLOAT['demand'], start_id] = float(self.steady_state_sim.node['demand'][start_node_name])
+            # Check if start junction is a reservoir
+            if start_node_name in self.wn.reservoir_name_list:
+                self.junctions_float[JUNCTION_FLOAT['head'], start_id] = float(self.steady_state_sim.node['head'][start_node_name])
             self.junctions_int[JUNCTION_INT['downstream_neighbors_num'], start_id] = len(downstream_link_names)
 
             # Update downstream nodes
@@ -456,6 +518,11 @@ class Mesh:
                     j += 1
 
                 end_id = self.junction_ids[downstream_node_name] # end junction id
+                # Define downstream junction demand
+                self.junctions_float[JUNCTION_FLOAT['demand'], end_id] = float(self.steady_state_sim.node['demand'][downstream_node_name])
+                # Check if downstream junction is a reservoir
+                if downstream_node_name in self.wn.reservoir_name_list:
+                    self.junctions_float[JUNCTION_FLOAT['head'], end_id] = float(self.steady_state_sim.node['head'][downstream_node_name])
 
                 if self.junctions_int[JUNCTION_INT['upstream_neighbors_num'], end_id] == NULL:
                     self.junctions_int[JUNCTION_INT['upstream_neighbors_num'], end_id] = 1
@@ -495,7 +562,7 @@ class Mesh:
                     self.nodes_int[NODE_INT['link_id'], i] = k
                     self.nodes_int[NODE_INT['subindex'], i] = end_id
                     self.junctions_int[JUNCTION_INT['n%d' % (ii+1)], start_id] = i
-                    self.junctions_int[JUNCTION_INT['upstream_neighbors_num'], end_id] -= 1
+                    self.junctions_int[JUNCTION_INT['n%d' % (jj+1)], end_id] = i
                     if link.link_type == 'Valve':
                         self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['valve']
                     elif link.link_type == 'Pump':
