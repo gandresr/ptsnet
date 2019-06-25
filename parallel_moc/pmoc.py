@@ -11,8 +11,10 @@ from numba import njit
 from time import time
 from os.path import isdir
 
+np.set_printoptions(precision=2)
+
 # Parallel does not perform well in sandy-bridge architectures
-@njit(parallel = False)
+# @njit(parallel = False)
 def run_interior_step(Q1, Q2, H1, H2, B, R):
     # Keep in mind that the first and last nodes in mesh.nodes will
     #   always be a boundary node
@@ -46,12 +48,6 @@ class Simulation:
     def run_simulation(self):
         clk = Clock()
         for t in range(1, self.time_steps):
-            if t == 1:
-                clk.tic()
-            if t == self.time_steps-1:
-                clk.tic()
-            # HECK YEAH! THIS THING RUNS AT WARP SPEED
-            NULL = -10
             run_interior_step(
                 self.flow_results[t-1,:],
                 self.flow_results[t,:],
@@ -59,19 +55,7 @@ class Simulation:
                 self.head_results[t,:],
                 self.mesh.nodes_float[NODE_FLOAT['B'],:],
                 self.mesh.nodes_float[NODE_FLOAT['R'],:])
-            NULL = 0
-            if t == 1:
-                print("\nInterior step compilation")
-                clk.toc()
-                clk.tic()
-            if t == self.time_steps-1:
-                print("\nInterior step compiled")
-                clk.toc()
-            self.run_junction_step(t)
-            if t == 1:
-                print("\nJunction step")
-                clk.toc()
-
+            # self.run_junction_step(t)
     def solve_valve(self):
         pass
 
@@ -110,54 +94,13 @@ class Simulation:
                         Q2[k] = (H1[k-1] + B[k-1]*Q1[k-1] - H1[k]) \
                               / (B[k-1] + R[k-1]*abs(Q1[k-1]))
             else:
-                if self.mesh.junction_name_list[j_id] == '7':
-                    continue
                 sc = 0
                 sb = 0
                 for j in range(downstream_num):
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                    if self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['junction']:
-                        sc += (H1[k] - B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
-                        sb += 1 / (B[k] + R[k]*abs(Q1[k]))
-                    # Solve the valve
-                    elif self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['valve']:
-                        if downstream_num > 2:
-                            raise Exception("Connection not supported")
-                        end_junction = self.mesh.nodes_int[NODE_INT['subindex'], k]
-                        end_unum = junctions[JUNCTION_INT['upstream_neighbors_num'], end_junction]
-                        end_dnum = junctions[JUNCTION_INT['downstream_neighbors_num'], end_junction]
-                        if end_unum > 2:
-                            raise Exception("Connection not supported")
-                        if end_dnum == 0:
-                            end_head = self.mesh.junctions_float[JUNCTION_FLOAT['head'], end_junction]
-                            end_demand = self.mesh.junctions_float[JUNCTION_FLOAT['demand'], end_junction]
-                            valve_id = self.mesh.nodes_int[NODE_INT['link_id'], k]
-                            setting_id = self.mesh.links_int[LINK_INT['setting_id'], valve_id]
-                            tau = self.settings[setting_id][t]
-                            cv = self.flow_results[0][k]/(self.head_results[0][k] ** 0.5) * tau
-                            if end_head != 0: # End junction is a reservoir
-                                pass
-                            elif end_demand > 0: # End junction has demand
-                                if downstream_num == 2: # C-
-                                    jj = j
-                                    if (j+1) % 2 == 0:
-                                        jj = 0
-                                    else:
-                                        jj = 1
-                                    kk = junctions[JUNCTION_INT['n%d' % (jj+1)], j_id]
-                                    H2[kk] = H1[kk+1] - B[kk+1]*Q1[kk+1] + (B[kk+1] + R[kk+1]*abs(Q1[kk+1]))*end_demand
-                                    Q2[kk] = -end_demand
-                                    break
-                                elif downstream_num == 1 and upstream_num == 1: # C+
-                                    kk = junctions[JUNCTION_INT['n2'], j_id]
-                                    H2[kk] = H1[kk-1] + B[kk-1] - (B[kk-1] + R[kk-1]*abs(Q1[kk-1]))*end_demand
-                                    Q2[kk] = end_demand
-                        if upstream_num != 0:
-                            pass
-                    else:
-                        raise Exception("Junction not supported yet")
+                    sc += (H1[k] - B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+                    sb += 1 / (B[k] + R[k]*abs(Q1[k]))
 
-                # Only junction nodes after this point
                 for j in range(downstream_num, upstream_num+downstream_num):
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
                     sc += (H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
@@ -165,9 +108,8 @@ class Simulation:
 
                 for j in range(downstream_num):
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                    if self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['junction']:
-                        H2[k] = sc/sb
-                        Q2[k] = (self.head_results[t, k] - H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+                    H2[k] = sc/sb
+                    Q2[k] = (self.head_results[t, k] - H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
 
                 for j in range(downstream_num, upstream_num+downstream_num):
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
@@ -312,7 +254,7 @@ class Mesh:
         self.fname = input_file[:input_file.find('.inp')]
         self.wn = wntr.network.WaterNetworkModel(input_file)
         self.steady_state_sim = wntr.sim.EpanetSimulator(self.wn).run_sim()
-        self.network_graph = self.wn.get_graph()
+        self.network_graph = self._get_network_graph()
 
         self.mesh_graph = None
         self.time_step = None
@@ -361,6 +303,24 @@ class Mesh:
         #   s indicates if a node is a separator according
         #   to parHIP
         self.partitioning = None
+
+    def _get_network_graph(self):
+
+        G = self.wn.get_graph()
+        switch_links = []
+        for n1 in G:
+            for n2 in G[n1]:
+                for link_name in G[n1][n2]:
+                    if float(self.steady_state_sim.link['flowrate'][link_name]) < 0:
+                        switch_links.append((n1, n2))
+                        self.steady_state_sim.link['flowrate'][link_name] *= -1
+        for n1, n2 in switch_links:
+            attrs = G[n1][n2]
+            link = list(attrs.keys())[0]
+            G.add_edge(n2, n1, key=link, attr_dict=attrs[link])
+            G.remove_edge(n1, n2)
+
+        return G
 
     def _define_wave_speeds(self, default_wave_speed = None, wave_speed_file = None):
         """ Stores the values of the wave speeds for every pipe in the EPANET network
