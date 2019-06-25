@@ -46,9 +46,12 @@ class Simulation:
     def run_simulation(self):
         clk = Clock()
         for t in range(1, self.time_steps):
-            if t == 2:
+            if t == 1:
+                clk.tic()
+            if t == self.time_steps-1:
                 clk.tic()
             # HECK YEAH! THIS THING RUNS AT WARP SPEED
+            NULL = -10
             run_interior_step(
                 self.flow_results[t-1,:],
                 self.flow_results[t,:],
@@ -56,8 +59,18 @@ class Simulation:
                 self.head_results[t,:],
                 self.mesh.nodes_float[NODE_FLOAT['B'],:],
                 self.mesh.nodes_float[NODE_FLOAT['R'],:])
+            NULL = 0
+            if t == 1:
+                print("\nInterior step compilation")
+                clk.toc()
+                clk.tic()
+            if t == self.time_steps-1:
+                print("\nInterior step compiled")
+                clk.toc()
             self.run_junction_step(t)
-        clk.toc()
+            if t == 1:
+                print("\nJunction step")
+                clk.toc()
 
     def solve_valve(self):
         pass
@@ -71,7 +84,6 @@ class Simulation:
         H1 = self.head_results[t-1, :]
         Q2 = self.flow_results[t, :]
         H2 = self.head_results[t, :]
-        VALVE_SOLVED = False
 
         for j_id in range(self.mesh.num_junctions):
 
@@ -98,6 +110,8 @@ class Simulation:
                         Q2[k] = (H1[k-1] + B[k-1]*Q1[k-1] - H1[k]) \
                               / (B[k-1] + R[k-1]*abs(Q1[k-1]))
             else:
+                if self.mesh.junction_name_list[j_id] == '7':
+                    continue
                 sc = 0
                 sb = 0
                 for j in range(downstream_num):
@@ -133,7 +147,6 @@ class Simulation:
                                     kk = junctions[JUNCTION_INT['n%d' % (jj+1)], j_id]
                                     H2[kk] = H1[kk+1] - B[kk+1]*Q1[kk+1] + (B[kk+1] + R[kk+1]*abs(Q1[kk+1]))*end_demand
                                     Q2[kk] = -end_demand
-                                    VALVE_SOLVED = True
                                     break
                                 elif downstream_num == 1 and upstream_num == 1: # C+
                                     kk = junctions[JUNCTION_INT['n2'], j_id]
@@ -144,10 +157,7 @@ class Simulation:
                     else:
                         raise Exception("Junction not supported yet")
 
-                if VALVE_SOLVED:
-                    continue
                 # Only junction nodes after this point
-
                 for j in range(downstream_num, upstream_num+downstream_num):
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
                     sc += (H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
