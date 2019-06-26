@@ -26,14 +26,13 @@ JUNCTION_INT = {
 }
 
 def define_junctions_int_table(degree):
-    _N_JUNCTION_INT = len(JUNCTION_INT)
     for i in range(degree):
         # Neighbors
         #   first, downstream neighbors are stored and then
         #   upstream neighbors.
         #   * ni: neighbor id
         #   * pi: processor assigned to node with id ni
-        JUNCTION_INT['n%d' % (i+1)] = _N_JUNCTION_INT + i
+        JUNCTION_INT['n%d' % (i+1)] = 3 + i
 
 JUNCTION_FLOAT = {
     'demand' : 0,

@@ -43,7 +43,56 @@ class Simulation:
         self.flow_results = np.zeros((T, mesh.num_nodes), dtype='float64')
         self.head_results = np.zeros((T, mesh.num_nodes), dtype='float64')
         self.settings = []
+        self.curves = []
         self.define_initial_conditions()
+
+    def define_curve(self, link_name, curve_type, curve = None, curve_file = None):
+        """Defines curve values for a link
+        If curve_type == 'Valve', then it corresponds to a Discharge
+        coefficient vs setting. If a curve is defined, it should be
+        a 2D array such that the first column contains setting values
+        and the second column discharge coefficient values (it should be
+        similarly done if a CSV file is defined)
+        e.g.,
+        curve = [[0.8, 1],
+                 [0.6, 0.55],
+                 [0.4, 0.28],
+                 [0.2, 0.1],
+                 [0, 0]]
+        => setting = [0.8, 0.6, 0.4, 0.2, 0]
+        => discharge_coefficients = [1, 0.55, 0.28, 0.1, 0]
+        Arguments:
+            link_name {string} -- [description]
+            curve_type {string} -- [description]
+        Keyword Arguments:
+            curve {2D array} -- 2D array with curve values (default: {None})
+            curve_file {string} -- path to curve file (default: {None})
+        Raises:
+            Exception: If curve or curve_file is not defined
+            Exception: If curve_type is not compatible with link type
+        """
+
+        if curve is None and curve_file is None:
+            raise Exception("It is necessary to define either a curve iterable or a curve_file")
+
+        link_id = self.mesh.link_ids[link_name]
+        link = self.mesh.wn.get_link(link_name)
+
+        if link.link_type in ('Valve', 'Pump'):
+            if curve_type != 'Valve':
+                raise Exception("Type of curve is not compatible with valve %s" % link_name)
+
+        # TODO: Incorporate other types of curves
+
+        if curve is not None:
+            cc = curve
+        elif curve_file is not None:
+            cc = np.loadtxt(curve_file, delimiter=',')
+
+        self.mesh.curves.append(cc)
+        curve_id = len(mesh.curves) - 1
+        self.mesh.links_int[LINK_INT['curve'], link_id] = curve_id
+        self.mesh.links_int[LINK_INT['curve_type'], link_id] = CURVE_TYPES[curve_type]
 
     def run_simulation(self):
         clk = Clock()
@@ -56,7 +105,8 @@ class Simulation:
                 self.mesh.nodes_float[NODE_FLOAT['B'],:],
                 self.mesh.nodes_float[NODE_FLOAT['R'],:])
             self.run_junction_step(t)
-    def solve_valve(self):
+
+    def run_valve_step(self):
         pass
 
     def run_junction_step(self, t):
@@ -178,6 +228,7 @@ class Simulation:
         for i in range(self.mesh.num_nodes):
             link_id = self.mesh.nodes_int[NODE_INT['link_id'], i]
             link_name = self.mesh.link_name_list[link_id]
+
             link = self.mesh.wn.get_link(link_name)
 
             self.flow_results[0][i] = float(self.steady_state_sim.link['flowrate'][link_name])
@@ -278,12 +329,23 @@ class Mesh:
         self.junction_name_list = None
         self.num_junctions = 0
 
-        # Data structures associated to links (pipes, valves, pumps)
-        self.links_int = None
-        self.links_float = None
+        # Data structures associated to links
         self.link_ids = None
         self.link_name_list = None
-        self.num_links = 0
+
+        # Data structures associated to valves
+        self.valves_int = None
+        self.valves_float = None
+        self.valve_ids = None
+        self.valve_name_list = None
+        self.num_valves = 0
+
+        # Data structures associated to pumps
+        self.pumps_int = None
+        self.pumps_float = None
+        self.pump_ids = None
+        self.pump_name_list = None
+        self.num_pumps = 0
 
         # Initialize mesh
         if (default_wave_speed is None) and (wave_speed_file is None):
@@ -435,19 +497,19 @@ class Mesh:
             elif d == 2:
                 if in_degree == 1 and out_degree == 1:
                     u_link_name = list(self.network_graph[unodes[0]][node])[0]
-                    d_link_name = list(self.network_graph[dnodes[0]][node])[0]
+                    d_link_name = list(self.network_graph[node][dnodes[0]])[0]
                     ulink = self.wn.get_link(u_link_name)
                     dlink = self.wn.get_link(d_link_name)
                     if ulink.link_type in ('Valve', 'Pump') and d_link_name in ('Valve', 'Pump'):
                         raise Exception("Links %s and %s are non-pipe elements and cannot be connected together" % (u_link_name, d_link_name))
             else:
                 for i in range(in_degree):
-                    n1 = dnodes[i]
+                    n1 = unodes[i]
                     link_name = list(self.network_graph[n1][node])[0]
                     link = self.wn.get_link(link_name)
                     if link.link_type in ('Valve', 'Pump'):
                         raise Exception("Connection in junction is not valid, it can not have non-pipe elements ")
-                for j in range(out_degree):
+                for i in range(out_degree):
                     n2 = dnodes[i]
                     link_name = list(self.network_graph[node][n2])[0]
                     link = self.wn.get_link(link_name)
@@ -565,10 +627,10 @@ class Mesh:
                 end_id = self.junction_ids[downstream_node_name] # end junction id
 
                 # Set default junction types for start and end junctions
-                if self.junctions_int[JUNCTION_INT['junction_types'], start_id] == NULL:
-                    self.junctions_int[JUNCTION_INT['junction_types'], start_id] = JUNCTION_TYPES['pipe']
-                if self.junctions_int[JUNCTION_INT['junction_types'], end_id] == NULL:
-                    self.junctions_int[JUNCTION_INT['junction_types'], end_id] = JUNCTION_TYPES['pipe']
+                if self.junctions_int[JUNCTION_INT['junction_type'], start_id] == NULL:
+                    self.junctions_int[JUNCTION_INT['junction_type'], start_id] = JUNCTION_TYPES['pipe']
+                if self.junctions_int[JUNCTION_INT['junction_type'], end_id] == NULL:
+                    self.junctions_int[JUNCTION_INT['junction_type'], end_id] = JUNCTION_TYPES['pipe']
 
                 # Define downstream junction demand
                 self.junctions_float[JUNCTION_FLOAT['demand'], end_id] = float(self.steady_state_sim.node['demand'][downstream_node_name])
@@ -595,6 +657,8 @@ class Mesh:
                         self.nodes_int[NODE_INT['link_id'], i] = k
                         if idx == 0:
                             self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['junction']
+                            print(start_id, ii, JUNCTION_INT['n%d' % (ii+1)])
+                            print(self.junctions_int[JUNCTION_INT['n%d' % (ii+1)], start_id])
                             self.junctions_int[JUNCTION_INT['n%d' % (ii+1)], start_id] = i
                         elif idx == self.segments[link_name]:
                             self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['junction']
@@ -609,16 +673,16 @@ class Mesh:
                         self.nodes_float[NODE_FLOAT['R'], i] = ffactor*dx / (2*G*pipe_diameter*pipe_area**2)
                         i += 1
                 elif link.link_type == 'Valve':
-                    self.junctions_int[JUNCTION_INT['junction_types'], start_id] = JUNCTION_TYPES['valve']
-                    self.junctions_int[JUNCTION_INT['junction_types'], end_id] = JUNCTION_TYPES['valve']
+                    self.junctions_int[JUNCTION_INT['junction_type'], start_id] = JUNCTION_TYPES['valve']
+                    self.junctions_int[JUNCTION_INT['junction_type'], end_id] = JUNCTION_TYPES['valve']
                     self.valves_int[VALVE_INT['upstream_junction'], v] = start_id
                     self.valves_int[VALVE_INT['downstream_junction'], v] = end_id
                     self.valve_ids[link_name] = v
                     self.valve_name_list.append(link_name)
                     v += 1
                 elif link.link_type == 'Pump':
-                    self.junctions_int[JUNCTION_INT['junction_types'], start_id] = JUNCTION_TYPES['pump']
-                    self.junctions_int[JUNCTION_INT['junction_types'], end_id] = JUNCTION_TYPES['pump']
+                    self.junctions_int[JUNCTION_INT['junction_type'], start_id] = JUNCTION_TYPES['pump']
+                    self.junctions_int[JUNCTION_INT['junction_type'], end_id] = JUNCTION_TYPES['pump']
                     self.pumps_int[PUMP_INT['upstream_junction'], p] = start_id
                     self.pumps_int[PUMP_INT['downstream_junction'], p] = end_id
                     self.pump_ids[link_name] = p
@@ -648,8 +712,9 @@ class Mesh:
         self._check_compatibility()
         self._define_mesh()
         self.num_nodes = self.nodes_int.shape[1]
-        self.num_links = self.links_int.shape[1]
         self.num_junctions = self.junctions_int.shape[1]
+        self.num_valves = self.valves_int.shape[1]
+        self.num_pumps = self.pumps_int.shape[1]
 
         self.partitioning = None
 
