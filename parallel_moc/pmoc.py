@@ -14,7 +14,7 @@ from os.path import isdir
 np.set_printoptions(precision=2)
 
 # Parallel does not perform well in sandy-bridge architectures
-# @njit(parallel = False)
+@njit(parallel = False)
 def run_interior_step(Q1, Q2, H1, H2, B, R):
     # Keep in mind that the first and last nodes in mesh.nodes will
     #   always be a boundary node
@@ -81,21 +81,18 @@ class Simulation:
             if reservoir_head != 0:
                 for j in range(downstream_num):
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                    if self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['junction']:
-                        H2[k] = H1[k]
-                        Q2[k] = (H1[k] - H1[k+1] + B[k+1]*Q1[k+1]) \
-                              / (B[k+1] + R[k+1]*abs(Q1[k+1]))
-                    else:
-                        raise Exception("Option not supported")
+                    H2[k] = H1[k]
+                    Q2[k] = (H1[k] - H1[k+1] + B[k+1]*Q1[k+1]) \
+                            / (B[k+1] + R[k+1]*abs(Q1[k+1]))
                 for j in range(downstream_num, upstream_num+downstream_num):
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                    if self.mesh.nodes_int[NODE_INT['node_type'], k] == NODE_TYPES['junction']:
-                        H2[k] = H1[k]
-                        Q2[k] = (H1[k-1] + B[k-1]*Q1[k-1] - H1[k]) \
-                              / (B[k-1] + R[k-1]*abs(Q1[k-1]))
+                    H2[k] = H1[k]
+                    Q2[k] = (H1[k-1] + B[k-1]*Q1[k-1] - H1[k]) \
+                            / (B[k-1] + R[k-1]*abs(Q1[k-1]))
             else:
                 sc = 0
                 sb = 0
+
                 for j in range(downstream_num):
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
                     sc += (H1[k] - B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
@@ -106,14 +103,16 @@ class Simulation:
                     sc += (H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
                     sb += 1 / (B[k] + R[k]*abs(Q1[k]))
 
+                HH = sc/sb + demand/sb
+
                 for j in range(downstream_num):
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                    H2[k] = sc/sb
+                    H2[k] = HH
                     Q2[k] = (self.head_results[t, k] - H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
 
                 for j in range(downstream_num, upstream_num+downstream_num):
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                    H2[k] = sc/sb
+                    H2[k] = HH
                     Q2[k] = (H1[k] + B[k]*Q1[k] - self.head_results[t, k]) / (B[k] + R[k]*abs(Q1[k]))
 
     def define_valve_setting(self, valve_name, setting = None, setting_file = None, default_setting = 1):
