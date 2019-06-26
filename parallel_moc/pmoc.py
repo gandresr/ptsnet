@@ -55,7 +55,7 @@ class Simulation:
                 self.head_results[t,:],
                 self.mesh.nodes_float[NODE_FLOAT['B'],:],
                 self.mesh.nodes_float[NODE_FLOAT['R'],:])
-            # self.run_junction_step(t)
+            self.run_junction_step(t)
     def solve_valve(self):
         pass
 
@@ -108,12 +108,12 @@ class Simulation:
                 for j in range(downstream_num):
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
                     H2[k] = HH
-                    Q2[k] = (self.head_results[t, k] - H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+                    Q2[k] = (HH - H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
 
                 for j in range(downstream_num, upstream_num+downstream_num):
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
                     H2[k] = HH
-                    Q2[k] = (H1[k] + B[k]*Q1[k] - self.head_results[t, k]) / (B[k] + R[k]*abs(Q1[k]))
+                    Q2[k] = (H1[k] + B[k]*Q1[k] - HH) / (B[k] + R[k]*abs(Q1[k]))
 
     def define_valve_setting(self, valve_name, setting = None, setting_file = None, default_setting = 1):
         """Defines setting values for a valve during the simulation time
@@ -394,6 +394,55 @@ class Mesh:
         # It is necessary to redefine the mesh graph everytime the segments are redefined
         self._define_mesh()
 
+    def _check_compatibility(self):
+        """[summary]
+
+        Assumptions:
+        - Only 2 types of non-pipe elements: valves and pumps
+        - The junctions of a non-pipe element can only be tanks, reservoirs or
+            junctions (this includes dead-ends)
+        - At most one link can be attached to a non-pipe element
+        """
+
+        for node in self.mesh_graph:
+            d = self.mesh_graph.degree(node)
+            dnodes = list(self.mesh_graph.successors(node))
+            unodes = list(self.mesh_graph.predecessors(node))
+            in_degree = len(unodes)
+            out_degree = len(dnodes)
+            if d == 0:
+                raise Exception("Junction %s is isolated" % node)
+            elif d == 1:
+                if in_degree == 1:
+                    link_name = list(self.mesh_graph[unodes[0]][node])[0]
+                    link = self.wn.get_link(link_name)
+                    if link.link_type == 'Pump':
+                        raise Exception("Pump %s is not valid, it has a dead-end" % link_name)
+                elif out_degree == 1:
+                    if node not in self.wn.reservoir_name_list:
+                        raise Exception("Junction %s can only be a reservoir" % node)
+            elif d == 2:
+                if in_degree == 1 and out_degree == 1:
+                    u_link_name = list(self.mesh_graph[unodes[0]][node])[0]
+                    d_link_name = list(self.mesh_graph[dnodes[0]][node])[0]
+                    ulink = self.wn.get_link(u_link_name)
+                    dlink = self.wn.get_link(d_link_name)
+                    if u_link.link_type in ('Valve', 'Pump') and d_link_name in ('Valve', 'Pump'):
+                        raise Exception("Links %s and %s are non-pipe elements and cannot be connected together" % (u_link_name, d_link_name))
+            else:
+                for i in range(in_degree):
+                    n1 = dnodes[i]
+                    link_name = list(self.mesh_graph[n1][node])[0]
+                    link = self.wn.get_link(link_name)
+                    if link.link_type in ('Valve', 'Pump'):
+                        raise Exception("Connection in junction is not valid, it can not have non-pipe elements ")
+                for j in range(out_degree)
+                    n2 = dnodes[i]
+                    link_name = list(self.mesh_graph[node][n2])[0]
+                    link = self.wn.get_link(link_name)
+                    if link.link_type in ('Valve', 'Pump'):
+                        raise Exception("Connection in junction is not valid, it can not have non-pipe elements ")
+
     def _define_mesh(self, write_mesh = False):
         """Defines the mesh graph of the water network
 
@@ -425,6 +474,12 @@ class Mesh:
             for each pipe in the network
         """
 
+        max_degree = 0
+        for n, d in self.network_graph.to_undirected().degree():
+            if d > max_degree:
+                max_degree = d
+        define_junctions_int_table(max_degree)
+
         num_total_nodes = \
             sum(self.segments.values()) + len(self.segments) \
                 + self.wn.num_pumps + self.wn.num_valves
@@ -433,25 +488,51 @@ class Mesh:
         self.nodes_float = np.full(
             (len(NODE_FLOAT), num_total_nodes), NULL, dtype = 'float64')
 
-        self.links_int = np.full(
-            (len(LINK_INT), self.wn.num_links), NULL, dtype = 'int')
-        self.links_float = np.full(
-            (len(LINK_FLOAT), self.wn.num_links), NULL, dtype = 'float64')
-        self.link_ids = {}
-        self.link_name_list = []
-
         self.junctions_int = np.full(
-            (len(JUNCTION_INT), self.wn.num_nodes), NULL, dtype = 'int')
+            (len(JUNCTION_INT), self.wn.num_nodes - 2*(self.wn.num_pumps + self.wn.num_valves)),
+            NULL, dtype = 'int')
         self.junctions_int[0:2,:] = 0
         self.junctions_float = np.full(
             (len(JUNCTION_FLOAT), self.wn.num_nodes), 0, dtype = 'float64')
         self.junction_ids = {}
         self.junction_name_list = []
 
+        self.link_ids = {}
+        self.link_name_list = []
+
+        self.valves_int = np.full(
+            (len(VALVE_INT), self.wn.num_valves) , NULL, dtype='float64')
+        self.valve_ids = {}
+        self.valve_name_list = []
+
+        self.pumps_int = np.full(
+            (len(PUMP_INT), self.wn.num_pumps), NULL, dtype='float64')
+        self.pumps_float = np.full(
+            (len(PUMP_FLOAT), self.wn.num_pumps), NULL, dtype='float64')
+        self.pump_ids = {}
+        self.pump_name_list = []
+
         i = 0 # nodes index
         j = 0 # junctions index
         k = 0 # links index
 
+        # Valves
+        for i, v in enumerate(self.wn.valves()):
+            valve_name = v[0]
+            valve = v[1]
+            self.valves_int[VALVE_INT['upstream_node'], i] = valve.start_node_name
+            self.valves_int[VALVE_INT['downstream_node'], i] = valve.end_node_name
+            self.valve_ids[p[0]] = i
+            self.valve_name_list.append(p[0])
+
+        # Pumps
+        for i, p in enumerate(self.wn.pumps()):
+            self.pumps_int[PUMP_INT['upstream_node'], i] = p[1].start_node_name
+            self.pumps_int[PUMP_INT['downstream_node'], i] = p[1].end_node_name
+            self.pump_ids[p[0]] = i
+            self.pump_name_list.append(p[0])
+
+        # Junctions
         for start_node_name in self.network_graph:
             downstream_nodes = self.network_graph[start_node_name]
 
@@ -508,7 +589,6 @@ class Mesh:
                     #   i-th node
                     for idx in range(self.segments[link_name]+1):
                         # Pipe nodes definition
-                        self.nodes_int[NODE_INT['id'], i] = i
                         self.nodes_int[NODE_INT['subindex'], i] = idx
                         self.nodes_int[NODE_INT['link_id'], i] = k
                         if idx == 0:
@@ -526,50 +606,14 @@ class Mesh:
                         self.nodes_float[NODE_FLOAT['B'], i] = self.wave_speeds[link_name] / (G*pipe_area)
                         self.nodes_float[NODE_FLOAT['R'], i] = ffactor*dx / (2*G*pipe_diameter*pipe_area**2)
                         i += 1
-                elif link.link_type in ('Valve', 'Pump'):
-                    self.nodes_int[NODE_INT['id'], i] = i
-                    self.nodes_int[NODE_INT['link_id'], i] = k
-                    self.nodes_int[NODE_INT['subindex'], i] = end_id
-                    self.junctions_int[JUNCTION_INT['n%d' % (ii+1)], start_id] = i
-                    self.junctions_int[JUNCTION_INT['n%d' % (jj+1)], end_id] = i
-                    if link.link_type == 'Valve':
-                        self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['valve']
-                    elif link.link_type == 'Pump':
-                        self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['pump']
-                    i += 1
-                else:
-                    raise Exception("Link %s of type %s is not supported" % (link_name, link.link_type))
 
                 # Link definition
-                self.links_int[LINK_INT['id'], k] = k
-                self.links_int[LINK_INT['link_type'], k] = LINK_TYPES[link.link_type]
                 self.link_name_list.append(link_name)
                 self.link_ids[link_name] = k
                 k += 1
 
     def _write_mesh(self):
-        """ Saves the mesh graph in a file compatible with METIS
-
-        # * This function should only be called after defining the mesh_graph
-
-        Raises:
-            Exception: if mesh graph has not been defined
-        """
-        G = self.mesh_graph
-        ids = dict( zip( list(G), range(len(G)) ) )
-
-        # Network is stored in METIS format
-        if G:
-            with open(self.fname + '.graph', 'w') as f:
-                f.write("%d %d\n" % (len(G), len(G.edges())))
-                for node in ids:
-                    fline = "" # file content
-                    for neighbor in G[node]:
-                        fline += "%d " % (ids[neighbor] + 1)
-                    fline += '\n'
-                    f.write(fline)
-        else:
-            raise Exception("It is necessary to define the mesh graph")
+        pass
 
     def initialize(self, dt, wave_speed_file, default_wave_speed):
         """Initializes the Mesh object
@@ -584,6 +628,7 @@ class Mesh:
 
         self._define_wave_speeds(default_wave_speed, wave_speed_file)
         self._define_segments(dt)
+        self._check_compatibility()
         self._define_mesh()
         self.num_nodes = self.nodes_int.shape[1]
         self.num_links = self.links_int.shape[1]
@@ -632,17 +677,6 @@ class Mesh:
             self.nodes_int[NODE_INT['processor'], i] = self.partitioning[node][0] # processor
             # is separator? ... more details in parHIP user manual
             self.nodes_int[NODE_INT['is_ghost'], i] = self.partitioning[node][1] == self.num_processors
-
-    def get_processor(self, node):
-        """Returns the processor assigned to a node in the mesh graph
-
-        Arguments:
-            node {string} -- name of the node
-
-        Returns:
-            integer -- processor id
-        """
-        return self.nodes_int[NODE_INT['processor'], self.node_ids[node]]
 
 class Clock:
     """Wall-clock time
