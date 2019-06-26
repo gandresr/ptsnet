@@ -2,7 +2,6 @@
 MOC_PATH = "/home/watsup/Documents/Github/hammer-net/parallel_moc/"
 
 NULL = -987654321
-MAX_NEIGHBORS_IN_JUNCTION = NULL
 G = 9.81 # m/s
 
 # Enums
@@ -46,10 +45,6 @@ VALVE_INT = {
     'curve_id': 3
 }
 
-VALVE_FLOAT = {
-
-}
-
 PUMP_INT = {
     'upstream_junction' : 0,
     'downstream_junction' : 1,
@@ -74,10 +69,11 @@ NODE_TYPES = {
 }
 
 JUNCTION_TYPES = {
-    'pipe': 0,
-    'valve': 1,
-    'pump': 2,
-    'dead_end': 3,
-    'burst': 4,
-    'leakage': 5,
+    'reservoir': 0,
+    'pipes': 1,
+    'valve': 2,
+    'pump': 3,
+    'dead_end': 4,
+    'burst': 5,
+    'leakage': 6,
 }

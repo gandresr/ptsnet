@@ -90,12 +90,12 @@ class Simulation:
             cc = np.loadtxt(curve_file, delimiter=',')
 
         self.mesh.curves.append(cc)
-        curve_id = len(mesh.curves) - 1
+        curve_id = len(self.curves) - 1
         self.mesh.links_int[LINK_INT['curve'], link_id] = curve_id
         self.mesh.links_int[LINK_INT['curve_type'], link_id] = CURVE_TYPES[curve_type]
 
     def run_simulation(self):
-        clk = Clock()
+        # clk = Clock()
         for t in range(1, self.time_steps):
             run_interior_step(
                 self.flow_results[t-1,:],
@@ -105,9 +105,14 @@ class Simulation:
                 self.mesh.nodes_float[NODE_FLOAT['B'],:],
                 self.mesh.nodes_float[NODE_FLOAT['R'],:])
             self.run_junction_step(t)
+            self.run_valve_step(t)
 
-    def run_valve_step(self):
-        pass
+    def run_valve_step(self, t):
+        for v in range(self.mesh.num_valves):
+            start_id = self.mesh.valves_int[VALVE_INT['upstream_junction'], v]
+            end_id = self.mesh.valves_int[VALVE_INT['downstream_junction'], v]
+            if start_id == NULL and end_id == NULL:
+                pass
 
     def run_junction_step(self, t):
 
@@ -124,11 +129,12 @@ class Simulation:
             downstream_num = junctions[JUNCTION_INT['downstream_neighbors_num'], j_id]
             upstream_num = junctions[JUNCTION_INT['upstream_neighbors_num'], j_id]
 
-            reservoir_head = self.mesh.junctions_float[JUNCTION_FLOAT['head'], j_id]
             demand = self.mesh.junctions_float[JUNCTION_FLOAT['demand'], j_id]
 
+            junction_type = self.mesh.junctions_int[JUNCTION_INT['junction_type'], j_id]
+
             # Junction is a reservoir
-            if reservoir_head != 0:
+            if junction_type == JUNCTION_TYPES['reservoir']:
                 for j in range(downstream_num):
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
                     H2[k] = H1[k]
@@ -139,7 +145,7 @@ class Simulation:
                     H2[k] = H1[k]
                     Q2[k] = (H1[k-1] + B[k-1]*Q1[k-1] - H1[k]) \
                             / (B[k-1] + R[k-1]*abs(Q1[k-1]))
-            else:
+            elif junction_type == JUNCTION_TYPES['pipes']:
                 sc = 0
                 sb = 0
 
@@ -500,7 +506,7 @@ class Mesh:
                     d_link_name = list(self.network_graph[node][dnodes[0]])[0]
                     ulink = self.wn.get_link(u_link_name)
                     dlink = self.wn.get_link(d_link_name)
-                    if ulink.link_type in ('Valve', 'Pump') and d_link_name in ('Valve', 'Pump'):
+                    if ulink.link_type in ('Valve', 'Pump') and dlink.link_type in ('Valve', 'Pump'):
                         raise Exception("Links %s and %s are non-pipe elements and cannot be connected together" % (u_link_name, d_link_name))
             else:
                 for i in range(in_degree):
@@ -548,14 +554,12 @@ class Mesh:
         """
 
         max_degree = 0
-        for n, d in self.network_graph.to_undirected().degree():
+        for _, d in self.network_graph.to_undirected().degree():
             if d > max_degree:
                 max_degree = d
         define_junctions_int_table(max_degree)
 
-        num_total_nodes = \
-            sum(self.segments.values()) + len(self.segments) \
-                + self.wn.num_pumps + self.wn.num_valves
+        num_total_nodes = sum(self.segments.values()) + len(self.segments)
         self.nodes_int = np.full(
             (len(NODE_INT), num_total_nodes), NULL, dtype = 'int')
         self.nodes_float = np.full(
@@ -611,6 +615,7 @@ class Mesh:
             # Check if start junction is a reservoir
             if start_node_name in self.wn.reservoir_name_list:
                 self.junctions_float[JUNCTION_FLOAT['head'], start_id] = float(self.steady_state_sim.node['head'][start_node_name])
+                self.junctions_int[JUNCTION_INT['junction_type'], start_id] = JUNCTION_TYPES['reservoir']
             self.junctions_int[JUNCTION_INT['downstream_neighbors_num'], start_id] = len(downstream_link_names)
 
             # Update downstream nodes
@@ -628,9 +633,9 @@ class Mesh:
 
                 # Set default junction types for start and end junctions
                 if self.junctions_int[JUNCTION_INT['junction_type'], start_id] == NULL:
-                    self.junctions_int[JUNCTION_INT['junction_type'], start_id] = JUNCTION_TYPES['pipe']
+                    self.junctions_int[JUNCTION_INT['junction_type'], start_id] = JUNCTION_TYPES['pipes']
                 if self.junctions_int[JUNCTION_INT['junction_type'], end_id] == NULL:
-                    self.junctions_int[JUNCTION_INT['junction_type'], end_id] = JUNCTION_TYPES['pipe']
+                    self.junctions_int[JUNCTION_INT['junction_type'], end_id] = JUNCTION_TYPES['pipes']
 
                 # Define downstream junction demand
                 self.junctions_float[JUNCTION_FLOAT['demand'], end_id] = float(self.steady_state_sim.node['demand'][downstream_node_name])
@@ -657,8 +662,6 @@ class Mesh:
                         self.nodes_int[NODE_INT['link_id'], i] = k
                         if idx == 0:
                             self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['junction']
-                            print(start_id, ii, JUNCTION_INT['n%d' % (ii+1)])
-                            print(self.junctions_int[JUNCTION_INT['n%d' % (ii+1)], start_id])
                             self.junctions_int[JUNCTION_INT['n%d' % (ii+1)], start_id] = i
                         elif idx == self.segments[link_name]:
                             self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['junction']
