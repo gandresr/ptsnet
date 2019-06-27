@@ -1,6 +1,7 @@
 __pycache__
-*.
+.*/
 !/.gitignore
+*.inp
 *.bin
 *.rpt
 *.sh
