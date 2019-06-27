@@ -15,7 +15,11 @@ NODE_INT = {
 
 NODE_FLOAT = {
     'B': 0,
-    'R': 1
+    'R': 1,
+    'Cm': 2,
+    'Cp': 3,
+    'Bm': 4,
+    'Bp': 5
 }
 
 JUNCTION_INT = {
@@ -35,7 +39,7 @@ def define_junctions_int_table(degree):
 
 JUNCTION_FLOAT = {
     'demand' : 0,
-    'head': 1
+    'head': 1,
 }
 
 VALVE_INT = {

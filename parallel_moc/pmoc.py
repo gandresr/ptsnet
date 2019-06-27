@@ -108,33 +108,44 @@ class Simulation:
             self.run_valve_step(t)
 
     def run_valve_step(self, t):
+        B = self.mesh.nodes_float[NODE_FLOAT['B'], :]
+        R = self.mesh.nodes_float[NODE_FLOAT['R'], :]
+        Q0 = self.flow_results[0, :]
+        Q1 = self.flow_results[t-1, :]
+        H1 = self.head_results[t-1, :]
+        Q2 = self.flow_results[t, :]
+        H2 = self.head_results[t, :]
         for v in range(self.mesh.num_valves):
             start_id = self.mesh.valves_int[VALVE_INT['upstream_junction'], v]
             end_id = self.mesh.valves_int[VALVE_INT['downstream_junction'], v]
-            if start_id == NULL and end_id == NULL:
-                pass
+            unode = self.mesh.junctions_int[JUNCTION_INT['n2'], start_id]
+            dnode = self.mesh.junctions_int[JUNCTION_INT['n1'], end_id]
+            Q2[unode] = Q0[unode] * 1./t
+            H2[unode] = H1[unode-1] + B[unode-1]*Q1[unode-1] - (B[unode-1] + R[unode-1]*abs(Q1[unode-1]))*Q2[unode]
 
     def run_junction_step(self, t):
 
         junctions = self.mesh.junctions_int
         B = self.mesh.nodes_float[NODE_FLOAT['B'], :]
         R = self.mesh.nodes_float[NODE_FLOAT['R'], :]
+        Cm = self.mesh.nodes_float[NODE_FLOAT['Cm'], :]
+        Bm = self.mesh.nodes_float[NODE_FLOAT['Bm'], :]
+        Cp = self.mesh.nodes_float[NODE_FLOAT['Cp'], :]
+        Bp = self.mesh.nodes_float[NODE_FLOAT['Bp'], :]
         Q1 = self.flow_results[t-1, :]
         H1 = self.head_results[t-1, :]
         Q2 = self.flow_results[t, :]
         H2 = self.head_results[t, :]
+        demand = self.mesh.junctions_float[JUNCTION_FLOAT['demand'], :]
+        junction_type = self.mesh.junctions_int[JUNCTION_INT['junction_type'], :]
 
         for j_id in range(self.mesh.num_junctions):
 
             downstream_num = junctions[JUNCTION_INT['downstream_neighbors_num'], j_id]
             upstream_num = junctions[JUNCTION_INT['upstream_neighbors_num'], j_id]
 
-            demand = self.mesh.junctions_float[JUNCTION_FLOAT['demand'], j_id]
-
-            junction_type = self.mesh.junctions_int[JUNCTION_INT['junction_type'], j_id]
-
             # Junction is a reservoir
-            if junction_type == JUNCTION_TYPES['reservoir']:
+            if junction_type[j_id] == JUNCTION_TYPES['reservoir']:
                 for j in range(downstream_num):
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
                     H2[k] = H1[k]
@@ -145,31 +156,35 @@ class Simulation:
                     H2[k] = H1[k]
                     Q2[k] = (H1[k-1] + B[k-1]*Q1[k-1] - H1[k]) \
                             / (B[k-1] + R[k-1]*abs(Q1[k-1]))
-            elif junction_type == JUNCTION_TYPES['pipes']:
+            elif junction_type[j_id] == JUNCTION_TYPES['pipes']:
                 sc = 0
                 sb = 0
 
-                for j in range(downstream_num):
+                for j in range(downstream_num): # C-
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                    sc += (H1[k] - B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
-                    sb += 1 / (B[k] + R[k]*abs(Q1[k]))
+                    Cm[k] = H1[k+1] - B[k+1]*Q1[k+1]
+                    Bm[k] = B[k+1] + R[k+1]*abs(Q1[k+1])
+                    sc += Cm[k] / Bm[k]
+                    sb += 1 / Bm[k]
 
-                for j in range(downstream_num, upstream_num+downstream_num):
+                for j in range(downstream_num, upstream_num+downstream_num): # C+
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                    sc += (H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
-                    sb += 1 / (B[k] + R[k]*abs(Q1[k]))
+                    Cp[k] = H1[k-1] + B[k-1]*Q1[k-1]
+                    Bp[k] = B[k-1] + R[k-1]*abs(Q1[k-1])
+                    sc += Cp[k] / Bp[k]
+                    sb += 1 / Bp[k]
 
-                HH = sc/sb + demand/sb
+                HH = sc/sb + demand[j_id]/sb
 
-                for j in range(downstream_num):
+                for j in range(downstream_num): # C-
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
                     H2[k] = HH
-                    Q2[k] = (HH - H1[k] + B[k]*Q1[k]) / (B[k] + R[k]*abs(Q1[k]))
+                    Q2[k] = (HH - Cm[k]) / Bm[k]
 
-                for j in range(downstream_num, upstream_num+downstream_num):
+                for j in range(downstream_num, upstream_num+downstream_num): # C+
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
                     H2[k] = HH
-                    Q2[k] = (H1[k] + B[k]*Q1[k] - HH) / (B[k] + R[k]*abs(Q1[k]))
+                    Q2[k] = (Cp[k] - HH) / Bp[k]
 
     def define_valve_setting(self, valve_name, setting = None, setting_file = None, default_setting = 1):
         """Defines setting values for a valve during the simulation time
