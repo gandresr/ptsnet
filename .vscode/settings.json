@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "stdlib.h": "c"
+    },
+    "editor.rulers": [80,100],
+    "python.pythonPath":"/home/watsup/anaconda3/bin/python"
+}
