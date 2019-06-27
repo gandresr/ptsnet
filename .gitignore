@@ -1,3 +1,5 @@
+.*
+!/.gitignore
 *.bin
 *.rpt
 *.sh
