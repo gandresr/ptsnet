@@ -14,7 +14,7 @@ from os.path import isdir
 np.set_printoptions(precision=2)
 
 # Parallel does not perform well in sandy-bridge architectures
-@njit(parallel = False)
+@njit(parallel = True)
 def run_interior_step(Q1, Q2, H1, H2, B, R):
     # Keep in mind that the first and last nodes in mesh.nodes will
     #   always be a boundary node
@@ -45,54 +45,6 @@ class Simulation:
         self.settings = []
         self.curves = []
         self.define_initial_conditions()
-
-    def define_curve(self, link_name, curve_type, curve = None, curve_file = None):
-        """Defines curve values for a link
-        If curve_type == 'Valve', then it corresponds to a Discharge
-        coefficient vs setting. If a curve is defined, it should be
-        a 2D array such that the first column contains setting values
-        and the second column discharge coefficient values (it should be
-        similarly done if a CSV file is defined)
-        e.g.,
-        curve = [[0.8, 1],
-                 [0.6, 0.55],
-                 [0.4, 0.28],
-                 [0.2, 0.1],
-                 [0, 0]]
-        => setting = [0.8, 0.6, 0.4, 0.2, 0]
-        => discharge_coefficients = [1, 0.55, 0.28, 0.1, 0]
-        Arguments:
-            link_name {string} -- [description]
-            curve_type {string} -- [description]
-        Keyword Arguments:
-            curve {2D array} -- 2D array with curve values (default: {None})
-            curve_file {string} -- path to curve file (default: {None})
-        Raises:
-            Exception: If curve or curve_file is not defined
-            Exception: If curve_type is not compatible with link type
-        """
-
-        if curve is None and curve_file is None:
-            raise Exception("It is necessary to define either a curve iterable or a curve_file")
-
-        link_id = self.mesh.link_ids[link_name]
-        link = self.mesh.wn.get_link(link_name)
-
-        if link.link_type in ('Valve', 'Pump'):
-            if curve_type != 'Valve':
-                raise Exception("Type of curve is not compatible with valve %s" % link_name)
-
-        # TODO: Incorporate other types of curves
-
-        if curve is not None:
-            cc = curve
-        elif curve_file is not None:
-            cc = np.loadtxt(curve_file, delimiter=',')
-
-        self.mesh.curves.append(cc)
-        curve_id = len(self.curves) - 1
-        self.mesh.links_int[LINK_INT['curve'], link_id] = curve_id
-        self.mesh.links_int[LINK_INT['curve_type'], link_id] = CURVE_TYPES[curve_type]
 
     def run_simulation(self):
         # clk = Clock()
@@ -185,6 +137,54 @@ class Simulation:
                     k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
                     H2[k] = HH
                     Q2[k] = (Cp[k] - HH) / Bp[k]
+
+    def define_curve(self, link_name, curve_type, curve = None, curve_file = None):
+        """Defines curve values for a link
+        If curve_type == 'Valve', then it corresponds to a Discharge
+        coefficient vs setting. If a curve is defined, it should be
+        a 2D array such that the first column contains setting values
+        and the second column discharge coefficient values (it should be
+        similarly done if a CSV file is defined)
+        e.g.,
+        curve = [[0.8, 1],
+                 [0.6, 0.55],
+                 [0.4, 0.28],
+                 [0.2, 0.1],
+                 [0, 0]]
+        => setting = [0.8, 0.6, 0.4, 0.2, 0]
+        => discharge_coefficients = [1, 0.55, 0.28, 0.1, 0]
+        Arguments:
+            link_name {string} -- [description]
+            curve_type {string} -- [description]
+        Keyword Arguments:
+            curve {2D array} -- 2D array with curve values (default: {None})
+            curve_file {string} -- path to curve file (default: {None})
+        Raises:
+            Exception: If curve or curve_file is not defined
+            Exception: If curve_type is not compatible with link type
+        """
+
+        if curve is None and curve_file is None:
+            raise Exception("It is necessary to define either a curve iterable or a curve_file")
+
+        link_id = self.mesh.link_ids[link_name]
+        link = self.mesh.wn.get_link(link_name)
+
+        if link.link_type in ('Valve', 'Pump'):
+            if curve_type != 'Valve':
+                raise Exception("Type of curve is not compatible with valve %s" % link_name)
+
+        # TODO: Incorporate other types of curves
+
+        if curve is not None:
+            cc = curve
+        elif curve_file is not None:
+            cc = np.loadtxt(curve_file, delimiter=',')
+
+        self.mesh.curves.append(cc)
+        curve_id = len(self.curves) - 1
+        self.mesh.links_int[LINK_INT['curve'], link_id] = curve_id
+        self.mesh.links_int[LINK_INT['curve_type'], link_id] = CURVE_TYPES[curve_type]
 
     def define_valve_setting(self, valve_name, setting = None, setting_file = None, default_setting = 1):
         """Defines setting values for a valve during the simulation time
