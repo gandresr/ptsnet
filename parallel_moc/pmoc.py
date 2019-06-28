@@ -7,14 +7,14 @@ import dis
 
 from constants import *
 from scipy.interpolate import splev, splrep
-from numba import njit
+from numba import njit, jit
 from time import time
 from os.path import isdir
 
 np.set_printoptions(precision=2)
 
 # Parallel does not perform well in sandy-bridge architectures
-@njit(parallel = True)
+@njit(parallel = False)
 def run_interior_step(Q1, Q2, H1, H2, B, R):
     # Keep in mind that the first and last nodes in mesh.nodes will
     #   always be a boundary node
@@ -24,6 +24,58 @@ def run_interior_step(Q1, Q2, H1, H2, B, R):
             / ((B[i] + R[i]*abs(Q1[i-1])) + (B[i] + R[i]*abs(Q1[i+1])))
         Q2[i] = ((H1[i-1] + B[i]*Q1[i-1]) - (H1[i+1] - B[i]*Q1[i+1])) \
             / ((B[i] + R[i]*abs(Q1[i-1])) + (B[i] + R[i]*abs(Q1[i+1])))
+
+@njit(parallel = False)
+def run_junction_step(
+    t, junctions, B, R, Cm, Bm, Cp, Bp, Q1, H1, Q2, H2, demand, junction_type,
+    RESERVOIR, PIPE, N, DOWN, UP):
+
+    for j_id in range(junctions.shape[1]):
+
+        downstream_num = junctions[DOWN, j_id]
+        upstream_num = junctions[UP, j_id]
+
+        # Junction is a reservoir
+        if junction_type[j_id] == RESERVOIR:
+            for j in range(downstream_num):
+                k = junctions[j+N, j_id]
+                H2[k] = H1[k]
+                Q2[k] = (H1[k] - H1[k+1] + B[k+1]*Q1[k+1]) \
+                        / (B[k+1] + R[k+1]*abs(Q1[k+1]))
+            for j in range(downstream_num, upstream_num+downstream_num):
+                k = junctions[j+N, j_id]
+                H2[k] = H1[k]
+                Q2[k] = (H1[k-1] + B[k-1]*Q1[k-1] - H1[k]) \
+                        / (B[k-1] + R[k-1]*abs(Q1[k-1]))
+        elif junction_type[j_id] == PIPE:
+            sc = 0
+            sb = 0
+
+            for j in range(downstream_num): # C-
+                k = junctions[j+N, j_id]
+                Cm[k] = H1[k+1] - B[k+1]*Q1[k+1]
+                Bm[k] = B[k+1] + R[k+1]*abs(Q1[k+1])
+                sc += Cm[k] / Bm[k]
+                sb += 1 / Bm[k]
+
+            for j in range(downstream_num, upstream_num+downstream_num): # C+
+                k = junctions[j+N, j_id]
+                Cp[k] = H1[k-1] + B[k-1]*Q1[k-1]
+                Bp[k] = B[k-1] + R[k-1]*abs(Q1[k-1])
+                sc += Cp[k] / Bp[k]
+                sb += 1 / Bp[k]
+
+            HH = sc/sb + demand[j_id]/sb
+
+            for j in range(downstream_num): # C-
+                k = junctions[j+N, j_id]
+                H2[k] = HH
+                Q2[k] = (HH - Cm[k]) / Bm[k]
+
+            for j in range(downstream_num, upstream_num+downstream_num): # C+
+                k = junctions[j+N, j_id]
+                H2[k] = HH
+                Q2[k] = (Cp[k] - HH) / Bp[k]
 
 class Simulation:
     """
@@ -56,7 +108,25 @@ class Simulation:
                 self.head_results[t,:],
                 self.mesh.nodes_float[NODE_FLOAT['B'],:],
                 self.mesh.nodes_float[NODE_FLOAT['R'],:])
-            self.run_junction_step(t)
+            run_junction_step(
+                t, self.mesh.junctions_int,
+                self.mesh.nodes_float[NODE_FLOAT['B'], :],
+                self.mesh.nodes_float[NODE_FLOAT['R'], :],
+                self.mesh.nodes_float[NODE_FLOAT['Cm'], :],
+                self.mesh.nodes_float[NODE_FLOAT['Bm'], :],
+                self.mesh.nodes_float[NODE_FLOAT['Cp'], :],
+                self.mesh.nodes_float[NODE_FLOAT['Bp'], :],
+                self.flow_results[t-1, :],
+                self.head_results[t-1, :],
+                self.flow_results[t, :],
+                self.head_results[t, :],
+                self.mesh.junctions_float[JUNCTION_FLOAT['demand'], :],
+                self.mesh.junctions_int[JUNCTION_INT['junction_type'], :],
+                JUNCTION_TYPES['reservoir'],
+                JUNCTION_TYPES['pipes'],
+                3,
+                JUNCTION_INT['downstream_neighbors_num'],
+                JUNCTION_INT['upstream_neighbors_num'])
             self.run_valve_step(t)
 
     def run_valve_step(self, t):
@@ -75,68 +145,6 @@ class Simulation:
             Q2[unode] = Q0[unode] * 1./t
             H2[unode] = H1[unode-1] + B[unode-1]*Q1[unode-1] - (B[unode-1] + R[unode-1]*abs(Q1[unode-1]))*Q2[unode]
 
-    def run_junction_step(self, t):
-
-        junctions = self.mesh.junctions_int
-        B = self.mesh.nodes_float[NODE_FLOAT['B'], :]
-        R = self.mesh.nodes_float[NODE_FLOAT['R'], :]
-        Cm = self.mesh.nodes_float[NODE_FLOAT['Cm'], :]
-        Bm = self.mesh.nodes_float[NODE_FLOAT['Bm'], :]
-        Cp = self.mesh.nodes_float[NODE_FLOAT['Cp'], :]
-        Bp = self.mesh.nodes_float[NODE_FLOAT['Bp'], :]
-        Q1 = self.flow_results[t-1, :]
-        H1 = self.head_results[t-1, :]
-        Q2 = self.flow_results[t, :]
-        H2 = self.head_results[t, :]
-        demand = self.mesh.junctions_float[JUNCTION_FLOAT['demand'], :]
-        junction_type = self.mesh.junctions_int[JUNCTION_INT['junction_type'], :]
-
-        for j_id in range(self.mesh.num_junctions):
-
-            downstream_num = junctions[JUNCTION_INT['downstream_neighbors_num'], j_id]
-            upstream_num = junctions[JUNCTION_INT['upstream_neighbors_num'], j_id]
-
-            # Junction is a reservoir
-            if junction_type[j_id] == JUNCTION_TYPES['reservoir']:
-                for j in range(downstream_num):
-                    k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                    H2[k] = H1[k]
-                    Q2[k] = (H1[k] - H1[k+1] + B[k+1]*Q1[k+1]) \
-                            / (B[k+1] + R[k+1]*abs(Q1[k+1]))
-                for j in range(downstream_num, upstream_num+downstream_num):
-                    k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                    H2[k] = H1[k]
-                    Q2[k] = (H1[k-1] + B[k-1]*Q1[k-1] - H1[k]) \
-                            / (B[k-1] + R[k-1]*abs(Q1[k-1]))
-            elif junction_type[j_id] == JUNCTION_TYPES['pipes']:
-                sc = 0
-                sb = 0
-
-                for j in range(downstream_num): # C-
-                    k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                    Cm[k] = H1[k+1] - B[k+1]*Q1[k+1]
-                    Bm[k] = B[k+1] + R[k+1]*abs(Q1[k+1])
-                    sc += Cm[k] / Bm[k]
-                    sb += 1 / Bm[k]
-
-                for j in range(downstream_num, upstream_num+downstream_num): # C+
-                    k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                    Cp[k] = H1[k-1] + B[k-1]*Q1[k-1]
-                    Bp[k] = B[k-1] + R[k-1]*abs(Q1[k-1])
-                    sc += Cp[k] / Bp[k]
-                    sb += 1 / Bp[k]
-
-                HH = sc/sb + demand[j_id]/sb
-
-                for j in range(downstream_num): # C-
-                    k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                    H2[k] = HH
-                    Q2[k] = (HH - Cm[k]) / Bm[k]
-
-                for j in range(downstream_num, upstream_num+downstream_num): # C+
-                    k = junctions[JUNCTION_INT['n%d' % (j+1)], j_id]
-                    H2[k] = HH
-                    Q2[k] = (Cp[k] - HH) / Bp[k]
 
     def define_curve(self, link_name, curve_type, curve = None, curve_file = None):
         """Defines curve values for a link

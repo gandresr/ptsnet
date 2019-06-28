@@ -11,8 +11,8 @@ import dis
 clk = Clock()
 
 # Test segmentation and partitioning
-T = 100
-dt1 = 0.01
+T = 8000
+dt1 = 0.02
 dt2 = 0.02
 # mesh = Mesh(MOC_PATH + "example_models/LoopedNet.inp", dt = dt1, default_wave_speed = 1200)
 # sim = Simulation(mesh, int(T/dt1))
