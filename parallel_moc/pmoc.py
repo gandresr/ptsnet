@@ -178,20 +178,21 @@ class Simulation:
         link_id = self.mesh.link_ids[link_name]
         link = self.mesh.wn.get_link(link_name)
 
-        if link.link_type in ('Valve', 'Pump'):
-            if curve_type != 'Valve':
+        if link.link_type in 'Valve':
+            if curve_type != 'valve':
                 raise Exception("Type of curve is not compatible with valve %s" % link_name)
-
-        # TODO: Incorporate other types of curves
+        elif link.link_type in 'Pump':
+            if curve_type != 'pump':
+                raise Exception("Type of curve is not compatible with pump %s" % link_name)
 
         if curve is not None:
             cc = curve
         elif curve_file is not None:
             cc = np.loadtxt(curve_file, delimiter=',')
 
-        self.mesh.curves.append(cc)
+        self.curves.append(cc)
         curve_id = len(self.curves) - 1
-        self.mesh.links_int[LINK_INT['curve'], link_id] = curve_id
+        self.mesh.links_int[LINK_INT['curve_id'], link_id] = curve_id
         self.mesh.links_int[LINK_INT['curve_type'], link_id] = CURVE_TYPES[curve_type]
 
     def define_valve_setting(self, valve_name, setting = None, setting_file = None, default_setting = 1):

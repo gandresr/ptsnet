@@ -11,7 +11,7 @@ import dis
 clk = Clock()
 
 # Test segmentation and partitioning
-T = 8000
+T = 1000
 dt1 = 0.02
 dt2 = 0.02
 # mesh = Mesh(MOC_PATH + "example_models/LoopedNet.inp", dt = dt1, default_wave_speed = 1200)
