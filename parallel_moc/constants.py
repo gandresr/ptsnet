@@ -42,20 +42,18 @@ JUNCTION_FLOAT = {
     'head': 1,
 }
 
-LINK_INT = {
-    'curve_id': 0,
-    'curve_type': 1,
-    'setting' : 2
-}
-
 VALVE_INT = {
     'upstream_junction' : 0,
-    'downstream_junction' : 1
+    'downstream_junction' : 1,
+    'curve_id': 2,
+    'setting' : 3
 }
 
 PUMP_INT = {
     'upstream_junction' : 0,
-    'downstream_junction' : 1
+    'downstream_junction' : 1,
+    'curve_id': 2,
+    'setting' : 3
 }
 
 PUMP_FLOAT = {

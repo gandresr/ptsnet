@@ -142,8 +142,13 @@ class Simulation:
             end_id = self.mesh.valves_int[VALVE_INT['downstream_junction'], v]
             unode = self.mesh.junctions_int[JUNCTION_INT['n2'], start_id]
             dnode = self.mesh.junctions_int[JUNCTION_INT['n1'], end_id]
-            Q2[unode] = Q0[unode] * 1./t
-            H2[unode] = H1[unode-1] + B[unode-1]*Q1[unode-1] - (B[unode-1] + R[unode-1]*abs(Q1[unode-1]))*Q2[unode]
+            valve_setting = self.mesh.links_int[]
+            if dnode == NULL:
+                # Dead-end
+                Q2[unode] = Q0[unode] * 
+                H2[unode] = H1[unode-1] + B[unode-1]*Q1[unode-1] - (B[unode-1] + R[unode-1]*abs(Q1[unode-1]))*Q2[unode]
+            else:
+
 
 
     def define_curve(self, link_name, curve_type, curve = None, curve_file = None):
@@ -178,22 +183,25 @@ class Simulation:
         link_id = self.mesh.link_ids[link_name]
         link = self.mesh.wn.get_link(link_name)
 
-        if link.link_type in 'Valve':
-            if curve_type != 'valve':
-                raise Exception("Type of curve is not compatible with valve %s" % link_name)
-        elif link.link_type in 'Pump':
-            if curve_type != 'pump':
-                raise Exception("Type of curve is not compatible with pump %s" % link_name)
-
         if curve is not None:
             cc = curve
         elif curve_file is not None:
             cc = np.loadtxt(curve_file, delimiter=',')
 
+        curve_id = len(self.curves)
+
+        if link.link_type in 'Valve':
+            if curve_type != 'valve':
+                raise Exception("Type of curve is not compatible with valve %s" % link_name)
+            self.mesh.valves_int[VALVE_INT['curve_id'], link_id] = curve_id
+            self.mesh.links_int[VALVE_INT['curve_type'], link_id] = CURVE_TYPES[curve_type]
+        elif link.link_type in 'Pump':
+            if curve_type != 'pump':
+                raise Exception("Type of curve is not compatible with pump %s" % link_name)
+            self.mesh.valves_int[PUMP_INT['curve_id'], link_id] = curve_id
+            self.mesh.links_int[PUMP_INT['curve_type'], link_id] = CURVE_TYPES[curve_type]
+
         self.curves.append(cc)
-        curve_id = len(self.curves) - 1
-        self.mesh.links_int[LINK_INT['curve_id'], link_id] = curve_id
-        self.mesh.links_int[LINK_INT['curve_type'], link_id] = CURVE_TYPES[curve_type]
 
     def define_valve_setting(self, valve_name, setting = None, setting_file = None, default_setting = 1):
         """Defines setting values for a valve during the simulation time
@@ -438,7 +446,6 @@ class Mesh:
             Exception: If default_wave_speed is not defined and the file with information
             of the wave speeds is incomplete
         """
-        # TODO : TEST IF TIME STEPS ARE THE SAME FOR ALL THE SEGMENTS/PIPES(?)
         self.wave_speeds = {}
 
         if default_wave_speed is not None:
