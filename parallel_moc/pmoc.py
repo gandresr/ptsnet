@@ -4,17 +4,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import subprocess
 import dis
+import pickle
 
 from constants import *
 from scipy.interpolate import splev, splrep
 from numba import njit, jit
 from time import time
 from os.path import isdir
-
 np.set_printoptions(precision=2)
 
 # Parallel does not perform well in sandy-bridge architectures
-@njit(parallel = False)
+@njit(parallel = True)
 def run_interior_step(Q1, Q2, H1, H2, B, R):
     # Keep in mind that the first and last nodes in mesh.nodes will
     #   always be a boundary node
@@ -98,9 +98,36 @@ class Simulation:
         self.curves = []
         self.define_initial_conditions()
 
+    def _check_model(self):
+        for v in range(self.mesh.num_valves):
+            start_id = self.mesh.valves_int[VALVE_INT['upstream_junction'], v]
+            end_id = self.mesh.valves_int[VALVE_INT['downstream_junction'], v]
+            unode = self.mesh.junctions_int[JUNCTION_INT['n2'], start_id]
+            dnode = self.mesh.junctions_int[JUNCTION_INT['n1'], end_id]
+            setting_id = self.mesh.valves_int[VALVE_INT['setting_id'], v]
+            valve_name = self.mesh.valve_name_list[v]
+            if setting_id == NULL:
+                setting = self.mesh.valves_float[VALVE_FLOAT['setting'], v]
+                if setting == NULL:
+                    raise Exception('It is necessary to define a setting value for valve %s' % valve_name)
+            if dnode != NULL and unode != NULL:
+                curve_id = self.mesh.valves_int[VALVE_INT['curve_id'], v]
+                if curve_id == NULL:
+                    raise Exception("It is necessary to define a curve for valve %s" % valve_name)
+        for p in range(self.mesh.num_pumps):
+            setting_id = self.mesh.pumps_int[PUMP_INT['setting_id'], p]
+            if setting_id == NULL:
+                setting = self.mesh.pumps_float[PUMP_FLOAT['setting'], p]
+                if setting == NULL:
+                    pump_name = self.mesh.pump_name_list[v]
+                    raise Exception('It is necessary to define a setting value for pump %s' % pump_name)
+
     def run_simulation(self):
-        # clk = Clock()
+        clk = Clock()
+        self._check_model()
         for t in range(1, self.time_steps):
+            if t <= 2:
+                clk.tic()
             run_interior_step(
                 self.flow_results[t-1,:],
                 self.flow_results[t,:],
@@ -108,6 +135,9 @@ class Simulation:
                 self.head_results[t,:],
                 self.mesh.nodes_float[NODE_FLOAT['B'],:],
                 self.mesh.nodes_float[NODE_FLOAT['R'],:])
+            if t <= 2:
+                clk.toc()
+                clk.tic()
             run_junction_step(
                 t, self.mesh.junctions_int,
                 self.mesh.nodes_float[NODE_FLOAT['B'], :],
@@ -127,6 +157,9 @@ class Simulation:
                 3,
                 JUNCTION_INT['downstream_neighbors_num'],
                 JUNCTION_INT['upstream_neighbors_num'])
+            if t <= 2:
+                clk.toc()
+                clk.tic()
             self.run_valve_step(t)
 
     def run_valve_step(self, t):
@@ -142,14 +175,21 @@ class Simulation:
             end_id = self.mesh.valves_int[VALVE_INT['downstream_junction'], v]
             unode = self.mesh.junctions_int[JUNCTION_INT['n2'], start_id]
             dnode = self.mesh.junctions_int[JUNCTION_INT['n1'], end_id]
-            valve_setting = self.mesh.links_int[]
+            setting = self.mesh.valves_float[VALVE_FLOAT['setting'], v]
+            setting_id = self.mesh.valves_int[VALVE_INT['setting_id'], v]
+            curve_id = self.mesh.valves_int[VALVE_INT['curve_id'], v]
+            if setting == NULL:
+                setting = self.settings[setting_id][t]
+            else:
+                self.mesh.valves_float[VALVE_FLOAT['setting'], v] = NULL
             if dnode == NULL:
                 # Dead-end
-                Q2[unode] = Q0[unode] * 
+                Q2[unode] = Q0[unode] * setting
                 H2[unode] = H1[unode-1] + B[unode-1]*Q1[unode-1] - (B[unode-1] + R[unode-1]*abs(Q1[unode-1]))*Q2[unode]
             else:
-
-
+                CV = self.curves[curve_id]
+                cv = CV(setting)
+                pass
 
     def define_curve(self, link_name, curve_type, curve = None, curve_file = None):
         """Defines curve values for a link
@@ -201,7 +241,14 @@ class Simulation:
             self.mesh.valves_int[PUMP_INT['curve_id'], link_id] = curve_id
             self.mesh.links_int[PUMP_INT['curve_type'], link_id] = CURVE_TYPES[curve_type]
 
-        self.curves.append(cc)
+        cc = cc[np.argsort(cc[:,0])]
+        X = cc[:,0]
+        Y = cc[:,1]
+
+        spl = splrep(X, Y)
+        F = lambda x : splev(x, spl)
+
+        self.curves.append(F)
 
     def define_valve_setting(self, valve_name, setting = None, setting_file = None, default_setting = 1):
         """Defines setting values for a valve during the simulation time
@@ -227,38 +274,32 @@ class Simulation:
         Raises:
             Exception: If setting iterable or setting file is not defined
             Exception: If valve curve has not been defined
+        # TODO: UPDATE DOCS
         """
         if setting is None and setting_file is None:
             raise Exception("It is necessary to define either a setting iterable or a setting_file")
 
-        valve_id = self.mesh.link_ids[valve_name]
-        # curve_id = self.mesh.links_int[LINK_INT['curve_id'], valve_id]
-
-        # if curve_id == NULL:
-        #     raise Exception("It is necessary to define the valve curve first")
+        valve_id = self.mesh.valve_ids[valve_name]
 
         ss = []
         if setting is not None:
-            ss = np.array(setting)
+            if type(setting) == float:
+                ss = setting
+            else:
+                ss = np.array(setting)
         elif setting_file is not None:
             ss = np.loadtxt(setting_file, dtype=float)
 
         setting_id = len(self.settings)
 
         N = len(ss)
-        if N < self.time_steps:
+        if N == 1:
+            self.mesh.valves_float[VALVE_FLOAT['setting'], valve_id] = ss
+        elif N < self.time_steps:
             ss = np.concatenate((ss, np.full((self.time_steps - N, 1), default_setting)), axis = None)
-
-        # spl = splrep(self.curves[curve_id][:,0], self.curves[curve_id][:,1])
-        # [:self.time_steps] in case that len(ss) > self.time_steps
-        # dcoeffs = splev(ss[:self.time_steps], spl)
-
-        # self.discharge_coefficients.append(dcoeffs)
-        self.settings.append(ss[:self.time_steps])
-        self.mesh.links_int[LINK_INT['setting_id'], valve_id] = setting_id
-
-        # dcoeff_id = len(self.discharge_coefficients) - 1
-        # self.mesh.links_int[LINK_INT['dcoeff_id'], valve_id] = dcoeff_id
+        if N > 1:
+            self.settings.append(ss[:self.time_steps])
+            self.mesh.valves_int[VALVE_INT['setting_id'], valve_id] = setting_id
 
     def define_initial_conditions(self):
         """Extracts initial conditions from EPANET
@@ -401,6 +442,17 @@ class Mesh:
         #   s indicates if a node is a separator according
         #   to parHIP
         self.partitioning = None
+
+    def save(self):
+        f = open(self.fname + '.mesh', 'wb')
+        pickle.dump(self, f)
+        f.close()
+
+    def load(fname):
+        f = open(fname + '.mesh', 'rb')
+        m = pickle.load(f)
+        f.close()
+        return m
 
     def _get_network_graph(self):
         """[summary]
@@ -609,6 +661,8 @@ class Mesh:
 
         self.valves_int = np.full(
             (len(VALVE_INT), self.wn.num_valves) , NULL, dtype='int')
+        self.valves_float = np.full(
+            (len(VALVE_FLOAT), self.wn.num_valves), NULL, dtype='float64')
         self.valve_ids = {}
         self.valve_name_list = []
 

@@ -39,28 +39,33 @@ def define_junctions_int_table(degree):
 
 JUNCTION_FLOAT = {
     'demand' : 0,
-    'head': 1,
+    'head': 1
 }
 
 VALVE_INT = {
     'upstream_junction' : 0,
     'downstream_junction' : 1,
     'curve_id': 2,
-    'setting' : 3
+    'setting_id' : 3
+}
+
+VALVE_FLOAT = {
+    'setting' : 0
 }
 
 PUMP_INT = {
     'upstream_junction' : 0,
     'downstream_junction' : 1,
     'curve_id': 2,
-    'setting' : 3
+    'setting_id' : 3
 }
 
 PUMP_FLOAT = {
     'a': 0,
     'b': 1,
     'c': 2,
-    'max_speed': 0,
+    'setting' : 3,
+    'max_speed': 4
 }
 
 NODE_TYPES = {
