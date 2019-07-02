@@ -165,6 +165,10 @@ class Simulation:
     def run_valve_step(self, t):
         B = self.mesh.nodes_float[NODE_FLOAT['B'], :]
         R = self.mesh.nodes_float[NODE_FLOAT['R'], :]
+        Cm = self.mesh.nodes_float[NODE_FLOAT['Cm'], :]
+        Bm = self.mesh.nodes_float[NODE_FLOAT['Bm'], :]
+        Cp = self.mesh.nodes_float[NODE_FLOAT['Cp'], :]
+        Bp = self.mesh.nodes_float[NODE_FLOAT['Bp'], :]
         Q0 = self.flow_results[0, :]
         Q1 = self.flow_results[t-1, :]
         H1 = self.head_results[t-1, :]
@@ -178,18 +182,29 @@ class Simulation:
             setting = self.mesh.valves_float[VALVE_FLOAT['setting'], v]
             setting_id = self.mesh.valves_int[VALVE_INT['setting_id'], v]
             curve_id = self.mesh.valves_int[VALVE_INT['curve_id'], v]
+            area = self.mesh.valves_float[VALVE_FLOAT['area'], v]
             if setting == NULL:
                 setting = self.settings[setting_id][t]
             else:
                 self.mesh.valves_float[VALVE_FLOAT['setting'], v] = NULL
             if dnode == NULL:
-                # Dead-end
+                # End-valve
                 Q2[unode] = Q0[unode] * setting
                 H2[unode] = H1[unode-1] + B[unode-1]*Q1[unode-1] - (B[unode-1] + R[unode-1]*abs(Q1[unode-1]))*Q2[unode]
             else:
-                CV = self.curves[curve_id]
-                cv = CV(setting)
-                pass
+                # Inline-valve
+                Cd = self.curves[curve_id](setting)
+                Cp[unode] = H1[unode-1] + B[unode-1]*Q1[unode-1]
+                Bp[unode] = B[unode-1] + R[unode-1]*abs(Q1[unode-1])
+                Cm[dnode] = H1[dnode+1] - B[dnode+1]*Q1[dnode+1]
+                Bm[dnode] = B[dnode+1] + R[dnode+1]*abs(Q1[dnode+1])
+                S = -1 if (Cp - Cm) < 0 else 1
+                Cv = 2*G*(Cd*setting*area)**2
+                X = Cv*(Bp[unode] + Bm[dnode])
+                Q2[unode] = (-S*X + S*(X**2 + S*4*Cv(Cp[unode] - Cm[dnode]))**0.5)/2
+                Q2[dnode] = Q2[unode]
+                H2[unode] = Cp[unode] - Bp[unode]*Q2[unode]
+                H2[dnode] = Cm[dnode] + Bm[dnode]*Q2[dnode]
 
     def define_curve(self, link_name, curve_type, curve = None, curve_file = None):
         """Defines curve values for a link

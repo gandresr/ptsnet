@@ -50,7 +50,8 @@ VALVE_INT = {
 }
 
 VALVE_FLOAT = {
-    'setting' : 0
+    'setting' : 0,
+    'area' : 1
 }
 
 PUMP_INT = {
