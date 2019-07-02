@@ -123,11 +123,9 @@ class Simulation:
                     raise Exception('It is necessary to define a setting value for pump %s' % pump_name)
 
     def run_simulation(self):
-        clk = Clock()
+        # clk = Clock()
         self._check_model()
         for t in range(1, self.time_steps):
-            if t <= 2:
-                clk.tic()
             run_interior_step(
                 self.flow_results[t-1,:],
                 self.flow_results[t,:],
@@ -135,9 +133,6 @@ class Simulation:
                 self.head_results[t,:],
                 self.mesh.nodes_float[NODE_FLOAT['B'],:],
                 self.mesh.nodes_float[NODE_FLOAT['R'],:])
-            if t <= 2:
-                clk.toc()
-                clk.tic()
             run_junction_step(
                 t, self.mesh.junctions_int,
                 self.mesh.nodes_float[NODE_FLOAT['B'], :],
@@ -157,9 +152,6 @@ class Simulation:
                 3,
                 JUNCTION_INT['downstream_neighbors_num'],
                 JUNCTION_INT['upstream_neighbors_num'])
-            if t <= 2:
-                clk.toc()
-                clk.tic()
             self.run_valve_step(t)
 
     def run_valve_step(self, t):
@@ -235,7 +227,6 @@ class Simulation:
         if curve is None and curve_file is None:
             raise Exception("It is necessary to define either a curve iterable or a curve_file")
 
-        link_id = self.mesh.link_ids[link_name]
         link = self.mesh.wn.get_link(link_name)
 
         if curve is not None:
@@ -248,13 +239,13 @@ class Simulation:
         if link.link_type in 'Valve':
             if curve_type != 'valve':
                 raise Exception("Type of curve is not compatible with valve %s" % link_name)
+            link_id = self.mesh.valve_ids[link_name]
             self.mesh.valves_int[VALVE_INT['curve_id'], link_id] = curve_id
-            self.mesh.links_int[VALVE_INT['curve_type'], link_id] = CURVE_TYPES[curve_type]
         elif link.link_type in 'Pump':
             if curve_type != 'pump':
                 raise Exception("Type of curve is not compatible with pump %s" % link_name)
-            self.mesh.valves_int[PUMP_INT['curve_id'], link_id] = curve_id
-            self.mesh.links_int[PUMP_INT['curve_type'], link_id] = CURVE_TYPES[curve_type]
+            link_id = self.mesh.pump_ids[link_name]
+            self.mesh.pumps_int[PUMP_INT['curve_id'], link_id] = curve_id
 
         cc = cc[np.argsort(cc[:,0])]
         X = cc[:,0]
