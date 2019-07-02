@@ -190,10 +190,10 @@ class Simulation:
                 Bp[unode] = B[unode-1] + R[unode-1]*abs(Q1[unode-1])
                 Cm[dnode] = H1[dnode+1] - B[dnode+1]*Q1[dnode+1]
                 Bm[dnode] = B[dnode+1] + R[dnode+1]*abs(Q1[dnode+1])
-                S = -1 if (Cp - Cm) < 0 else 1
+                S = -1 if (Cp[unode] - Cm[dnode]) < 0 else 1
                 Cv = 2*G*(Cd*setting*area)**2
                 X = Cv*(Bp[unode] + Bm[dnode])
-                Q2[unode] = (-S*X + S*(X**2 + S*4*Cv(Cp[unode] - Cm[dnode]))**0.5)/2
+                Q2[unode] = (-S*X + S*(X**2 + S*4*Cv*(Cp[unode] - Cm[dnode]))**0.5)/2
                 Q2[dnode] = Q2[unode]
                 H2[unode] = Cp[unode] - Bp[unode]*Q2[unode]
                 H2[dnode] = Cm[dnode] + Bm[dnode]*Q2[dnode]
@@ -476,9 +476,9 @@ class Mesh:
                         switch_links.append((n1, n2))
                         self.steady_state_sim.link['flowrate'][link_name] *= -1
                     elif flow == 0:
-                        ha = self.steady_state_sim.node['head'][n1]
-                        hb = self.steady_state_sim.node['head'][n2]
-                        if hb < ha:
+                        ha = float(self.steady_state_sim.node['head'][n1])
+                        hb = float(self.steady_state_sim.node['head'][n2])
+                        if ha < hb:
                             switch_links.append((n1, n2))
         for n1, n2 in switch_links:
             attrs = G[n1][n2]
@@ -777,6 +777,7 @@ class Mesh:
                     self.junctions_int[JUNCTION_INT['junction_type'], end_id] = JUNCTION_TYPES['valve']
                     self.valves_int[VALVE_INT['upstream_junction'], v] = start_id
                     self.valves_int[VALVE_INT['downstream_junction'], v] = end_id
+                    self.valves_float[VALVE_FLOAT['area'], v] = (np.pi * link.diameter ** 2 / 4)
                     self.valve_ids[link_name] = v
                     self.valve_name_list.append(link_name)
                     v += 1
