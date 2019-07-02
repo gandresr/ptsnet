@@ -463,11 +463,11 @@ class Mesh:
         pickle.dump(self, f)
         f.close()
 
-    def load(fname):
-        f = open(fname + '.mesh', 'rb')
-        m = pickle.load(f)
-        f.close()
-        return m
+    # def load(fname):
+    #     f = open(fname + '.mesh', 'rb')
+    #     m = pickle.load(f)
+    #     f.close()
+    #     return m
 
     def _get_network_graph(self):
         """[summary]
@@ -480,9 +480,15 @@ class Mesh:
         for n1 in G:
             for n2 in G[n1]:
                 for link_name in G[n1][n2]:
-                    if float(self.steady_state_sim.link['flowrate'][link_name]) < 0:
+                    flow = float(self.steady_state_sim.link['flowrate'][link_name])
+                    if flow < 0:
                         switch_links.append((n1, n2))
                         self.steady_state_sim.link['flowrate'][link_name] *= -1
+                    elif flow == 0:
+                        ha = self.steady_state_sim.node['head'][n1]
+                        hb = self.steady_state_sim.node['head'][n2]
+                        if hb < ha:
+                            switch_links.append((n1, n2))
         for n1, n2 in switch_links:
             attrs = G[n1][n2]
             link = list(attrs.keys())[0]
