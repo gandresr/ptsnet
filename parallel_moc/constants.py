@@ -1,6 +1,6 @@
-
 MOC_PATH = "/home/watsup/Documents/Github/hammer-net/parallel_moc/"
 
+MAX_NEIGHBORS = 6
 NULL = -987654321
 G = 9.81 # m/s
 TOL = 1E-6
@@ -29,14 +29,13 @@ JUNCTION_INT = {
     'junction_type' : 2
 }
 
-def define_junctions_int_table(degree):
-    for i in range(degree):
-        # Neighbors
-        #   first, downstream neighbors are stored and then
-        #   upstream neighbors.
-        #   * ni: neighbor id
-        #   * pi: processor assigned to node with id ni
-        JUNCTION_INT['n%d' % (i+1)] = 3 + i
+for i in range(MAX_NEIGHBORS):
+    # Neighbors
+    #   first, downstream neighbors are stored and then
+    #   upstream neighbors.
+    #   * ni: neighbor id
+    #   * pi: processor assigned to node with id ni
+    JUNCTION_INT['n%d' % (i+1)] = 3 + i
 
 JUNCTION_FLOAT = {
     'demand' : 0,

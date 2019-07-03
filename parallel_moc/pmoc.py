@@ -14,6 +14,28 @@ from os.path import isdir
 
 np.set_printoptions(precision=2)
 
+def save_model(mesh):
+    """Saves mesh object
+
+    Arguments:
+        mesh {Mesh} -- mesh object
+    """
+    with open(mesh.fname + '.mesh', 'wb') as f:
+        pickle.dump(vars(mesh), f)
+
+def open_model(fname):
+    """Returns pickled mesh
+
+    Arguments:
+        fname {string} -- mesh filemane
+
+    Returns:
+        [Mesh] -- stored mesh object
+    """
+    with open(fname[:fname.find('.')] + '.mesh', 'rb') as f:
+        m = pickle.load(f)
+    return Mesh(None, None, attrs=m)
+
 # Parallel does not perform well in sandy-bridge architectures
 @njit(parallel = True)
 def run_interior_step(Q1, Q2, H1, H2, B, R):
@@ -199,6 +221,9 @@ class Simulation:
                 H2[unode] = Cp[unode] - Bp[unode]*Q2[unode]
                 H2[dnode] = Cm[dnode] + Bm[dnode]*Q2[dnode]
 
+        def run_pump_step(self):
+            pass
+
     def define_curve(self, link_name, curve_type, curve = None, curve_file = None):
         """Defines curve values for a link
         If curve_type == 'Valve', then it corresponds to a Discharge
@@ -366,7 +391,7 @@ class Mesh:
         # * IDS are indexes associated to data structures
         # * Junctions in EPANET are not the same as junctions in PMOC
     """
-    def __init__(self, input_file, dt, wave_speed_file = None, default_wave_speed = None):
+    def __init__(self, input_file, dt, wave_speed_file = None, default_wave_speed = None, attrs = None):
         """Creates a Mesh object from a .inp EPANET file
 
         The MOC Mesh is created based on a desired time step which is the
@@ -387,6 +412,10 @@ class Mesh:
             Exception: If no definition of default_wave_speed value or wave_speed_file
                 is given. At least one should be given
         """
+
+        if attrs != None:
+            self.__dict__.update(attrs)
+            return
 
         self.fname = input_file[:input_file.find('.inp')]
         self.wn = wntr.network.WaterNetworkModel(input_file)
@@ -451,17 +480,6 @@ class Mesh:
         #   to parHIP
         self.partitioning = None
 
-    def save(self):
-        f = open(self.fname + '.mesh', 'wb')
-        pickle.dump(self, f)
-        f.close()
-
-    # def load(fname):
-    #     f = open(fname + '.mesh', 'rb')
-    #     m = pickle.load(f)
-    #     f.close()
-    #     return m
-
     def _get_network_graph(self):
         """[summary]
 
@@ -475,7 +493,6 @@ class Mesh:
                 for link_name in G[n1][n2]:
                     flow = float(self.steady_state_sim.link['flowrate'][link_name])
                     if flow < -TOL:
-                        print("HERE!", n1, n2, flow)
                         switch_links.append((n1, n2))
                         self.steady_state_sim.link['flowrate'][link_name] *= -1
                     elif flow == 0:
@@ -650,12 +667,6 @@ class Mesh:
         # * This function should only be called after defining the segments
             for each pipe in the network
         """
-
-        max_degree = 0
-        for _, d in self.network_graph.to_undirected().degree():
-            if d > max_degree:
-                max_degree = d
-        define_junctions_int_table(max_degree)
 
         num_total_nodes = sum(self.segments.values()) + len(self.segments)
         self.nodes_int = np.full(
