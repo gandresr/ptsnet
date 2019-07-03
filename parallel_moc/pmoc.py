@@ -11,6 +11,7 @@ from scipy.interpolate import splev, splrep
 from numba import njit, jit
 from time import time
 from os.path import isdir
+
 np.set_printoptions(precision=2)
 
 # Parallel does not perform well in sandy-bridge architectures
@@ -334,6 +335,7 @@ class Simulation:
                 else:
                     hl = head_2 - head_1
                     self.head_results[0][i] = head_1 + hl*dx/link.length
+
 
 class Mesh:
     """ Defines the mesh for an EPANET network to solve the 1D MOC
@@ -876,3 +878,5 @@ class Clock:
         """Ends timer and prints time elapsed
         """
         print('Elapsed time: %.8f seconds' % (time() - self.clk))
+
+clk = Clock()
