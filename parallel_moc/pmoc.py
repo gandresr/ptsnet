@@ -323,7 +323,7 @@ class Simulation:
             k = self.mesh.nodes_int[NODE_INT['subindex'], i]
             node_type = self.mesh.nodes_int[NODE_INT['node_type'], i]
 
-            if node_type not in  (NODE_TYPES['interior'], NODE_TYPES['junction']):
+            if node_type not in  (NODE_TYPES['interior'], NODE_TYPES['boundary']):
                 self.head_results[0][i] = float(self.steady_state_sim.node['head'][start_node_name])
             else:
                 head_1 = float(self.steady_state_sim.node['head'][start_node_name])
@@ -474,7 +474,8 @@ class Mesh:
             for n2 in G[n1]:
                 for link_name in G[n1][n2]:
                     flow = float(self.steady_state_sim.link['flowrate'][link_name])
-                    if flow < 0:
+                    if flow < -TOL:
+                        print("HERE!", n1, n2, flow)
                         switch_links.append((n1, n2))
                         self.steady_state_sim.link['flowrate'][link_name] *= -1
                     elif flow == 0:
@@ -760,10 +761,10 @@ class Mesh:
                         self.nodes_int[NODE_INT['subindex'], i] = idx
                         self.nodes_int[NODE_INT['link_id'], i] = k
                         if idx == 0:
-                            self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['junction']
+                            self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['boundary']
                             self.junctions_int[JUNCTION_INT['n%d' % (ii+1)], start_id] = i
                         elif idx == self.segments[link_name]:
-                            self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['junction']
+                            self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['boundary']
                             self.junctions_int[JUNCTION_INT['n%d' % (jj+1)], end_id] = i
                         else:
                             self.nodes_int[NODE_INT['node_type'], i] = NODE_TYPES['interior']

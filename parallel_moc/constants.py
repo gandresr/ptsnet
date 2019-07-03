@@ -3,6 +3,7 @@ MOC_PATH = "/home/watsup/Documents/Github/hammer-net/parallel_moc/"
 
 NULL = -987654321
 G = 9.81 # m/s
+TOL = 1E-6
 
 # Enums
 NODE_INT = {
@@ -72,10 +73,7 @@ PUMP_FLOAT = {
 NODE_TYPES = {
     'none' : NULL,
     'interior' : 0,
-    # boundary nodes
-    'junction' : 1,
-    'valve' : 2,
-    'pump' : 3
+    'boundary' : 1
 }
 
 JUNCTION_TYPES = {
