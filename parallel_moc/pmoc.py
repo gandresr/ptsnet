@@ -221,8 +221,12 @@ class Simulation:
                 H2[unode] = Cp[unode] - Bp[unode]*Q2[unode]
                 H2[dnode] = Cm[dnode] + Bm[dnode]*Q2[dnode]
 
-        def run_pump_step(self):
-            pass
+    def run_pump_step(self):
+        pass
+
+    def define_burst(self, junction_name, A, Cd):
+        j_id = self.mesh.junction_ids[junction_name]
+        pass
 
     def define_curve(self, link_name, curve_type, curve = None, curve_file = None):
         """Defines curve values for a link
@@ -282,7 +286,7 @@ class Simulation:
 
         self.curves.append(F)
 
-    def define_valve_setting(self, valve_name, setting = None, setting_file = None, default_setting = 1):
+    def define_valve_setting(self, valve_name, setting = None, setting_file = None):
         """Defines setting values for a valve during the simulation time
 
         If the valve setting is not defined for a certain time step, the
@@ -306,7 +310,7 @@ class Simulation:
         Raises:
             Exception: If setting iterable or setting file is not defined
             Exception: If valve curve has not been defined
-        # TODO: UPDATE DOCS
+        # TODO: UPDATE DOCS - default setting == ss[-1]
         """
         if setting is None and setting_file is None:
             raise Exception("It is necessary to define either a setting iterable or a setting_file")
@@ -328,7 +332,7 @@ class Simulation:
         if N == 1:
             self.mesh.valves_float[VALVE_FLOAT['setting'], valve_id] = ss
         elif N < self.time_steps:
-            ss = np.concatenate((ss, np.full((self.time_steps - N, 1), default_setting)), axis = None)
+            ss = np.concatenate((ss, np.full((self.time_steps - N, 1), ss[-1])), axis = None)
         if N > 1:
             self.settings.append(ss[:self.time_steps])
             self.mesh.valves_int[VALVE_INT['setting_id'], valve_id] = setting_id
@@ -360,7 +364,6 @@ class Simulation:
                 else:
                     hl = head_2 - head_1
                     self.head_results[0][i] = head_1 + hl*dx/link.length
-
 
 class Mesh:
     """ Defines the mesh for an EPANET network to solve the 1D MOC

@@ -26,16 +26,14 @@ NODE_FLOAT = {
 JUNCTION_INT = {
     'downstream_neighbors_num' : 0, # between [0,6]
     'upstream_neighbors_num' : 1, # between [0,6]
-    'junction_type' : 2
+    'junction_type' : 2,
+    'n1' : 3,
+    'n2' : 4,
+    'n3' : 5,
+    'n4' : 6,
+    'n5' : 7,
+    'n6' : 8,
 }
-
-for i in range(MAX_NEIGHBORS):
-    # Neighbors
-    #   first, downstream neighbors are stored and then
-    #   upstream neighbors.
-    #   * ni: neighbor id
-    #   * pi: processor assigned to node with id ni
-    JUNCTION_INT['n%d' % (i+1)] = 3 + i
 
 JUNCTION_FLOAT = {
     'demand' : 0,
@@ -79,10 +77,9 @@ JUNCTION_TYPES = {
     'reservoir': 0,
     'pipes': 1,
     'valve': 2,
-    'pump': 3,
-    'dead_end': 4,
-    'burst': 5,
-    'leakage': 6,
+    'burst': 3,
+    'pump': 4,
+    'dead_end': 5
 }
 
 CURVE_TYPES = {
