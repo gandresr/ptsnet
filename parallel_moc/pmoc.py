@@ -132,33 +132,48 @@ class Simulation:
             j_id = self.mesh.junction_ids[junction]
             self.mesh.junctions_float[JUNCTION_FLOAT['emitter_setting'], j_id] = setting
         elif settings != None:
-            for i, junction in enumerate(junctions):
-                j_id = self.mesh.junction_ids[junction]
-                setting_id = len(self.settings)
-                self.settings.append(settings[i])
-                self.mesh.junctions_int[JUNCTION_INT['emitter_setting_id'], j_id] = setting_id
+            if type(settings[0]) == float:
+                for i, junction in enumerate(junctions):
+                    p_id = self.mesh.junction_ids[junction]
+                    self.mesh.junctions_float[JUNCTION_FLOAT['emitter_setting'], p_id] = settings[i]
+            else:
+                for i, junction in enumerate(junctions):
+                    j_id = self.mesh.junction_ids[junction]
+                    setting_id = len(self.settings)
+                    self.settings.append(settings[i])
+                    self.mesh.junctions_int[JUNCTION_INT['emitter_setting_id'], j_id] = setting_id
 
     def set_valve_setting(self, valve=None, valves=None, setting=None, settings=None):
         if setting != None:
             v_id = self.mesh.valve_ids[valve]
             self.mesh.valves_float[VALVE_FLOAT['setting'], v_id] = setting
         elif settings != None:
-            for i, valve in enumerate(valves):
-                p_id = self.mesh.valve_ids[valve]
-                setting_id = len(self.settings)
-                self.settings.append(settings[i])
-                self.mesh.valves_int[VALVE_INT['setting_id'], p_id] = setting_id
+            if type(settings[0]) == float:
+                for i, valve in enumerate(valves):
+                    p_id = self.mesh.valve_ids[valve]
+                    self.mesh.valves_float[VALVE_FLOAT['setting'], p_id] = settings[i]
+            else:
+                for i, valve in enumerate(valves):
+                    p_id = self.mesh.valve_ids[valve]
+                    setting_id = len(self.settings)
+                    self.settings.append(settings[i])
+                    self.mesh.valves_int[VALVE_INT['setting_id'], p_id] = setting_id
 
     def set_pump_setting(self, pump=None, pumps=None, setting=None, settings=None):
         if setting != None:
             p_id = self.mesh.pump_ids[pump]
             self.mesh.pumps_float[PUMP_FLOAT['setting'], p_id] = setting
         elif settings != None:
-            for i, pump in enumerate(pumps):
-                p_id = self.mesh.pump_ids[pump]
-                setting_id = len(self.settings)
-                self.settings.append(settings[i])
-                self.mesh.pumps_int[PUMP_INT['setting_id'], p_id] = setting_id
+            if type(settings[0]) == float:
+                for i, pump in enumerate(pumps):
+                    p_id = self.mesh.pump_ids[pump]
+                    self.mesh.pumps_float[PUMP_FLOAT['setting'], p_id] = settings[i]
+            else:
+                for i, pump in enumerate(pumps):
+                    p_id = self.mesh.pump_ids[pump]
+                    setting_id = len(self.settings)
+                    self.settings.append(settings[i])
+                    self.mesh.pumps_int[PUMP_INT['setting_id'], p_id] = setting_id
 
     def define_emitter(self, junctions, coefficients):
         """[summary]
