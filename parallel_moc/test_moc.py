@@ -20,11 +20,15 @@ setting = np.linspace(0, 1, int(1/dt))
 setting2 = np.linspace(1, 1, 2)
 mesh = Mesh(inp_file, dt = dt, default_wave_speed = 1200)
 sim = Simulation(mesh, int(T/dt))
-sim.define_valve_setting('10', setting=setting2)
-sim.define_valve_setting('11', setting=setting)
 sim.define_curve('11', 'valve', curve_file=MOC_PATH+'valves/v_curve.csv')
+
 clk.tic()
-sim.run_simulation()
+for t in range(sim.time_steps-1):
+    if t < len(setting2):
+        sim.set_valve_setting('10', setting2[t])
+    if t < len(setting):
+        sim.set_valve_setting('11', setting[t])
+    sim.run_step()
 clk.toc()
 
 # sim.plot_results()
