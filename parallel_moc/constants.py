@@ -23,21 +23,27 @@ NODE_FLOAT = {
     'Bp': 5
 }
 
+JN = 5
+
 JUNCTION_INT = {
     'downstream_neighbors_num' : 0, # between [0,6]
     'upstream_neighbors_num' : 1, # between [0,6]
     'junction_type' : 2,
-    'n1' : 3,
-    'n2' : 4,
-    'n3' : 5,
-    'n4' : 6,
-    'n5' : 7,
-    'n6' : 8,
+    'emitter_curve' : 3,
+    'emitter_setting_id': 4,
+    'n1' : 5,
+    'n2' : 6,
+    'n3' : 7,
+    'n4' : 8,
+    'n5' : 9,
+    'n6' : 10
 }
 
 JUNCTION_FLOAT = {
     'demand' : 0,
-    'head': 1
+    'head': 1,
+    'emitter_coefficient': 2,
+    'emitter_setting': 3
 }
 
 VALVE_INT = {
@@ -77,12 +83,13 @@ JUNCTION_TYPES = {
     'reservoir': 0,
     'pipes': 1,
     'valve': 2,
-    'burst': 3,
+    'emitter': 3,
     'pump': 4,
     'dead_end': 5
 }
 
 CURVE_TYPES = {
-    'pump': 0,
-    'valve' : 1
+    'valve' : 0,
+    'pump': 1,
+    'emitter' : 2
 }

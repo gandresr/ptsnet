@@ -50,8 +50,8 @@ def run_interior_step(Q1, Q2, H1, H2, B, R):
 
 @njit(parallel = False)
 def run_junction_step(
-    t, junctions, B, R, Cm, Bm, Cp, Bp, Q1, H1, Q2, H2, demand, junction_type,
-    RESERVOIR, PIPE, N, DOWN, UP):
+    junctions, B, R, Cm, Bm, Cp, Bp, Q1, H1, Q2, H2,
+    demand, coefficient, setting, junction_type, RESERVOIR, PIPE, EMITTER, N, DOWN, UP):
 
     for j_id in range(junctions.shape[1]):
 
@@ -70,7 +70,7 @@ def run_junction_step(
                 H2[k] = H1[k]
                 Q2[k] = (H1[k-1] + B[k-1]*Q1[k-1] - H1[k]) \
                         / (B[k-1] + R[k-1]*abs(Q1[k-1]))
-        elif junction_type[j_id] == PIPE:
+        elif junction_type[j_id] == EMITTER or junction_type[j_id] == PIPE:
             sc = 0
             sb = 0
 
@@ -88,7 +88,12 @@ def run_junction_step(
                 sc += Cp[k] / Bp[k]
                 sb += 1 / Bp[k]
 
-            HH = sc/sb + demand[j_id]/sb
+            Z = sc/sb + demand[j_id]/sb
+            HH = Z
+
+            if junction_type[j_id] == EMITTER:
+                K = (setting[j_id]*coefficient[j_id]/sb)**2
+                HH = ((2*z + K) - np.sqrt(K**2 + 4*Z*K)) / 2
 
             for j in range(downstream_num): # C-
                 k = junctions[j+N, j_id]
@@ -121,6 +126,30 @@ class Simulation:
         self.curves = []
         self.define_initial_conditions()
 
+    def set_emitter_setting(self, junction_name, setting):
+        j_id = self.mesh.junction_ids[junction_name]
+        self.mesh.junctions_float['emitter_setting'] = setting
+
+    def set_valve_setting(self, valve_name, setting):
+    def define_emitter(self, junctions, coefficients, settings=None):
+        """[summary]
+
+        Arguments:
+            junction_name {[type]} -- [description]
+            Kd {[type]} -- Discharge coefficient times A
+        """
+
+        if type(junctions) != type(''):
+            for i, j in enumerate(junctions):
+                self.define_emitter(j, coefficients[i], settings[i])
+        else:
+            j_id = self.mesh.junction_ids[junctions]
+            self.mesh.junctions_int[JUNCTION_INT['junction_type'], j_id] = JUNCTION_TYPES['emitter']
+            self.mesh.junctions_float[JUNCTION_FLOAT['emitter_coefficient'], j_id] = coefficients
+            if settings != None:
+                self.mesh.junctions_int[JUNCTION_INT['emitter_setting_id']] = len(self.settings)
+                self.settings.append(settings)
+
     def _check_model(self):
         for v in range(self.mesh.num_valves):
             start_id = self.mesh.valves_int[VALVE_INT['upstream_junction'], v]
@@ -145,37 +174,43 @@ class Simulation:
                     pump_name = self.mesh.pump_name_list[v]
                     raise Exception('It is necessary to define a setting value for pump %s' % pump_name)
 
-    def run_simulation(self):
-        # clk = Clock()
-        self._check_model()
-        for t in range(1, self.time_steps):
-            run_interior_step(
+    def run_step(self):
+        run_interior_step(
                 self.flow_results[t-1,:],
                 self.flow_results[t,:],
                 self.head_results[t-1,:],
                 self.head_results[t,:],
                 self.mesh.nodes_float[NODE_FLOAT['B'],:],
                 self.mesh.nodes_float[NODE_FLOAT['R'],:])
-            run_junction_step(
-                t, self.mesh.junctions_int,
-                self.mesh.nodes_float[NODE_FLOAT['B'], :],
-                self.mesh.nodes_float[NODE_FLOAT['R'], :],
-                self.mesh.nodes_float[NODE_FLOAT['Cm'], :],
-                self.mesh.nodes_float[NODE_FLOAT['Bm'], :],
-                self.mesh.nodes_float[NODE_FLOAT['Cp'], :],
-                self.mesh.nodes_float[NODE_FLOAT['Bp'], :],
-                self.flow_results[t-1, :],
-                self.head_results[t-1, :],
-                self.flow_results[t, :],
-                self.head_results[t, :],
-                self.mesh.junctions_float[JUNCTION_FLOAT['demand'], :],
-                self.mesh.junctions_int[JUNCTION_INT['junction_type'], :],
-                JUNCTION_TYPES['reservoir'],
-                JUNCTION_TYPES['pipes'],
-                3,
-                JUNCTION_INT['downstream_neighbors_num'],
-                JUNCTION_INT['upstream_neighbors_num'])
-            self.run_valve_step(t)
+        run_junction_step(
+            self.mesh.junctions_int,
+            self.mesh.nodes_float[NODE_FLOAT['B'], :],
+            self.mesh.nodes_float[NODE_FLOAT['R'], :],
+            self.mesh.nodes_float[NODE_FLOAT['Cm'], :],
+            self.mesh.nodes_float[NODE_FLOAT['Bm'], :],
+            self.mesh.nodes_float[NODE_FLOAT['Cp'], :],
+            self.mesh.nodes_float[NODE_FLOAT['Bp'], :],
+            self.flow_results[t-1, :],
+            self.head_results[t-1, :],
+            self.flow_results[t, :],
+            self.head_results[t, :],
+            self.mesh.junctions_float[JUNCTION_FLOAT['demand'], :],
+            self.mesh.junctions_float[JUNCTION_FLOAT['emitter_coefficient'], :],
+            self.mesh.junctions_float[JUNCTION_FLOAT['emitter_setting'], :],
+            self.mesh.junctions_int[JUNCTION_INT['junction_type'], :],
+            JUNCTION_TYPES['reservoir'],
+            JUNCTION_TYPES['pipes'],
+            JUNCTION_TYPES['emitter']
+            JN,
+            JUNCTION_INT['downstream_neighbors_num'],
+            JUNCTION_INT['upstream_neighbors_num'])
+        self.run_valve_step(t)
+
+    def run_simulation(self):
+        # clk = Clock()
+        self._check_model()
+        for t in range(1, self.time_steps):
+            self.run_step(t)
 
     def run_valve_step(self, t):
         B = self.mesh.nodes_float[NODE_FLOAT['B'], :]
@@ -224,9 +259,6 @@ class Simulation:
     def run_pump_step(self):
         pass
 
-    def define_burst(self, junction_name, A, Cd):
-        j_id = self.mesh.junction_ids[junction_name]
-        pass
 
     def define_curve(self, link_name, curve_type, curve = None, curve_file = None):
         """Defines curve values for a link
