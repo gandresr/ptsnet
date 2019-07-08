@@ -14,16 +14,11 @@ from os.path import isdir
 
 np.set_printoptions(precision=2)
 
-def save_model(mesh):
-    """Saves mesh object
+def save_simulation(sim):
+    with open(sim.mesh.fname + '.sim', 'wb') as f:
+        pickle.dump(vars(sim), f)
 
-    Arguments:
-        mesh {Mesh} -- mesh object
-    """
-    with open(mesh.fname + '.mesh', 'wb') as f:
-        pickle.dump(vars(mesh), f)
-
-def open_model(fname):
+def open_simulation(fname):
     """Returns pickled mesh
 
     Arguments:
@@ -32,9 +27,9 @@ def open_model(fname):
     Returns:
         [Mesh] -- stored mesh object
     """
-    with open(fname[:fname.find('.')] + '.mesh', 'rb') as f:
-        m = pickle.load(f)
-    return Mesh(None, None, attrs=m)
+    with open(fname[:fname.find('.')] + '.sim', 'rb') as f:
+        data = pickle.load(f)
+    return Simulation(None, None, attrs=data)
 
 # Parallel does not perform well in sandy-bridge architectures
 @njit(parallel = True)
@@ -116,7 +111,10 @@ class Simulation:
     * it is not possible to connect one valve to another
     * valves should be 100% open for initial conditions
     """
-    def __init__(self, mesh, T):
+    def __init__(self, mesh, T, check_model = True, attrs = None):
+        if attrs != None:
+            self.__dict__.update(attrs)
+            return
         self.time_steps = T
         self.t = 0
         self.mesh = mesh
@@ -125,6 +123,7 @@ class Simulation:
         self.head_results = np.zeros((T, mesh.num_nodes), dtype='float64')
         self.curves = []
         self.define_initial_conditions()
+        self.check_model = check_model
 
     def set_emitter_setting(self, junction_name, setting):
         j_id = self.mesh.junction_ids[junction_name]
@@ -185,7 +184,7 @@ class Simulation:
             self.run_step()
 
     def run_step(self):
-        if self.t == 0:
+        if self.t == 0 and self.check_model:
             self._check_model()
         self.t += 1
         run_interior_step(
@@ -218,7 +217,7 @@ class Simulation:
             JUNCTION_INT['downstream_neighbors_num'],
             JUNCTION_INT['upstream_neighbors_num'])
         self.run_valve_step(self.t)
-        self.run_pump_step()
+        self.run_pump_step(self.t)
 
     def run_valve_step(self, t):
         B = self.mesh.nodes_float[NODE_FLOAT['B'], :]
@@ -266,7 +265,6 @@ class Simulation:
         Bm = self.mesh.nodes_float[NODE_FLOAT['Bm'], :]
         Cp = self.mesh.nodes_float[NODE_FLOAT['Cp'], :]
         Bp = self.mesh.nodes_float[NODE_FLOAT['Bp'], :]
-        Q0 = self.flow_results[0, :]
         Q1 = self.flow_results[t-1, :]
         H1 = self.head_results[t-1, :]
         Q2 = self.flow_results[t, :]
@@ -274,24 +272,29 @@ class Simulation:
         for p in range(self.mesh.num_pumps):
             start_id = self.mesh.pumps_int[PUMP_INT['upstream_junction'], p]
             end_id = self.mesh.pumps_int[PUMP_INT['downstream_junction'], p]
-            A = self.mesh.pumps_float[PUMP_FLOAT['a'], p]
+            a = self.mesh.pumps_float[PUMP_FLOAT['a'], p]
             kk = self.mesh.junctions_int[JUNCTION_INT['n1'], end_id]
             Cm[kk] = H1[kk+1] - B[kk+1]*Q1[kk+1]
             Bm[kk] = B[kk+1] + R[kk+1]*abs(Q1[kk+1])
-            B = self.mesh.pumps_float[PUMP_FLOAT['b'], p] - Bm[kk]
-            C = self.mesh.pumps_float[PUMP_FLOAT['b'], p] - Cm[kk]
+            b = self.mesh.pumps_float[PUMP_FLOAT['b'], p] + Bm[kk]
+            c = self.mesh.pumps_float[PUMP_FLOAT['b'], p] - Cm[kk]
+
             if self.mesh.junctions_int[JUNCTION_INT['junction_type'], start_id] == JUNCTION_TYPES['reservoir']:
                 H1R = self.mesh.junctions_float[JUNCTION_FLOAT['head'], start_id]
-                C += H1R
-                Q2[jj] = (-B + (B**2 - 4*A*C)**0.5) / 2*A
+                c += H1R
+                Q2[jj] = (-b - (b**2 - 4*a*c)**0.5) / 2*a
+                if Q2[jj] < 0:
+                    Q2[jj] = 0
                 H1[jj] = H1R
             else:
                 jj = self.mesh.junctions_int[JUNCTION_INT['n2'], start_id]
                 Cp[jj] = H1[jj-1] + B[jj-1]*Q1[jj-1]
                 Bp[jj] = B[jj-1] + R[jj-1]*abs(Q1[jj-1])
-                B -= Bp[jj]
-                C += Cp[jj]
-                Q2[jj] = (-B + (B**2 - 4*A*C)**0.5) / 2*A
+                b += Bp[jj]
+                c += Cp[jj]
+                Q2[jj] = (-b - (b**2 - 4*a*c)**0.5) / 2*a
+                if Q2[jj] < 0:
+                    Q2[jj] = 0
                 H1[jj] = Cp[jj] - Bp[jj]*Q2[jj]
             H2[kk] = Cm[kk] + Bm[kk]*Q2[jj]
             Q2[kk] = Q2[jj]
@@ -632,9 +635,10 @@ class Mesh:
                     link = self.wn.get_link(link_name)
                     if link.link_type == 'Pump':
                         raise Exception("Pump %s is not valid, it has a dead-end" % link_name)
-                elif out_degree == 1:
-                    if node not in self.wn.reservoir_name_list:
-                        raise Exception("Junction %s can only be a reservoir" % node)
+                # TODO : CHECK IF IT WORKED
+                # elif out_degree == 1:
+                #     if node not in self.wn.reservoir_name_list:
+                #         raise Exception("Junction %s can only be a reservoir" % node)
             elif d == 2:
                 if in_degree == 1 and out_degree == 1:
                     u_link_name = list(self.network_graph[unodes[0]][node])[0]

@@ -1,6 +1,6 @@
 from pmoc import Mesh, Simulation, MOC_PATH, NODE_INT, NODE_TYPES
 from pmoc import clk, run_interior_step
-from pmoc import save_model, open_model
+# from pmoc import save_model, open_model
 from time import time
 from multiprocessing import Process
 from pprint import pprint
@@ -10,12 +10,12 @@ import matplotlib.pyplot as plt
 import dis
 
 # Test segmentation and partitioning
-T = 50
-dt = 0.04
+T = 1000
+dt = 0.05
 
 inp_file = MOC_PATH + "example_models/LoopedNet_pump.inp"
 
-setting = np.linspace(0, 1, int(1/dt))
+setting = np.linspace(1, 0, int(1/dt))
 setting2 = np.linspace(1, 1, 2)
 mesh = Mesh(inp_file, dt = dt, default_wave_speed = 1200)
 sim = Simulation(mesh, int(T/dt))
@@ -31,5 +31,5 @@ for t in range(sim.time_steps-1):
 clk.toc()
 
 t2 = np.linspace(0, T, int(T/dt))
-plt.plot(t2, sim.head_results[:,0])
+plt.plot(t2, sim.flow_results[:,0])
 plt.show()
