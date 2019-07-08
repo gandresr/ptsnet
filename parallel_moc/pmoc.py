@@ -316,57 +316,6 @@ class Simulation:
 
         self.curves.append(F)
 
-    def define_valve_setting(self, valve_name, setting = None, setting_file = None):
-        """Defines setting values for a valve during the simulation time
-
-        If the valve setting is not defined for a certain time step, the
-        default_setting value will be used. If both, a vector and a file
-        are defined, then, the vector is choosen and the file omitted.
-
-        Arguments:
-            valve_name {string} -- valve name as defined in EPANET
-
-        Keyword Arguments:
-            setting {iterable} -- float iterable with setting values for the
-                first T steps of the simulation, T <= self.time_steps
-                (default: {None})
-            setting_file {string} -- path to file with setting values  for the
-                first T steps of the simulation, T <= self.time_steps. The i-th
-                line of the file has the value of the valve setting at the i-th
-                time step (default: {None})
-            default_setting {int} -- default value assigned to not setting
-                values that are not defined (default: {1})
-
-        Raises:
-            Exception: If setting iterable or setting file is not defined
-            Exception: If valve curve has not been defined
-        # TODO: UPDATE DOCS - default setting == ss[-1]
-        """
-        if setting is None and setting_file is None:
-            raise Exception("It is necessary to define either a setting iterable or a setting_file")
-
-        valve_id = self.mesh.valve_ids[valve_name]
-
-        ss = []
-        if setting is not None:
-            if type(setting) == float:
-                ss = setting
-            else:
-                ss = np.array(setting)
-        elif setting_file is not None:
-            ss = np.loadtxt(setting_file, dtype=float)
-
-        setting_id = len(self.settings)
-
-        N = len(ss)
-        if N == 1:
-            self.mesh.valves_float[VALVE_FLOAT['setting'], valve_id] = ss
-        elif N < self.time_steps:
-            ss = np.concatenate((ss, np.full((self.time_steps - N, 1), ss[-1])), axis = None)
-        if N > 1:
-            self.settings.append(ss[:self.time_steps])
-            self.mesh.valves_int[VALVE_INT['setting_id'], valve_id] = setting_id
-
     def define_initial_conditions(self):
         """Extracts initial conditions from EPANET
         """
