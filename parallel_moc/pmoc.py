@@ -171,11 +171,12 @@ class Simulation:
                 curve_id = self.mesh.valves_int[VALVE_INT['curve_id'], v]
                 if curve_id == NULL:
                     raise Exception("It is necessary to define a curve for valve %s" % valve_name)
-        for p in range(self.mesh.num_pumps):
-            setting = self.mesh.pumps_float[PUMP_FLOAT['setting'], p]
-            if setting == NULL:
-                pump_name = self.mesh.pump_name_list[v]
-                raise Exception('It is necessary to define a setting value for pump %s' % pump_name)
+        # TODO : INCLUDE PUMP
+        # for p in range(self.mesh.num_pumps):
+        #     setting = self.mesh.pumps_float[PUMP_FLOAT['setting'], p]
+        #     if setting == NULL:
+        #         pump_name = self.mesh.pump_name_list[p]
+        #         raise Exception('It is necessary to define a setting value for pump %s' % pump_name)
 
     def run_simulation(self):
         # clk = Clock()
@@ -217,6 +218,7 @@ class Simulation:
             JUNCTION_INT['downstream_neighbors_num'],
             JUNCTION_INT['upstream_neighbors_num'])
         self.run_valve_step(self.t)
+        self.run_pump_step()
 
     def run_valve_step(self, t):
         B = self.mesh.nodes_float[NODE_FLOAT['B'], :]
@@ -257,28 +259,41 @@ class Simulation:
                 H2[unode] = Cp[unode] - Bp[unode]*Q2[unode]
                 H2[dnode] = Cm[dnode] + Bm[dnode]*Q2[dnode]
 
-    def run_pump_step(self):
+    def run_pump_step(self, t):
+        B = self.mesh.nodes_float[NODE_FLOAT['B'], :]
+        R = self.mesh.nodes_float[NODE_FLOAT['R'], :]
+        Cm = self.mesh.nodes_float[NODE_FLOAT['Cm'], :]
+        Bm = self.mesh.nodes_float[NODE_FLOAT['Bm'], :]
+        Cp = self.mesh.nodes_float[NODE_FLOAT['Cp'], :]
+        Bp = self.mesh.nodes_float[NODE_FLOAT['Bp'], :]
+        Q0 = self.flow_results[0, :]
+        Q1 = self.flow_results[t-1, :]
+        H1 = self.head_results[t-1, :]
+        Q2 = self.flow_results[t, :]
+        H2 = self.head_results[t, :]
         for p in range(self.mesh.num_pumps):
             start_id = self.mesh.pumps_int[PUMP_INT['upstream_junction'], p]
             end_id = self.mesh.pumps_int[PUMP_INT['downstream_junction'], p]
-            H1 = 0
             A = self.mesh.pumps_float[PUMP_FLOAT['a'], p]
-            kk = self.junctions_int[JUNCTION_INT['n1'], end_id]
+            kk = self.mesh.junctions_int[JUNCTION_INT['n1'], end_id]
             Cm[kk] = H1[kk+1] - B[kk+1]*Q1[kk+1]
             Bm[kk] = B[kk+1] + R[kk+1]*abs(Q1[kk+1])
             B = self.mesh.pumps_float[PUMP_FLOAT['b'], p] - Bm[kk]
             C = self.mesh.pumps_float[PUMP_FLOAT['b'], p] - Cm[kk]
             if self.mesh.junctions_int[JUNCTION_INT['junction_type'], start_id] == JUNCTION_TYPES['reservoir']:
-                H1 = self.junctions_float[JUNCTION_FLOAT['head'], start_id]
-                C += H1
+                H1R = self.mesh.junctions_float[JUNCTION_FLOAT['head'], start_id]
+                C += H1R
+                Q2[jj] = (-B + (B**2 - 4*A*C)**0.5) / 2*A
+                H1[jj] = H1R
             else:
-                jj = self.junctions_int[JUNCTION_INT['n2'], start_id]
+                jj = self.mesh.junctions_int[JUNCTION_INT['n2'], start_id]
                 Cp[jj] = H1[jj-1] + B[jj-1]*Q1[jj-1]
                 Bp[jj] = B[jj-1] + R[jj-1]*abs(Q1[jj-1])
                 B -= Bp[jj]
                 C += Cp[jj]
-
-            Q2[jj] = (-B + sqrt(B**2 - 4*A*C)) / 2*A
+                Q2[jj] = (-B + (B**2 - 4*A*C)**0.5) / 2*A
+                H1[jj] = Cp[jj] - Bp[jj]*Q2[jj]
+            H2[kk] = Cm[kk] + Bm[kk]*Q2[jj]
             Q2[kk] = Q2[jj]
 
     def define_curve(self, link_name, curve_type, curve = None, curve_file = None):
@@ -805,6 +820,10 @@ class Mesh:
                     self.junctions_int[JUNCTION_INT['junction_type'], end_id] = JUNCTION_TYPES['pump']
                     self.pumps_int[PUMP_INT['upstream_junction'], p] = start_id
                     self.pumps_int[PUMP_INT['downstream_junction'], p] = end_id
+                    (a, b, c,) = link.get_head_curve_coefficients()
+                    self.pumps_float[PUMP_FLOAT['a'], p] = a
+                    self.pumps_float[PUMP_FLOAT['b'], p] = b
+                    self.pumps_float[PUMP_FLOAT['c'], p] = c
                     self.pump_ids[link_name] = p
                     self.pump_name_list.append(link_name)
                     p += 1
@@ -812,7 +831,6 @@ class Mesh:
                 self.link_name_list.append(link_name)
                 self.link_ids[link_name] = k
                 k += 1
-
     def _write_mesh(self):
         pass
 

@@ -9,12 +9,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import dis
 
-
 # Test segmentation and partitioning
-T = 1000
-dt = 0.01
+T = 50
+dt = 0.04
 
-inp_file = MOC_PATH + "example_models/LoopedNet_valve.inp"
+inp_file = MOC_PATH + "example_models/LoopedNet_pump.inp"
 
 setting = np.linspace(0, 1, int(1/dt))
 setting2 = np.linspace(1, 1, 2)
@@ -31,8 +30,6 @@ for t in range(sim.time_steps-1):
     sim.run_step()
 clk.toc()
 
-# sim.plot_results()
 t2 = np.linspace(0, T, int(T/dt))
-# plt.plot(t2, sim.flow_results[:,0])
-plt.plot(t2, sim.flow_results[:,45])
+plt.plot(t2, sim.head_results[:,0])
 plt.show()
