@@ -49,8 +49,7 @@ JUNCTION_FLOAT = {
 VALVE_INT = {
     'upstream_junction' : 0,
     'downstream_junction' : 1,
-    'curve_id': 2,
-    'setting_id' : 3
+    'curve_id': 2
 }
 
 VALVE_FLOAT = {
@@ -62,7 +61,6 @@ PUMP_INT = {
     'upstream_junction' : 0,
     'downstream_junction' : 1,
     'curve_id': 2,
-    'setting_id' : 3
 }
 
 PUMP_FLOAT = {

@@ -122,7 +122,6 @@ class Simulation:
         self.steady_state_sim = mesh.steady_state_sim
         self.flow_results = np.zeros((T, mesh.num_nodes), dtype='float64')
         self.head_results = np.zeros((T, mesh.num_nodes), dtype='float64')
-        self.settings = []
         self.curves = []
         self.define_initial_conditions()
 
@@ -131,7 +130,14 @@ class Simulation:
         self.mesh.junctions_float['emitter_setting'] = setting
 
     def set_valve_setting(self, valve_name, setting):
-    def define_emitter(self, junctions, coefficients, settings=None):
+        v_id = self.mesh.valve_ids[valve_name]
+        self.mesh.valves_float['setting'] = setting
+
+    def set_pump_setting(self, pump_name, setting):
+        p_id = self.mesh.pump_ids[pump_name]
+        self.mesh.pumps_float['setting'] = setting
+
+    def define_emitter(self, junctions, coefficients):
         """[summary]
 
         Arguments:
@@ -146,9 +152,6 @@ class Simulation:
             j_id = self.mesh.junction_ids[junctions]
             self.mesh.junctions_int[JUNCTION_INT['junction_type'], j_id] = JUNCTION_TYPES['emitter']
             self.mesh.junctions_float[JUNCTION_FLOAT['emitter_coefficient'], j_id] = coefficients
-            if settings != None:
-                self.mesh.junctions_int[JUNCTION_INT['emitter_setting_id']] = len(self.settings)
-                self.settings.append(settings)
 
     def _check_model(self):
         for v in range(self.mesh.num_valves):
@@ -230,13 +233,8 @@ class Simulation:
             unode = self.mesh.junctions_int[JUNCTION_INT['n2'], start_id]
             dnode = self.mesh.junctions_int[JUNCTION_INT['n1'], end_id]
             setting = self.mesh.valves_float[VALVE_FLOAT['setting'], v]
-            setting_id = self.mesh.valves_int[VALVE_INT['setting_id'], v]
             curve_id = self.mesh.valves_int[VALVE_INT['curve_id'], v]
             area = self.mesh.valves_float[VALVE_FLOAT['area'], v]
-            if setting == NULL:
-                setting = self.settings[setting_id][t]
-            else:
-                self.mesh.valves_float[VALVE_FLOAT['setting'], v] = NULL
             if dnode == NULL:
                 # End-valve
                 Q2[unode] = Q0[unode] * setting
