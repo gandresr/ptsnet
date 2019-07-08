@@ -124,19 +124,41 @@ class Simulation:
         self.flow_results = np.zeros((T, mesh.num_nodes), dtype='float64')
         self.head_results = np.zeros((T, mesh.num_nodes), dtype='float64')
         self.curves = []
+        self.settings = []
         self.define_initial_conditions()
 
-    def set_emitter_setting(self, junction_name, setting):
-        j_id = self.mesh.junction_ids[junction_name]
-        self.mesh.junctions_float[JUNCTION_FLOAT['emitter_setting'], j_id] = setting
+    def set_emitter_setting(self, junction=None, junctions=None, setting=None, settings=None):
+        if setting != None:
+            j_id = self.mesh.junction_ids[junction]
+            self.mesh.junctions_float[JUNCTION_FLOAT['emitter_setting'], j_id] = setting
+        elif settings != None:
+            for i, junction in enumerate(junctions):
+                j_id = self.mesh.junction_ids[junction]
+                setting_id = len(self.settings)
+                self.settings.append(settings[i])
+                self.mesh.junctions_int[JUNCTION_INT['emitter_setting_id'], j_id] = setting_id
 
-    def set_valve_setting(self, valve_name, setting):
-        v_id = self.mesh.valve_ids[valve_name]
-        self.mesh.valves_float[VALVE_FLOAT['setting'], v_id] = setting
+    def set_valve_setting(self, valve=None, valves=None, setting=None, settings=None):
+        if setting != None:
+            v_id = self.mesh.valve_ids[valve]
+            self.mesh.valves_float[VALVE_FLOAT['setting'], v_id] = setting
+        elif settings != None:
+            for i, valve in enumerate(valves):
+                p_id = self.mesh.valve_ids[valve]
+                setting_id = len(self.settings)
+                self.settings.append(settings[i])
+                self.mesh.valves_int[VALVE_INT['setting_id'], p_id] = setting_id
 
-    def set_pump_setting(self, pump_name, setting):
-        p_id = self.mesh.pump_ids[pump_name]
-        self.mesh.pumps_float[PUMP_FLOAT['setting'], p_id] = setting
+    def set_pump_setting(self, pump=None, pumps=None, setting=None, settings=None):
+        if setting != None:
+            p_id = self.mesh.pump_ids[pump]
+            self.mesh.pumps_float[PUMP_FLOAT['setting'], p_id] = setting
+        elif settings != None:
+            for i, pump in enumerate(pumps):
+                p_id = self.mesh.pump_ids[pump]
+                setting_id = len(self.settings)
+                self.settings.append(settings[i])
+                self.mesh.pumps_int[PUMP_INT['setting_id'], p_id] = setting_id
 
     def define_emitter(self, junctions, coefficients):
         """[summary]
@@ -171,12 +193,11 @@ class Simulation:
                 curve_id = self.mesh.valves_int[VALVE_INT['curve_id'], v]
                 if curve_id == NULL:
                     raise Exception("It is necessary to define a curve for valve %s" % valve_name)
-        # TODO : INCLUDE PUMP
-        # for p in range(self.mesh.num_pumps):
-        #     setting = self.mesh.pumps_float[PUMP_FLOAT['setting'], p]
-        #     if setting == NULL:
-        #         pump_name = self.mesh.pump_name_list[p]
-        #         raise Exception('It is necessary to define a setting value for pump %s' % pump_name)
+        for p in range(self.mesh.num_pumps):
+            setting = self.mesh.pumps_float[PUMP_FLOAT['setting'], p]
+            if setting == NULL:
+                pump_name = self.mesh.pump_name_list[p]
+                raise Exception('It is necessary to define a setting value for pump %s' % pump_name)
 
     def run_simulation(self):
         # clk = Clock()
