@@ -89,11 +89,8 @@ def run_junction_step(
                 sb += 1 / Bp[k]
 
             Z = sc/sb + demand[j_id]/sb
-            HH = Z
-
-            if junction_type[j_id] == EMITTER:
-                K = (setting[j_id]*coefficient[j_id]/sb)**2
-                HH = ((2*Z + K) - np.sqrt(K**2 + 4*Z*K)) / 2
+            K = (setting[j_id]*coefficient[j_id]/sb)**2
+            HH = ((2*Z + K) - np.sqrt(K**2 + 4*Z*K)) / 2
 
             for j in range(downstream_num): # C-
                 k = junctions[j+N, j_id]
@@ -109,7 +106,7 @@ class Simulation:
     """
     Here all the tables and properties required to
     run a MOC simulation are defined. Tables for
-    simulations in parallel are created
+    simulations in parallel are createdemitter
 
     In the meantime:
     * valves are not valid in junctions
@@ -239,7 +236,7 @@ class Simulation:
             self.mesh.nodes_float[NODE_FLOAT['Bm'], :],
             self.mesh.nodes_float[NODE_FLOAT['Cp'], :],
             self.mesh.nodes_float[NODE_FLOAT['Bp'], :],
-            self.flow_results[self.t-1, :],
+            self.flow_results[self.t-1, :],emitter
             self.head_results[self.t-1, :],
             self.flow_results[self.t, :],
             self.head_results[self.t, :],
@@ -508,7 +505,7 @@ class Mesh:
         # Data structures associated to valves
         self.valves_int = None
         self.valves_float = None
-        self.valve_ids = None
+        self.valve_ids = Noneemitter
         self.valve_name_list = None
         self.num_valves = 0
 
@@ -564,45 +561,6 @@ class Mesh:
 
         return G
 
-    def _define_wave_speeds(self, default_wave_speed = None, wave_speed_file = None):
-        """ Stores the values of the wave speeds for every pipe in the EPANET network
-
-        The file should be a CSV file, specifying the pipe and its wave_speed as follows:
-            pipe_name_1,wave_speed_1
-            pipe_name_2,wave_speed_n
-            ...
-            pipe_name_n,wave_speed_n
-
-        Pipes not specified in the file will have a wave_speed value
-        equal to the default_wave_speed
-
-        Keyword Arguments:
-            default_wave_speed {float} -- default value of wave speed for all the pipes in
-            the network (default: {None})
-            wave_speed_file {string} -- path to CSV file that contains information of the wave speeds
-            for each pipe in the network (default: {None})
-
-        Raises:
-            Exception: If default_wave_speed is not defined and the file with information
-            of the wave speeds is incomplete
-        """
-        self.wave_speeds = {}
-
-        if default_wave_speed is not None:
-            self.wave_speeds = dict.fromkeys(self.wn.pipe_name_list, default_wave_speed)
-
-        if wave_speed_file:
-            with open(wave_speed_file, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    pipe, wave_speed = line.split(',')
-                    self.wave_speeds[pipe] = float(wave_speed)
-
-        if len(self.wave_speeds) != len(self.wn.pipe_name_list):
-            self.wave_speeds = {}
-            raise Exception("""
-            The file does not specify wave speed values for all the pipes,
-            it is necessary to define a default wave speed value""")
 
     def _define_segments(self, dt):
         """Estimates the number of segments for each pipe in the EPANET network

@@ -23,7 +23,6 @@ sim.define_curve('9', 'valve', curve_file=MOC_PATH+'valves/v_curve.csv')
 
 clk.tic()
 for t in range(sim.time_steps-1):
-    
     # if t < len(setting):
     #     sim.set_valve_setting('11', setting[t])
     sim.run_step()
