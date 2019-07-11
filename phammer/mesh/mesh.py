@@ -70,7 +70,7 @@ class Mesh:
             dt {float} -- desired time step
         """
         # Get the maximum time steps for each pipe
-        segments = self.wn.query_link_attribute('length') # The length attribute is just for pipes
+        segments = self.wn.query_link_attribute('length')
 
         for pipe in segments:
             segments[pipe] /= self.wave_speeds[pipe]
@@ -78,9 +78,8 @@ class Mesh:
         # Maximum time_step in the system to capture waves in all pipes
         max_dt = segments[min(segments, key=segments.get)]
 
-        # Desired dt < max_dt ?
         t_step = min(time_step, max_dt)
-        if t_step != time_step:
+        if t_step != time_step and WARNINGS:
             print("Warning: Time step has been redefined to: %f [s]" % t_step)
         self.time_step = t_step
 

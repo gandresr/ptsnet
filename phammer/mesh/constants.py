@@ -1,7 +1,12 @@
+# ----- Utils -----
+
+WARNINGS = True
+
 # ----- Constants for mesh creation -----
 
 TOL = 1E-6
 G = 9.807
+
 # ----- Index labels for Node tables -----
 
 POINTS_INT = (
