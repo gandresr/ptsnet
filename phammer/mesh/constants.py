@@ -38,8 +38,8 @@ NODES_OBJ = ('upstream_points', 'downstream_points')
 # ----- Index labels for Valve tables -----
 
 VALVES_INT = (
-    'upstream_junction',
-    'downstream_junction',
+    'upstream_node',
+    'downstream_node',
     'curve_id',
     'setting_id',
 )
@@ -48,7 +48,7 @@ VALVES_FLOAT = ('setting', 'area',)
 
 # ----- Index labels for Pump tables -----
 
-PUMPS_INT = ('upstream_junction' ,'downstream_junction' ,'curve_id','setting_id',)
+PUMPS_INT = ('upstream_node' ,'downstream_node' ,'curve_id','setting_id',)
 
 PUMPS_FLOAT = ('a', 'b', 'c', 'setting', 'max_speed',)
 

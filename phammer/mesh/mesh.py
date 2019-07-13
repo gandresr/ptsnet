@@ -1,8 +1,8 @@
 import wntr
-from numpy import isnan, nan
+import numpy as np
 
-from .constants import *
-from ..arrays.arrays import define_data_table
+from constants import *
+from arrays import define_data_table
 
 class Mesh:
     def __init__(self, input_file, time_step, default_wave_speed = None, wave_speed_file = None, delimiter=','):
@@ -10,7 +10,7 @@ class Mesh:
         self.steady_state_sim = wntr.sim.EpanetSimulator(self.wn).run_sim()
         self.network_graph = self.get_network_graph()
         self.time_step = time_step
-        self.wave_speeds = self.get_wave_speeds(default_wave_speed = None, wave_speed_file = None, delimiter=',')
+        self.wave_speeds = self.get_wave_speeds(default_wave_speed, wave_speed_file, delimiter)
         self.segments = self.get_segments(time_step)
         self.properties = self.define_properties()
 
@@ -107,11 +107,11 @@ class Mesh:
         properties['int']['points'] = define_data_table(
             range(self.num_points), POINTS_INT)
         properties['int']['nodes'] = define_data_table(
-            range(self.num_points), NODES_INT)
+            self.wn.node_name_list, NODES_INT)
         properties['int']['valves'] = define_data_table(
-            range(self.num_points), VALVES_INT)
+            self.wn.valve_name_list, VALVES_INT)
         properties['int']['pumps'] = define_data_table(
-            range(self.num_points), PUMPS_INT)
+            self.wn.pump_name_list, PUMPS_INT)
 
         properties['float']['points'] = define_data_table(
             range(self.num_points), POINTS_FLOAT)
@@ -123,7 +123,7 @@ class Mesh:
             self.wn.pump_name_list, PUMPS_FLOAT)
 
         properties['obj']['nodes'] = define_data_table(
-            self.wn.node_name_list, NODES_OBJ, dtype=np.objects)
+            self.wn.node_name_list, NODES_OBJ, dtype=np.object)
 
         # Set default values for node_type
         properties['int']['nodes']['node_type'] = NODE_TYPES['junction']
@@ -154,7 +154,8 @@ class Mesh:
             for j, end_node in enumerate(downstream_nodes):
                 link_name = downstream_link_names[j]
                 link = self.wn.get_link(link_name)
-
+                # link_id is based on the wntr data structure
+                link_id = self.steady_state_sim.link['status'].columns.get_loc(link_name)
 
                 # Check if end junction is a reservoir
                 if end_node in self.wn.reservoir_name_list:
@@ -180,19 +181,19 @@ class Mesh:
                     #  i-th node
                     for idx in range(self.segments[link_name]+1):
                         properties['int']['points']['subindex'][i] = idx
-                        properties['int']['points']['link_id'][i] = k
-                        if idx == 0:
+                        properties['int']['points']['link_id'][i] = link_id
+                        if idx == 0: # downstream node of start_node
                             properties['int']['points']['point_type'][i] = POINT_TYPES['boundary']
-                            if isnan(properties['obj']['nodes'][start_node]):
-                                properties['obj']['nodes'][start_node] = [i]
+                            if np.isnan(properties['obj']['nodes']['downstream_points'][start_node]):
+                                properties['obj']['nodes']['downstream_points'][start_node] = [i]
                             else:
-                                properties['obj']['nodes'][start_node].append(i)
-                        elif idx == self.segments[link_name]:
+                                properties['obj']['nodes']['downstream_points'][start_node].append(i)
+                        elif idx == self.segments[link_name]: # upstream node of end_node
                             properties['int']['points']['point_type'][i] = POINT_TYPES['boundary']
-                            if isnan(properties['obj']['nodes'][end_node]):
-                                properties['obj']['nodes'][end_node] = [i]
+                            if np.isnan(properties['obj']['nodes']['upstream_points'][end_node]):
+                                properties['obj']['nodes']['upstream_points'][end_node] = [i]
                             else:
-                                properties['obj']['nodes'][end_node].append(i)
+                                properties['obj']['nodes']['upstream_points'][end_node].append(i)
                         dx = pipe_length / self.segments[link_name]
                         properties['float']['points']['B'][i] = self.wave_speeds[link_name] / (G*pipe_area)
                         properties['float']['points']['R'][i] = ffactor*dx / (2*G*pipe_diameter*pipe_area**2)
@@ -209,10 +210,8 @@ class Mesh:
                     properties['int']['pumps']['upstream_junction'][link_name] = properties['int']['nodes'].index.get_loc(start_node)
                     properties['int']['pumps']['downstream_junction'][link_name] = properties['int']['nodes'].index.get_loc(end_node)
                     (a, b, c,) = link.get_head_curve_coefficients()
-                    properties['float']['pumps']'a'][link_name] = a
-                    properties['float']['pumps']'b'][link_name] = b
-                    properties['float']['pumps']'c'][link_name] = c
+                    properties['float']['pumps']['a'][link_name] = a
+                    properties['float']['pumps']['b'][link_name] = b
+                    properties['float']['pumps']['c'][link_name] = c
 
-        if self.num_points != (i-1):
-            raise Exception("Internal error - incorrect size for DF")
         return properties
