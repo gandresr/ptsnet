@@ -1,7 +1,7 @@
 import wntr
 import numpy as np
 
-from phammer.mesh.constants import *
+from phammer.simulation.constants import *
 
 class Mesh:
     def __init__(self, input_file, time_step, default_wave_speed = None, wave_speed_file = None, delimiter=','):
@@ -121,16 +121,16 @@ class Mesh:
         })
 
         properties['float']['points'] = POINTS_FLOAT(**{
-            prop: np.full(self.num_points, np.nan, dtype = np.float) for prop in POINTS_FLOAT._fields
+            prop: np.zeros(self.num_points, dtype = np.float) for prop in POINTS_FLOAT._fields
         })
         properties['float']['nodes'] =  NODES_FLOAT(**{
-            prop: np.full(self.num_nodes, np.nan, dtype = np.float) for prop in NODES_FLOAT._fields
+            prop: np.zeros(self.num_nodes, dtype = np.float) for prop in NODES_FLOAT._fields
         })
         properties['float']['valves'] = VALVES_FLOAT(**{
-            prop: np.full(self.num_valves, np.nan, dtype = np.float) for prop in VALVES_FLOAT._fields
+            prop: np.zeros(self.num_valves, dtype = np.float) for prop in VALVES_FLOAT._fields
         })
         properties['float']['pumps'] =  PUMPS_FLOAT(**{
-            prop: np.full(self.num_pumps, np.nan, dtype = np.float) for prop in PUMPS_FLOAT._fields
+            prop: np.zeros(self.num_pumps, dtype = np.float) for prop in PUMPS_FLOAT._fields
         })
 
         properties['obj']['nodes'] =  NODES_OBJ(**{
@@ -160,7 +160,6 @@ class Mesh:
             # Define start junction demand
             H0_start = float(self.steady_state_sim.node['head'][start_node])
             fixed_demand = float(self.steady_state_sim.node['demand'][start_node])
-            properties['float']['nodes'].fixed_demand[start_node_id] = fixed_demand
             properties['float']['nodes'].demand_coeff[start_node_id] = fixed_demand / (2*G*H0_start**0.5)
 
             # Update downstream nodes
@@ -178,7 +177,6 @@ class Mesh:
                 # Define end junction demand
                 H0_end = float(self.steady_state_sim.node['head'][end_node])
                 fixed_demand = float(self.steady_state_sim.node['demand'][end_node])
-                properties['float']['nodes'].fixed_demand[end_node_id] = fixed_demand
                 properties['float']['nodes'].demand_coeff[end_node_id] = fixed_demand / (2*G*H0_end**0.5)
 
                 if link.link_type == 'Pipe':
