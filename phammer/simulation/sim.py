@@ -1,5 +1,5 @@
 import numpy as np
-import mesh.Mesh as Mesh
+import ..mesh.Mesh as Mesh
 
 class Simulation:
     """

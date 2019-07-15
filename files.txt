@@ -1,0 +1,1 @@
+/usr/local/lib/python2.7/dist-packages/phammer-0.0.1-py2.7.egg

@@ -1,8 +1,9 @@
 import wntr
 import numpy as np
 
-from constants import *
-from arrays import define_data_table
+from time import time
+from phammer.mesh.constants import *
+from phammer.arrays.arrays import define_data_table
 
 class Mesh:
     def __init__(self, input_file, time_step, default_wave_speed = None, wave_speed_file = None, delimiter=','):
