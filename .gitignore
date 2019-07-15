@@ -10,3 +10,4 @@ __pycache__
 *.csv
 *.ipynb
 *.mesh
+*.png
