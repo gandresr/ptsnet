@@ -3,7 +3,7 @@ from os import getcwd, sep
 
 
 input_file = '../examples/files/LoopedNet_1.inp'
-time_step = 0.01
+time_step = 0.0001
 wave_speed = 1200
 
 mesh = Mesh(
