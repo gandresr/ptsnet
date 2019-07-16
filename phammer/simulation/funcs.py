@@ -112,16 +112,17 @@ def run_valve_step(t, Q, H, B, R, valves_int, valves_float, nodes_obj):
         # TODO FUNCTION TO SET VALVE COEFF BASED ON SETTING AT EVERY TIME STEP
         valve_coeff = valves_float.valve_coeff[v]
         area = valves_float.area[v]
+        Cp = H[t-1][unode-1] + B[unode-1]*Q[t-1][unode-1]
+        Bp = B[unode-1] + R[unode-1]*abs(Q[t-1][unode-1])
 
         if len(dnode) == 0:
             # End-valve
-            Q[t][unode] = 
-            H[t][unode] = H[t-1][unode-1] + B[unode-1]*Q[t-1][unode-1] - (B[unode-1] + R[unode-1]*abs(Q[t-1][unode-1]))*Q[t][unode]
+            K = 2*G*(Bp * setting * valve_coeff * area)**2
+            H[t][unode] = ((2*Cp + K) - ((2*Cp + K)**2 - 4*Cp**2) ** 0.5) / 2
+            Q[t][unode] = setting * valve_coeff * area * (2*G*H[t][unode])
         else:
             dnode = dnode[0]
             # Inline-valve
-            Cp = H[t-1][unode-1] + B[unode-1]*Q[t-1][unode-1]
-            Bp = B[unode-1] + R[unode-1]*abs(Q[t-1][unode-1])
             Cm = H[t-1][dnode+1] - B[dnode+1]*Q[t-1][dnode+1]
             Bm = B[dnode+1] + R[dnode+1]*abs(Q[t-1][dnode+1])
             S = -1 if (Cp - Cm) < 0 else 1

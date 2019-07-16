@@ -34,5 +34,3 @@ class Simulation:
         self.curves = []
         self.settings = []
 
-    def (self, parameter_list):
-        pass
