@@ -1,8 +1,9 @@
 from collections import namedtuple as ntuple
 
-# ----- Utils -----
+# ----- Global -----
 
 WARNINGS = True
+PARALLEL = True
 
 # ----- Constants for mesh creation -----
 
@@ -46,7 +47,10 @@ VALVES_INT = ntuple('VALVES_INT',
     'setting_id']
 )
 
-VALVES_FLOAT = ntuple('VALVES_FLOAT', ['setting', 'area'])
+VALVES_FLOAT = ntuple('VALVES_FLOAT',
+    ['setting',
+    'area',
+    'valve_coeff'])
 
 # ----- Index labels for Pump tables -----
 
