@@ -215,11 +215,11 @@ class Mesh:
                 elif link.link_type == 'Pump':
                     properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['pump']
                     properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['pump']
-                    properties['int']['pumps'].upstream_junction[valve_ids[link_name]] = node_ids[start_node]
-                    properties['int']['pumps'].downstream_junction[valve_ids[link_name]] = node_ids[end_node]
+                    properties['int']['pumps'].upstream_junction[pump_ids[link_name]] = node_ids[start_node]
+                    properties['int']['pumps'].downstream_junction[pump_ids[link_name]] = node_ids[end_node]
                     (a, b, c,) = link.get_head_curve_coefficients()
-                    properties['float']['pumps'].a[valve_ids[link_name]] = a
-                    properties['float']['pumps'].b[valve_ids[link_name]] = b
-                    properties['float']['pumps'].c[valve_ids[link_name]] = c
+                    properties['float']['pumps'].a[pump_ids[link_name]] = a
+                    properties['float']['pumps'].b[pump_ids[link_name]] = b
+                    properties['float']['pumps'].c[pump_ids[link_name]] = c
 
         return properties

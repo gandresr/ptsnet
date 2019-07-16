@@ -1,6 +1,5 @@
 from numba import njit
-
-PARALLEL = True
+from phammer.simulation.constants import G, PARALLEL
 
 @njit(parallel = PARALLEL)
 def run_interior_step(t, Q, H, B, R):
@@ -12,7 +11,6 @@ def run_interior_step(t, Q, H, B, R):
 
     TODO: UPDATE ARGUMENTS
     """
-
     for i in range(1, H.shape[1]-1):
         # The first and last nodes are skipped in the  loop considering
         # that they are boundary nodes (every interior node requires an
@@ -20,11 +18,10 @@ def run_interior_step(t, Q, H, B, R):
         H[t][i] = ((H[t-1][i-1] + B[i]*Q[t-1][i-1])*(B[i] + R[i]*abs(Q[t-1][i+1])) \
             + (H[t-1][i+1] - B[i]*Q[t-1][i+1])*(B[i] + R[i]*abs(Q[t-1][i-1]))) \
             / ((B[i] + R[i]*abs(Q[t-1][i-1])) + (B[i] + R[i]*abs(Q[t-1][i+1])))
-        Q[t][i] = ((H[t-1][i-1] + B[i]*Q[t-1][i-1]) - (H[t-1][i+1] - B[i]*Q[t-1][i+1])) \
-            / ((B[i] + R[i]*abs(Q[t-1][i-1])) + (B[i] + R[i]*abs(Q[t-1][i+1])))
+        Q[t][i] = (H[t][i] - H[t-1][i+1] + B[i]*Q[t-1][i+1]) / (B[i] + R[i]*abs(Q[t-1][i+1]))
 
 @njit(parallel = PARALLEL)
-def run_junction_step(Q, H, D, E, B, R, nodes_int, nodes_float, nodes_obj, RESERVOIR, PIPE, EMITTER):
+def run_junction_step(t, Q, H, D, E, B, R, nodes_int, nodes_float, nodes_obj, RESERVOIR, PIPE, EMITTER):
     """Solves flow and head for boundary points attached to nodes
 
     All the numpy arrays are passed by reference,
@@ -51,11 +48,11 @@ def run_junction_step(Q, H, D, E, B, R, nodes_int, nodes_float, nodes_obj, RESER
         DOWN {int} -- row index in junctions_int to extract downstream_neighbors_num
         N {int} -- row index to extract the first downstream node in table junctions_int
     """
-    for node_id in range(nodes.shape[1]):
+    for node_id in range(nodes_int.shape[1]):
 
         dpoints = nodes_obj.downstream_points[node_id]
         upoints = nodes_obj.upstream_points[node_id]
-        node_type = nodes_int.node_type[nodes_id]
+        node_type = nodes_int.node_type[node_id]
 
         # Junction is a reservoir
         if node_type == RESERVOIR:
@@ -103,3 +100,34 @@ def run_junction_step(Q, H, D, E, B, R, nodes_int, nodes_float, nodes_obj, RESER
             for k in upoints: # C+
                 H[t][k] = HH
                 Q[t][k] = (Cp[j] - HH) / Bp[j]
+
+@njit(parallel = PARALLEL)
+def run_valve_step(t, Q, H, B, R, valves_int, valves_float, nodes_obj):
+    for v in range(valves_int.shape[0]):
+        start_id = valves_int.upstream_node[v]
+        end_id = valves_int.downstream_node[v]
+        unode = nodes_obj.upstream_points[start_id][0]
+        dnode = nodes_obj.downstream_points[start_id]
+        setting = valves_float.setting[v]
+        # TODO FUNCTION TO SET VALVE COEFF BASED ON SETTING AT EVERY TIME STEP
+        valve_coeff = valves_float.valve_coeff[v]
+        area = valves_float.area[v]
+
+        if len(dnode) == 0:
+            # End-valve
+            Q[t][unode] = 
+            H[t][unode] = H[t-1][unode-1] + B[unode-1]*Q[t-1][unode-1] - (B[unode-1] + R[unode-1]*abs(Q[t-1][unode-1]))*Q[t][unode]
+        else:
+            dnode = dnode[0]
+            # Inline-valve
+            Cp = H[t-1][unode-1] + B[unode-1]*Q[t-1][unode-1]
+            Bp = B[unode-1] + R[unode-1]*abs(Q[t-1][unode-1])
+            Cm = H[t-1][dnode+1] - B[dnode+1]*Q[t-1][dnode+1]
+            Bm = B[dnode+1] + R[dnode+1]*abs(Q[t-1][dnode+1])
+            S = -1 if (Cp - Cm) < 0 else 1
+            Cv = 2*G*(valve_coeff*setting*area)**2
+            X = Cv*(Bp + Bm)
+            Q[t][unode] = (-S*X + S*(X**2 + S*4*Cv*(Cp - Cm))**0.5)/2
+            Q[t][dnode] = Q[t][unode]
+            H[t][unode] = Cp - Bp*Q[t][unode]
+            H[t][dnode] = Cm + Bm*Q[t][dnode]

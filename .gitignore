@@ -11,3 +11,5 @@ __pycache__
 *.ipynb
 *.mesh
 *.png
+*.egg-info
+*.sim
