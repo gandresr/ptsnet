@@ -28,6 +28,8 @@ class Simulation:
         self.steady_state_sim = self.mesh.steady_state_sim
         self.Q = np.zeros((T, self.mesh.num_points), dtype=np.float)
         self.H = np.zeros((T, self.mesh.num_points), dtype=np.float)
+        self.E = np.zeros((T, self.mesh.num_nodes), dtype=np.float)
+        self.D = np.zeros((T, self.mesh.num_nodes), dtype=np.float)
         self.Q[0,:], self.H[0,:] = self.get_initial_conditions(self.mesh)
         self.curves = []
         self.settings = []
