@@ -2,7 +2,7 @@ from numba import njit
 from phammer.simulation.constants import G, PARALLEL
 
 @njit(parallel = PARALLEL)
-def run_interior_step(t, Q, H, B, R):
+def run_interior_step(Q0, H0, Q1, H1, B, R):
     """Solves flow and head for interior points
 
     All the numpy arrays are passed by reference,
@@ -11,17 +11,17 @@ def run_interior_step(t, Q, H, B, R):
 
     TODO: UPDATE ARGUMENTS
     """
-    for i in range(1, H.shape[1]-1):
+    for i in range(1, H0.shape[1]-1):
         # The first and last nodes are skipped in the  loop considering
         # that they are boundary nodes (every interior node requires an
         # upstream and a downstream neighbor)
-        H[t][i] = ((H[t-1][i-1] + B[i]*Q[t-1][i-1])*(B[i] + R[i]*abs(Q[t-1][i+1])) \
-            + (H[t-1][i+1] - B[i]*Q[t-1][i+1])*(B[i] + R[i]*abs(Q[t-1][i-1]))) \
-            / ((B[i] + R[i]*abs(Q[t-1][i-1])) + (B[i] + R[i]*abs(Q[t-1][i+1])))
-        Q[t][i] = (H[t][i] - H[t-1][i+1] + B[i]*Q[t-1][i+1]) / (B[i] + R[i]*abs(Q[t-1][i+1]))
+        H1[i] = ((H0[i-1] + B[i]*Q0[i-1])*(B[i] + R[i]*abs(Q0[i+1])) \
+            + (H0[i+1] - B[i]*Q0[i+1])*(B[i] + R[i]*abs(Q0[i-1]))) \
+            / ((B[i] + R[i]*abs(Q0[i-1])) + (B[i] + R[i]*abs(Q0[i+1])))
+        Q1[i] = (H1[i] - H0[i+1] + B[i]*Q0[i+1]) / (B[i] + R[i]*abs(Q0[i+1]))
 
 @njit(parallel = PARALLEL)
-def run_junction_step(t, Q, H, D, E, B, R, nodes_int, nodes_float, nodes_obj, RESERVOIR, PIPE, EMITTER):
+def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, nodes_int, nodes_float, nodes_obj, RESERVOIR, PIPE, EMITTER):
     """Solves flow and head for boundary points attached to nodes
 
     All the numpy arrays are passed by reference,
@@ -57,13 +57,13 @@ def run_junction_step(t, Q, H, D, E, B, R, nodes_int, nodes_float, nodes_obj, RE
         # Junction is a reservoir
         if node_type == RESERVOIR:
             for k in dpoints:
-                H[t][k] = H[t-1][k]
-                Q[t][k] = (H[t-1][k] - H[t-1][k+1] + B[k+1]*Q[t-1][k+1]) \
-                        / (B[k+1] + R[k+1]*abs(Q[t-1][k+1]))
+                H1[k] = H0[k]
+                Q1[k] = (H0[k] - H0[k+1] + B[k+1]*Q0[k+1]) \
+                        / (B[k+1] + R[k+1]*abs(Q0[k+1]))
             for k in upoints:
-                H[t][k] = H[t-1][k]
-                Q[t][k] = (H[t-1][k-1] + B[k-1]*Q[t-1][k-1] - H[t-1][k]) \
-                        / (B[k-1] + R[k-1]*abs(Q[t-1][k-1]))
+                H1[k] = H0[k]
+                Q1[k] = (H0[k-1] + B[k-1]*Q0[k-1] - H0[k]) \
+                        / (B[k-1] + R[k-1]*abs(Q0[k-1]))
         elif node_type == EMITTER or node_type == PIPE:
             sc = 0
             sb = 0
@@ -73,14 +73,14 @@ def run_junction_step(t, Q, H, D, E, B, R, nodes_int, nodes_float, nodes_obj, RE
             Bp = [0 for i in range(len(upoints))]
 
             for j, k in enumerate(dpoints): # C-
-                Cm[j] = H[t-1][k+1] - B[k+1]*Q[t-1][k+1]
-                Bm[j] = B[k+1] + R[k+1]*abs(Q[t-1][k+1])
+                Cm[j] = H0[k+1] - B[k+1]*Q0[k+1]
+                Bm[j] = B[k+1] + R[k+1]*abs(Q0[k+1])
                 sc += Cm[j] / Bm[j]
                 sb += 1 / Bm[j]
 
             for j, k in enumerate(upoints): # C+
-                Cp[j] = H[t-1][k-1] + B[k-1]*Q[t-1][k-1]
-                Bp[j] = B[k-1] + R[k-1]*abs(Q[t-1][k-1])
+                Cp[j] = H0[k-1] + B[k-1]*Q0[k-1]
+                Bp[j] = B[k-1] + R[k-1]*abs(Q0[k-1])
                 sc += Cp[j] / Bp[j]
                 sb += 1 / Bp[j]
 
@@ -90,45 +90,45 @@ def run_junction_step(t, Q, H, D, E, B, R, nodes_int, nodes_float, nodes_obj, RE
             K = ((Ke+Kd)/sb)**2
             HH = ((2*Z + K) - (K**2 + 4*Z*K)**0.5) / 2
 
-            E[t][node_id] = Ke*(2*G*HH)**0.5
-            D[t][node_id] = Kd*(2*G*HH)**0.5
+            E1[node_id] = Ke*(2*G*HH)**0.5
+            D1[node_id] = Kd*(2*G*HH)**0.5
 
             for k in dpoints: # C-
-                H[t][k] = HH
-                Q[t][k] = (HH - Cm[j]) / Bm[j]
+                H1[k] = HH
+                Q1[k] = (HH - Cm[j]) / Bm[j]
 
             for k in upoints: # C+
-                H[t][k] = HH
-                Q[t][k] = (Cp[j] - HH) / Bp[j]
+                H1[k] = HH
+                Q1[k] = (Cp[j] - HH) / Bp[j]
 
 @njit(parallel = PARALLEL)
-def run_valve_step(t, Q, H, B, R, valves_int, valves_float, nodes_obj):
+def run_valve_step(Q0, H0, Q1, H1, B, R, valves_int, valves_float, nodes_obj):
     for v in range(valves_int.shape[0]):
         start_id = valves_int.upstream_node[v]
         end_id = valves_int.downstream_node[v]
         unode = nodes_obj.upstream_points[start_id][0]
-        dnode = nodes_obj.downstream_points[start_id]
+        dnode = nodes_obj.downstream_points[end_id]
         setting = valves_float.setting[v]
         # TODO FUNCTION TO SET VALVE COEFF BASED ON SETTING AT EVERY TIME STEP
         valve_coeff = valves_float.valve_coeff[v]
         area = valves_float.area[v]
-        Cp = H[t-1][unode-1] + B[unode-1]*Q[t-1][unode-1]
-        Bp = B[unode-1] + R[unode-1]*abs(Q[t-1][unode-1])
+        Cp = H0[unode-1] + B[unode-1]*Q0[unode-1]
+        Bp = B[unode-1] + R[unode-1]*abs(Q0[unode-1])
 
         if len(dnode) == 0:
             # End-valve
             K = 2*G*(Bp * setting * valve_coeff * area)**2
-            H[t][unode] = ((2*Cp + K) - ((2*Cp + K)**2 - 4*Cp**2) ** 0.5) / 2
-            Q[t][unode] = setting * valve_coeff * area * (2*G*H[t][unode])
+            H1[unode] = ((2*Cp + K) - ((2*Cp + K)**2 - 4*Cp**2) ** 0.5) / 2
+            Q1[unode] = setting * valve_coeff * area * (2*G*H1[unode])
         else:
             dnode = dnode[0]
             # Inline-valve
-            Cm = H[t-1][dnode+1] - B[dnode+1]*Q[t-1][dnode+1]
-            Bm = B[dnode+1] + R[dnode+1]*abs(Q[t-1][dnode+1])
+            Cm = H0[dnode+1] - B[dnode+1]*Q0[dnode+1]
+            Bm = B[dnode+1] + R[dnode+1]*abs(Q0[dnode+1])
             S = -1 if (Cp - Cm) < 0 else 1
             Cv = 2*G*(valve_coeff*setting*area)**2
             X = Cv*(Bp + Bm)
-            Q[t][unode] = (-S*X + S*(X**2 + S*4*Cv*(Cp - Cm))**0.5)/2
-            Q[t][dnode] = Q[t][unode]
-            H[t][unode] = Cp - Bp*Q[t][unode]
-            H[t][dnode] = Cm + Bm*Q[t][dnode]
+            Q1[unode] = (-S*X + S*(X**2 + S*4*Cv*(Cp - Cm))**0.5)/2
+            Q1[dnode] = Q1[unode]
+            H1[unode] = Cp - Bp*Q1[unode]
+            H1[dnode] = Cm + Bm*Q1[dnode]

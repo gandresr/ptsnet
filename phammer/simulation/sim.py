@@ -1,6 +1,6 @@
 import numpy as np
 
-from phammer.simulation.utils import define_curve
+from phammer.simulation.utils import define_curve, is_iterable
 from phammer.mesh.mesh import Mesh
 from phammer.simulation.constants import *
 from phammer.simulation.initial_conditions import get_initial_conditions
@@ -34,6 +34,36 @@ class Simulation:
         self.curves = []
         self.settings = []
 
+    def _define_valves_setting(self, valves, settings):
+        for i, valve in enumerate(valves):
+            valve_id = self.mesh.valve_ids[valve]
+            self.mesh.properties['float']['valves'].setting[valve_id] = settings[i]
+
+    def _define_emitters_setting(self, nodes, settings):
+        for i, node in enumerate(nodes):
+            node_id = self.mesh.node_ids[node]
+            self.mesh.properties['float']['nodes'].emitter_setting[node_id] = settings[i]
+
+    def define_valve_setting(self, valve, setting):
+        if type(setting) == float:
+            self._define_valves_setting((valve,), (setting,))
+        elif is_iterable(setting):
+            valve_id = self.mesh.valve_ids[valve]
+            self.mesh.properties['int']['valves'].setting_id[valve_id] = len(self.settings)
+            self.settings.append(settings)
+        else:
+            raise Exception("Type error: setting type should be float or iterable")
+
+    def define_emitter_setting(self, node, setting):
+        if type(setting) == float:
+            self._define_emitters_setting((node,), (setting,))
+        elif is_iterable(setting):
+            node_id = self.mesh.nodes_ids[node]
+            self.mesh.properties['int']['nodes'].setting_id[node_id] = len(self.settings)
+            self.settings.append(settings)
+        else:
+            raise Exception("Type error: setting type should be float or iterable")
+
     def define_valve_curve(self, valve, X, Y):
         valve_id = self.mesh.valve_ids[valve]
         self.mesh.properties['int']['valves'].curve_id[valve_id] = len(self.curves)
@@ -43,24 +73,6 @@ class Simulation:
         node_id = self.mesh.node_ids[node]
         self.mesh.properties['int']['nodes'].emitter_curve_id[node_id] = len(self.curves)
         self.curves.append(define_curve(X, Y))
-
-    def define_valve_setting(self, valve, setting):
-        if setting < 0 or setting > 1:
-            raise Exception("Setting value has to be in [0,1]")
-        valve_id = self.mesh.valve_ids[valve]
-        self.mesh.properties['float']['valves'].setting[valve_id] = setting
-
-    def define_emitter_setting(self, node, setting):
-        if setting < 0 or setting > 1:
-            raise Exception("Setting value has to be in [0,1]")
-        node_id = self.mesh.node_ids[node]
-        self.mesh.properties['float']['nodes'].emitter_setting[node_id] = setting
-
-    def define_valve(self,):
-        pass
-
-    def define_pump(self, ):
-        pass
 
     def initialize(self, default_wave_speed = None, wave_speed_file = None, delimiter=',')
         self.mesh = Mesh(
