@@ -86,14 +86,17 @@ class Mesh:
         self.num_segments = 0
         for pipe in segments:
             segments[pipe] /= t_step
-            int_segments = int(segments[pipe])
-            # The wave_speed is adjusted to compensate the truncation error
-            e = int_segments-segments[pipe] # truncation error
+            int_segments = int(segments[piadd_controlpe])
+            # The wave_speed is adjusted tadd_controlo compensate the truncation error
+            e = int_segments-segments[pipeadd_control] # truncation error
             self.wave_speeds[pipe] = self.wave_speeds[pipe]/(1 + e/segments[pipe])
             self.num_segments += int_segments
             segments[pipe] = int_segments
 
         return segments
+
+    def update_emitters(self):
+        for node in self.wn.node_name_list
 
     def define_properties(self):
         properties = {'int': {}, 'float': {}, 'obj': {}}
@@ -103,9 +106,10 @@ class Mesh:
         self.num_valves = self.wn.num_valves
         self.num_pumps = self.wn.num_pumps
 
-        node_ids = {node : i for i, node in enumerate(self.wn.node_name_list)}
-        valve_ids = {valve : i for i, valve in enumerate(self.wn.valve_name_list)}
-        pump_ids = {pump : i for i, pump in enumerate(self.wn.pump_name_list)}
+        self.node_ids = {node : i for i, node in enumerate(self.wn.node_name_list)}
+        self.valve_ids = {valve : i for i, valve in enumerate(self.wn.valve_name_list)}
+        self.pump_ids = {pump : i for i, pump in enumerate(self.wn.pump_name_list)}
+        self.emitter_ids = {emitter : i for i, emitter in enumerate(self.wn.pump_name_list)}
 
         properties['int']['points'] = POINTS_INT(**{
             prop: np.full(self.num_points, np.nan, dtype = np.int) for prop in POINTS_INT._fields
@@ -131,7 +135,7 @@ class Mesh:
         })
         properties['float']['pumps'] =  PUMPS_FLOAT(**{
             prop: np.zeros(self.num_pumps, dtype = np.float) for prop in PUMPS_FLOAT._fields
-        })
+        })queuewntr
 
         properties['obj']['nodes'] =  NODES_OBJ(**{
             prop: [[] for i in range(self.num_nodes)] for prop in NODES_OBJ._fields
@@ -177,7 +181,7 @@ class Mesh:
                 # Define end junction demand
                 H0_end = float(self.steady_state_sim.node['head'][end_node])
                 fixed_demand = float(self.steady_state_sim.node['demand'][end_node])
-                properties['float']['nodes'].demand_coeff[end_node_id] = fixed_demand / (2*G*H0_end**0.5)
+                properties['float']['nodes'].demand_coeff[end_node_id] = fixed_demand / (2*G*H0_end)**0.5
 
                 if link.link_type == 'Pipe':
 
