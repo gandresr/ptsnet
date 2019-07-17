@@ -39,19 +39,22 @@ class Simulation:
         self.mesh.properties['int']['valves'].curve_id[valve_id] = len(self.curves)
         self.curves.append(define_curve(X, Y))
 
-    def define_emitter_curve(self, emitter, X, Y):
-        emitter_id = self.mesh.emitter_ids[valve]
-        self.mesh.properties['int']['emitters'].curve_id[emitter_id] = len(self.curves)
+    def define_emitter_curve(self, node, X, Y):
+        node_id = self.mesh.node_ids[node]
+        self.mesh.properties['int']['nodes'].emitter_curve_id[node_id] = len(self.curves)
         self.curves.append(define_curve(X, Y))
 
-    def define_emitter(self, node, coefficient, settings = None, curve = None):
-        """[summary]
-        Arguments:
-            junction_name {[type]} -- [description]
-            Kd {[type]} -- Discharge coefficient times A
-        """
+    def define_valve_setting(self, valve, setting):
+        if setting < 0 or setting > 1:
+            raise Exception("Setting value has to be in [0,1]")
+        valve_id = self.mesh.valve_ids[valve]
+        self.mesh.properties['float']['valves'].setting[valve_id] = setting
+
+    def define_emitter_setting(self, node, setting):
+        if setting < 0 or setting > 1:
+            raise Exception("Setting value has to be in [0,1]")
         node_id = self.mesh.node_ids[node]
-        self.emitters.append(EMITTER_INT(node_id, curve_id, setting_id))
+        self.mesh.properties['float']['nodes'].emitter_setting[node_id] = setting
 
     def define_valve(self,):
         pass

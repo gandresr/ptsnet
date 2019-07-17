@@ -109,7 +109,6 @@ class Mesh:
         self.node_ids = {node : i for i, node in enumerate(self.wn.node_name_list)}
         self.valve_ids = {valve : i for i, valve in enumerate(self.wn.valve_name_list)}
         self.pump_ids = {pump : i for i, pump in enumerate(self.wn.pump_name_list)}
-        self.emitter_ids = {emitter : i for i, emitter in enumerate(self.wn.pump_name_list)}
 
         properties['int']['points'] = POINTS_INT(**{
             prop: np.full(self.num_points, np.nan, dtype = np.int) for prop in POINTS_INT._fields
@@ -181,7 +180,7 @@ class Mesh:
                 # Define end junction demand
                 H0_end = float(self.steady_state_sim.node['head'][end_node])
                 fixed_demand = float(self.steady_state_sim.node['demand'][end_node])
-                properties['float']['nodes'].demand_coeff[end_node_id] = fixed_demand / (2*G*H0_end)**0.5
+                properties['float']['nodes'].emitter_coeff[end_node_id] = fixed_demand / (2*G*H0_end)**0.5
 
                 if link.link_type == 'Pipe':
 
@@ -192,9 +191,9 @@ class Mesh:
                     pipe_length = link.length
                     ffactor = (abs(H0_start - H0_end)*2*G*pipe_diameter) / (pipe_length * (Q0 / pipe_area)**2)
 
-                    #  Points are stored in order, such that the i-1 and the i+1
-                    #  correspond to the upstream and downstream nodes of the
-                    #  i-th node
+                    #  Points are stored in order, such that the i-1 and the i+1 points
+                    #  correspond to the upstream and downstream points of the
+                    #  i-th point
                     for idx in range(self.segments[link_name]+1):
                         properties['int']['points'].subindex[i] = idx
                         properties['int']['points'].link_id[i] = link_id

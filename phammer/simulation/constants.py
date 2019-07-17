@@ -26,10 +26,11 @@ POINTS_FLOAT = ntuple('POINTS_FLOAT', ['B', 'R'])
 
 NODES_INT = ntuple('NODES_INT',
     ['node_type',
+    'emitter_curve_id',
     'emitter_setting_id']
 )
 
-NODES_FLOAT = ntuple('NODES_FLOAT', ['emitter_coeff'])
+NODES_FLOAT = ntuple('NODES_FLOAT', ['emitter_coeff', 'emmitter_setting'])
 
 NODES_OBJ = ntuple('NODES_OBJ', ['upstream_points', 'downstream_points'])
 
