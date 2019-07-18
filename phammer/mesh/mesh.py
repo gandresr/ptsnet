@@ -184,7 +184,9 @@ class Mesh:
             # Define start junction demand
             H0_start = float(self.steady_state_sim.node['head'][start_node])
             fixed_demand = float(self.steady_state_sim.node['demand'][start_node])
+            emitter_demand = float(self.steady_state_sim.node['leak_demand'][start_node])
             self.properties['float']['nodes'].demand_coeff[start_node_id] = fixed_demand / (2*G*H0_start**0.5)
+            self.properties['float']['nodes'].emitter_coeff[start_node_id] = emitter_demand / (2*G*H0_start**0.5)
 
             # Update downstream nodes
             for j, end_node in enumerate(downstream_nodes):
@@ -201,10 +203,11 @@ class Mesh:
                 # Define end junction demand
                 H0_end = float(self.steady_state_sim.node['head'][end_node])
                 fixed_demand = float(self.steady_state_sim.node['demand'][end_node])
-                self.properties['float']['nodes'].emitter_coeff[end_node_id] = fixed_demand / (2*G*H0_end)**0.5
+                emitter_demand = float(self.steady_state_sim.node['leak_demand'][end_node])
+                self.properties['float']['nodes'].demand_coeff[end_node_id] = fixed_demand / (2*G*H0_end)**0.5
+                self.properties['float']['nodes'].emitter_coeff[end_node_id] = emitter_demand / (2*G*H0_end)**0.5
 
                 if link.link_type == 'Pipe':
-
                     # Friction factor based on D-W equation
                     Q0 = float(self.steady_state_sim.link['flowrate'][link_name])
                     pipe_diameter = link.diameter

@@ -4,6 +4,7 @@ import wntr
 from phammer.simulation.utils import define_curve, is_iterable
 from phammer.mesh.mesh import Mesh
 from phammer.simulation.initial_conditions import get_initial_conditions
+from phammer.funcs 
 
 class Simulation:
     """
@@ -100,4 +101,6 @@ class Simulation:
         if self.full_results:
             self.Q[0,:], self.H[0,:] = get_initial_conditions(self.mesh)
         else:
-            self.Q0[0,:], self.H0[0,:] = get_initial_conditions(self.mesh)
+            self.Q0, self.H0 = get_initial_conditions(self.mesh)
+    
+    def run_step()
