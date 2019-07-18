@@ -43,17 +43,17 @@ class Simulation:
 
         if full_results:
             self.Q = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
-            self.H = np.zeros_like(Q)
+            self.H = np.zeros_like(self.Q)
         else:
             self.Q0 = np.zeros(self.mesh.num_points, dtype=np.float)
-            self.Q1 = np.zeros_like(Q0)
-            self.H0 = np.zeros_like(Q0)
-            self.H1 = np.zeros_like(Q0)
-            self.Q = np.zeros((self.time_steps, 2*self.mesh.wn.num_pipes), dtype=np.float)
-            self.H = np.zeros_like(Q)
+            self.Q1 = np.zeros_like(self.Q0)
+            self.H0 = np.zeros_like(self.Q0)
+            self.H1 = np.zeros_like(self.Q0)
+            self.Q = np.zeros((self.time_steps, self.mesh.num_boundaries), dtype=np.float)
+            self.H = np.zeros_like(self.Q)
 
         self.E = np.zeros((self.time_steps, self.mesh.num_nodes), dtype=np.float)
-        self.D = np.zeros_like(E)
+        self.D = np.zeros_like(self.E)
 
         # store pairs (obj_id, scipy_interpolator)
         self.pump_curves = {}
@@ -116,7 +116,7 @@ class Simulation:
     def define_valve_curve(self, valve, X, Y):
         valve_id = self.mesh.valve_ids[valve]
         self.mesh.properties['int']['valves'].curve_id[valve_id] = len(self.valve_curves)
-        self.valve_curves.[valve_id] = define_curve(X, Y)
+        self.valve_curves[valve_id] = define_curve(X, Y)
 
     def define_emitter_curve(self, node, X, Y):
         node_id = self.mesh.node_ids[node]
@@ -149,16 +149,16 @@ class Simulation:
         if self.t == 0:
             self.start()
             if not self.full_results:
-                self.Q = self.Q0[self.mesh.node_point_indexes]
-                self.H = self.H0[self.mesh.node_point_indexes]
+                self.Q = self.Q0[self.mesh.boundary_ids]
+                self.H = self.H0[self.mesh.boundary_ids]
         else:
             self.t += 1
 
         if self.full_results:
             Q0 = self.Q[self.t-1, :]
             Q1 = self.Q[self.t, :]
-            H1 = self.H[self.t-1, :]
-            H2 = self.H[self.t, :]
+            H0 = self.H[self.t-1, :]
+            H1 = self.H[self.t, :]
         else:
             if self.t % 2 != 0:
                 Q0 = self.Q0
@@ -185,8 +185,10 @@ class Simulation:
         run_valve_step(Q0, H0, Q1, H1,
             self.mesh.properties['float']['points'].B,
             self.mesh.properties['float']['points'].R,
-            valves_int, valves_float, nodes_obj)
+            self.mesh.properties['int']['valves'],
+            self.mesh.properties['float']['valves'],
+            self.mesh.properties['obj']['valves'])
 
         if not self.full_results:
-            self.Q[t,:] = Q1[self.mesh.node_point_indexes]
-            self.H[t,:] = H1[self.mesh.node_point_indexes]
+            self.Q[self.t,:] = Q1[self.mesh.boundary_ids]
+            self.H[self.t,:] = H1[self.mesh.boundary_ids]

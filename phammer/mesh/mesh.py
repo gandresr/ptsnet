@@ -16,11 +16,13 @@ class Mesh:
         self.properties = {}
 
         self.num_segments = 0
+        self.num_boundaries = 0
         self.num_points = 0
         self.num_nodes = 0
         self.num_valves = 0
         self.num_pumps = 0
 
+        self.boundary_ids = []
         self.node_ids = {}
         self.valve_ids = {}
         self.pump_ids = {}
@@ -118,6 +120,7 @@ class Mesh:
     def _initialize(self):
         self.properties = {'int': {}, 'float': {}, 'obj': {}}
 
+        self.num_boundaries = 2*self.wn.num_pipes
         self.num_points = self.num_segments + len(self.segments)
         self.num_nodes = self.wn.num_nodes
         self.num_valves = self.wn.num_valves
@@ -224,9 +227,11 @@ class Mesh:
                         if idx == 0: # downstream node of start_node
                             self.properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
                             self.properties['obj']['nodes'].downstream_points[start_node_id].append(i)
+                            self.boundary_ids.append(i)
                         elif idx == self.segments[link_name]: # upstream node of end_node
                             self.properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
                             self.properties['obj']['nodes'].upstream_points[end_node_id].append(i)
+                            self.boundary_ids.append(i)
                         else: # interior point
                             self.properties['int']['points'].point_type[i] = POINT_TYPES['interior']
                         dx = pipe_length / self.segments[link_name]
