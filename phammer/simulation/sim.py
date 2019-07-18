@@ -4,8 +4,7 @@ import wntr
 from phammer.simulation.utils import define_curve, is_iterable
 from phammer.mesh.mesh import Mesh
 from phammer.simulation.initial_conditions import get_initial_conditions
-from phammer.simulation.funcs import set_settings
-from phammer.simulation.utils import set_coefficients
+from phammer.simulation.utils import set_settings, set_coefficients
 
 class Simulation:
     """
@@ -53,14 +52,14 @@ class Simulation:
         self.D = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
 
         # store pairs (obj_id, scipy_interpolator)
-        self.pump_curves = []
-        self.valve_curves = []
-        self.emitter_curves = []
+        self.pump_curves = {}
+        self.valve_curves = {}
+        self.emitter_curves = {}
 
         # store pairs (obj_id, settings array)
-        self.pump_settings = []
-        self.valve_settings = []
-        self.emitter_settings = []
+        self.pump_settings = {}
+        self.valve_settings = {}
+        self.emitter_settings = {}
 
     def add_emitter(self, node, area, discharge_coeff, initial_setting=1):
         if not (0 <= initial_setting <= 1):
@@ -84,13 +83,13 @@ class Simulation:
                 raise Exception("Setting values should be in [0, 1]")
             if obj_type == 'pumps':
                 self.mesh.properties['int'][obj_type].setting_id[obj_id] = len(self.pump_settings)
-                self.pump_settings.append((obj_id, obj_settings,))
+                self.pump_settings[obj_id] = obj_settings
             elif obj_type == 'valves':
                 self.mesh.properties['int'][obj_type].setting_id[obj_id] = len(self.valve_settings)
-                self.valve_settings.append((obj_id, obj_settings,))
+                self.valve_settings[obj_id] = obj_settings
             elif obj_type == 'nodes':
                 self.mesh.properties['int'][obj_type].setting_id[obj_id] = len(self.emitter_settings)
-                self.emitter_settings.append((obj_id, obj_settings,))
+                self.emitter_settings[obj_id] = obj_settings
             else:
                 raise Exception("Type error: obj_type not compatible (internal error)")
         else:
@@ -107,18 +106,18 @@ class Simulation:
 
     def define_pump_curve(self, pump, X, Y):
         pump_id = self.mesh.pump_ids[pump]
-        self.mesh.properties['int']['pumps'].pump_curve_id[pump_id] = len(self.curves)
-        self.pump_curves.append((pump_id, define_curve(X, Y),))
+        self.mesh.properties['int']['pumps'].pump_curve_id[pump_id] = len(self.pump_curves)
+        self.pump_curves[pump_id] = define_curve(X, Y)
 
     def define_valve_curve(self, valve, X, Y):
         valve_id = self.mesh.valve_ids[valve]
-        self.mesh.properties['int']['valves'].curve_id[valve_id] = len(self.curves)
-        self.valve_curves.append((valve_id, define_curve(X, Y),))
+        self.mesh.properties['int']['valves'].curve_id[valve_id] = len(self.valve_curves)
+        self.valve_curves.[valve_id] = define_curve(X, Y)
 
     def define_emitter_curve(self, node, X, Y):
         node_id = self.mesh.node_ids[node]
-        self.mesh.properties['int']['nodes'].emitter_curve_id[node_id] = len(self.curves)
-        self.emitter_curves.append((node_id, define_curve(X, Y),))
+        self.mesh.properties['int']['nodes'].emitter_curve_id[node_id] = len(self.emitter_curves)
+        self.emitter_curves[node_id] = define_curve(X, Y)
 
     def start(self):
         self.mesh.create_mesh()

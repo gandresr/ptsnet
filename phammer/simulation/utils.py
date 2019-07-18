@@ -11,6 +11,11 @@ def is_iterable(x):
     except:
         return False
 
+def set_settings(t, settings, setting_property):
+    for obj_id in settings:
+        if t < len(settings[obj_id]) - 1:
+            setting_property[obj_id] = settings[obj_id][t]
+
 def set_coefficients(obj_curves, coeff, obj_setting):
     for obj_curve in obj_curves:
             obj_id = obj_curve[0]

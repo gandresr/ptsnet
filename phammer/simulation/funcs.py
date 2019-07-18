@@ -134,12 +134,3 @@ def run_valve_step(Q0, H0, Q1, H1, B, R, valves_int, valves_float, nodes_obj):
             Q1[dnode] = Q1[unode]
             H1[unode] = Cp - Bp*Q1[unode]
             H1[dnode] = Cm + Bm*Q1[dnode]
-
-# ------------------ UTILS ------------------
-
-@jit(nopython = True, cache = True)
-def set_settings(t, settings, setting_property):
-    for i in range(len(settings)):
-        if t < len(settings[i][1]) - 1:
-            obj_id = settings[i][0]
-            setting_property[obj_id] = settings[i][1][t]
