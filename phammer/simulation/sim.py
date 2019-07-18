@@ -22,6 +22,7 @@ class Simulation:
         self.time_step = time_step
         self.time_steps = int(duration/time_step)
         self.t = 0 # current time
+        self.full_results = full_results
         if full_results:
             self.Q = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
             self.H = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
@@ -91,4 +92,7 @@ class Simulation:
             wave_speed_file = wave_speed_file,
             delimiter = delimiter)
         self.steady_state_sim = self.mesh.steady_state_sim
-        self.Q[0,:], self.H[0,:] = get_initial_conditions(self.mesh)
+        if self.full_results:
+            self.Q[0,:], self.H[0,:] = get_initial_conditions(self.mesh)
+        else:
+            self.Q0[0,:], self.H0[0,:] = get_initial_conditions(self.mesh)
