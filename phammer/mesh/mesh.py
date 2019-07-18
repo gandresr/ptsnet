@@ -1,19 +1,39 @@
 import wntr
 import numpy as np
 
-from phammer.simulation.constants import *
+from phammer.simulation.constants import TOL, WARNINGS, G
+from phammer.simulation.constants import POINTS_INT, POINTS_FLOAT
+from phammer.simulation.constants import NODES_INT, NODES_FLOAT, NODES_OBJ
+from phammer.simulation.constants import VALVES_INT, VALVES_FLOAT
+from phammer.simulation.constants import PUMPS_INT, PUMPS_FLOAT
+from phammer.simulation.constants import NODE_TYPES, POINT_TYPES, CURVE_TYPES
 
 class Mesh:
     def __init__(self, input_file, time_step, wn, default_wave_speed = None, wave_speed_file = None, delimiter=','):
-        self.wn = wn
-        self.steady_state_sim = wntr.sim.WNTRSimulator(self.wn).run_sim()
-        self.network_graph = self.get_network_graph()
-        self.time_step = time_step
-        self.wave_speeds = self.get_wave_speeds(default_wave_speed, wave_speed_file, delimiter)
-        self.segments = self.get_segments(time_step)
-        self.properties = self.define_properties()
 
-    def get_network_graph(self):
+        self.steady_state_sim = None
+        self.network_graph = None
+        self.properties = {}
+
+        self.num_segments = 0
+        self.num_points = 0
+        self.num_nodes = 0
+        self.num_valves = 0
+        self.num_pumps = 0
+
+        self.node_ids = {}
+        self.valve_ids = {}
+        self.pump_ids = {}
+
+        self.wn = wn
+        self.time_step = time_step
+
+        self.wave_speeds = self._get_wave_speeds(default_wave_speed, wave_speed_file, delimiter)
+        self.segments = self._get_segments(time_step)
+
+        self._initialize()
+
+    def _get_network_graph(self):
         G = self.wn.get_graph()
         switch_links = []
         for n1 in G:
@@ -36,7 +56,7 @@ class Mesh:
 
         return G
 
-    def get_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
+    def _get_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
         wave_speeds = {}
 
         if default_wave_speed is None and wave_speed_file is None:
@@ -60,7 +80,7 @@ class Mesh:
 
         return wave_speeds
 
-    def get_segments(self, time_step):
+    def _get_segments(self, time_step):
         """Estimates the number of segments for each pipe in the EPANET network
 
         Pipes are segmented in order to create a Mesh for the MOC
@@ -86,20 +106,17 @@ class Mesh:
         self.num_segments = 0
         for pipe in segments:
             segments[pipe] /= t_step
-            int_segments = int(segments[piadd_controlpe])
-            # The wave_speed is adjusted tadd_controlo compensate the truncation error
-            e = int_segments-segments[pipeadd_control] # truncation error
+            int_segments = int(segments[pipe])
+            # The wave_speed is adjusted to compensate the truncation error
+            e = int_segments-segments[pipe] # truncation error
             self.wave_speeds[pipe] = self.wave_speeds[pipe]/(1 + e/segments[pipe])
             self.num_segments += int_segments
             segments[pipe] = int_segments
 
         return segments
 
-    def update_emitters(self):
-        for node in self.wn.node_name_list
-
-    def define_properties(self):
-        properties = {'int': {}, 'float': {}, 'obj': {}}
+    def _initialize(self):
+        self.properties = {'int': {}, 'float': {}, 'obj': {}}
 
         self.num_points = self.num_segments + len(self.segments)
         self.num_nodes = self.wn.num_nodes
@@ -110,44 +127,48 @@ class Mesh:
         self.valve_ids = {valve : i for i, valve in enumerate(self.wn.valve_name_list)}
         self.pump_ids = {pump : i for i, pump in enumerate(self.wn.pump_name_list)}
 
-        properties['int']['points'] = POINTS_INT(**{
+        self.properties['int']['points'] = POINTS_INT(**{
             prop: np.full(self.num_points, np.nan, dtype = np.int) for prop in POINTS_INT._fields
         })
-        properties['int']['nodes'] = NODES_INT(**{
+        self.properties['int']['nodes'] = NODES_INT(**{
             prop: np.full(self.num_nodes, np.nan, dtype = np.int) for prop in NODES_INT._fields
         })
-        properties['int']['valves'] = VALVES_INT(**{
+        self.properties['int']['valves'] = VALVES_INT(**{
             prop: np.full(self.num_valves, np.nan, dtype = np.int) for prop in VALVES_INT._fields
         })
-        properties['int']['pumps'] = PUMPS_INT(**{
+        self.properties['int']['pumps'] = PUMPS_INT(**{
             prop: np.full(self.num_pumps, np.nan, dtype = np.int) for prop in PUMPS_INT._fields
         })
 
-        properties['float']['points'] = POINTS_FLOAT(**{
+        self.properties['float']['points'] = POINTS_FLOAT(**{
             prop: np.zeros(self.num_points, dtype = np.float) for prop in POINTS_FLOAT._fields
         })
-        properties['float']['nodes'] =  NODES_FLOAT(**{
+        self.properties['float']['nodes'] =  NODES_FLOAT(**{
             prop: np.zeros(self.num_nodes, dtype = np.float) for prop in NODES_FLOAT._fields
         })
-        properties['float']['valves'] = VALVES_FLOAT(**{
+        self.properties['float']['valves'] = VALVES_FLOAT(**{
             prop: np.zeros(self.num_valves, dtype = np.float) for prop in VALVES_FLOAT._fields
         })
-        properties['float']['pumps'] =  PUMPS_FLOAT(**{
+        self.properties['float']['pumps'] =  PUMPS_FLOAT(**{
             prop: np.zeros(self.num_pumps, dtype = np.float) for prop in PUMPS_FLOAT._fields
-        })queuewntr
+        })
 
-        properties['obj']['nodes'] =  NODES_OBJ(**{
+        self.properties['obj']['nodes'] =  NODES_OBJ(**{
             prop: [[] for i in range(self.num_nodes)] for prop in NODES_OBJ._fields
         })
+
+    def create_mesh(self):
+        self.steady_state_sim = wntr.sim.WNTRSimulator(self.wn).run_sim()
+        self.network_graph = self._get_network_graph()
 
         i = 0 # nodes index
 
         for start_node in self.network_graph:
 
-            start_node_id = node_ids[start_node]
+            start_node_id = self.node_ids[start_node]
 
             # Set default values for node_type
-            properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['junction']
+            self.properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['junction']
 
             downstream_nodes = self.network_graph[start_node]
 
@@ -158,16 +179,16 @@ class Mesh:
 
             # Check if start junction is a reservoir
             if start_node in self.wn.reservoir_name_list:
-                properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['reservoir']
+                self.properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['reservoir']
 
             # Define start junction demand
             H0_start = float(self.steady_state_sim.node['head'][start_node])
             fixed_demand = float(self.steady_state_sim.node['demand'][start_node])
-            properties['float']['nodes'].demand_coeff[start_node_id] = fixed_demand / (2*G*H0_start**0.5)
+            self.properties['float']['nodes'].demand_coeff[start_node_id] = fixed_demand / (2*G*H0_start**0.5)
 
             # Update downstream nodes
             for j, end_node in enumerate(downstream_nodes):
-                end_node_id = node_ids[end_node]
+                end_node_id = self.node_ids[end_node]
                 link_name = downstream_link_names[j]
                 link = self.wn.get_link(link_name)
                 # link_id is based on the wntr data structure
@@ -175,12 +196,12 @@ class Mesh:
 
                 # Check if end junction is a reservoir
                 if end_node in self.wn.reservoir_name_list:
-                    properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['reservoir']
+                    self.properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['reservoir']
 
                 # Define end junction demand
                 H0_end = float(self.steady_state_sim.node['head'][end_node])
                 fixed_demand = float(self.steady_state_sim.node['demand'][end_node])
-                properties['float']['nodes'].emitter_coeff[end_node_id] = fixed_demand / (2*G*H0_end)**0.5
+                self.properties['float']['nodes'].emitter_coeff[end_node_id] = fixed_demand / (2*G*H0_end)**0.5
 
                 if link.link_type == 'Pipe':
 
@@ -195,34 +216,32 @@ class Mesh:
                     #  correspond to the upstream and downstream points of the
                     #  i-th point
                     for idx in range(self.segments[link_name]+1):
-                        properties['int']['points'].subindex[i] = idx
-                        properties['int']['points'].link_id[i] = link_id
+                        self.properties['int']['points'].subindex[i] = idx
+                        self.properties['int']['points'].link_id[i] = link_id
                         if idx == 0: # downstream node of start_node
-                            properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
-                            properties['obj']['nodes'].downstream_points[start_node_id].append(i)
+                            self.properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
+                            self.properties['obj']['nodes'].downstream_points[start_node_id].append(i)
                         elif idx == self.segments[link_name]: # upstream node of end_node
-                            properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
-                            properties['obj']['nodes'].upstream_points[end_node_id].append(i)
+                            self.properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
+                            self.properties['obj']['nodes'].upstream_points[end_node_id].append(i)
                         else: # interior point
-                            properties['int']['points'].point_type[i] = POINT_TYPES['interior']
+                            self.properties['int']['points'].point_type[i] = POINT_TYPES['interior']
                         dx = pipe_length / self.segments[link_name]
-                        properties['float']['points'].B[i] = self.wave_speeds[link_name] / (G*pipe_area)
-                        properties['float']['points'].R[i] = ffactor*dx / (2*G*pipe_diameter*pipe_area**2)
+                        self.properties['float']['points'].B[i] = self.wave_speeds[link_name] / (G*pipe_area)
+                        self.properties['float']['points'].R[i] = ffactor*dx / (2*G*pipe_diameter*pipe_area**2)
                         i += 1
                 elif link.link_type == 'Valve':
-                    properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['valve']
-                    properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['valve']
-                    properties['int']['valves'].upstream_node[valve_ids[link_name]] = node_ids[start_node]
-                    properties['int']['valves'].downstream_node[valve_ids[link_name]] = node_ids[end_node]
-                    properties['float']['valves'].area[valve_ids[link_name]] = (np.pi * link.diameter ** 2 / 4)
+                    self.properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['valve']
+                    self.properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['valve']
+                    self.properties['int']['valves'].upstream_node[self.valve_ids[link_name]] = self.node_ids[start_node]
+                    self.properties['int']['valves'].downstream_node[self.valve_ids[link_name]] = self.node_ids[end_node]
+                    self.properties['float']['valves'].area[self.valve_ids[link_name]] = (np.pi * link.diameter ** 2 / 4)
                 elif link.link_type == 'Pump':
-                    properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['pump']
-                    properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['pump']
-                    properties['int']['pumps'].upstream_junction[pump_ids[link_name]] = node_ids[start_node]
-                    properties['int']['pumps'].downstream_junction[pump_ids[link_name]] = node_ids[end_node]
+                    self.properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['pump']
+                    self.properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['pump']
+                    self.properties['int']['pumps'].upstream_junction[self.pump_ids[link_name]] = self.node_ids[start_node]
+                    self.properties['int']['pumps'].downstream_junction[self.pump_ids[link_name]] = self.node_ids[end_node]
                     (a, b, c,) = link.get_head_curve_coefficients()
-                    properties['float']['pumps'].a[pump_ids[link_name]] = a
-                    properties['float']['pumps'].b[pump_ids[link_name]] = b
-                    properties['float']['pumps'].c[pump_ids[link_name]] = c
-
-        return properties
+                    self.properties['float']['pumps'].a[self.pump_ids[link_name]] = a
+                    self.properties['float']['pumps'].b[self.pump_ids[link_name]] = b
+                    self.properties['float']['pumps'].c[self.pump_ids[link_name]] = c

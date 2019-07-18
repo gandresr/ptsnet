@@ -3,7 +3,6 @@ import wntr
 
 from phammer.simulation.utils import define_curve, is_iterable
 from phammer.mesh.mesh import Mesh
-from phammer.simulation.constants import *
 from phammer.simulation.initial_conditions import get_initial_conditions
 
 class Simulation:
@@ -16,13 +15,26 @@ class Simulation:
     * valves are not valid between two junctions
     * it is not possible to connect one valve to another
     """
-    def __init__(self, input_file, duration, time_step, full_results=False):
+    def __init__(self, input_file, duration, time_step, default_wave_speed = None, wave_speed_file = None, delimiter=',', full_results=False):
         if time_step > duration:
             raise Exception("Error: duration < time_step")
+
+        self.t = 0 # current time
         self.time_step = time_step
         self.time_steps = int(duration/time_step)
-        self.t = 0 # current time
         self.full_results = full_results
+        self.fname = input_file[:input_file.find('.inp')]
+        self.wn = wntr.network.WaterNetworkModel(input_file)
+        self.steady_state_sim = None
+
+        self.mesh = Mesh(
+            self.fname + '.inp',
+            self.time_step,
+            self.wn,
+            default_wave_speed = default_wave_speed,
+            wave_speed_file = wave_speed_file,
+            delimiter = delimiter)
+
         if full_results:
             self.Q = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
             self.H = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
@@ -31,11 +43,9 @@ class Simulation:
             self.H0 = np.zeros(self.mesh.num_points, dtype=np.float)
             self.Q = np.zeros((self.time_steps, 2*self.mesh.wn.num_pipes), dtype=np.float)
             self.H = np.zeros((self.time_steps, 2*self.mesh.wn.num_pipes), dtype=np.float)
-        self.fname = input_file[:input_file.find('.inp')]
+
         self.E = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
         self.D = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
-        self.wn = wntr.network.WaterNetworkModel(input_file)
-        self.mesh = None
         self.curves = []
         self.settings = []
 
@@ -66,7 +76,7 @@ class Simulation:
             # start_time has to be != None, be mindful about end_time
             self._define_emitters_setting((node,), (setting,))
         elif is_iterable(setting):
-            node_id = self.mesh.nodes_ids[node]
+            node_id = self.mesh.node_ids[node]
             self.mesh.properties['int']['nodes'].setting_id[node_id] = len(self.settings)
             self.settings.append(setting)
             ss = ss[0]
@@ -84,13 +94,8 @@ class Simulation:
         self.mesh.properties['int']['nodes'].emitter_curve_id[node_id] = len(self.curves)
         self.curves.append(define_curve(X, Y))
 
-    def initialize(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
-        self.mesh = Mesh(
-            self.fname + '.inp',
-            self.time_step,
-            default_wave_speed = default_wave_speed,
-            wave_speed_file = wave_speed_file,
-            delimiter = delimiter)
+    def start(self):
+        self.mesh.create_mesh()
         self.steady_state_sim = self.mesh.steady_state_sim
         if self.full_results:
             self.Q[0,:], self.H[0,:] = get_initial_conditions(self.mesh)

@@ -1,5 +1,4 @@
 import numpy as np
-from phammer.mesh.constants import *
 
 def get_initial_conditions(mesh):
     Q0 = np.zeros(mesh.num_points, dtype = np.float)
