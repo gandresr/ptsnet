@@ -5,6 +5,7 @@ from phammer.simulation.utils import define_curve, is_iterable
 from phammer.mesh.mesh import Mesh
 from phammer.simulation.initial_conditions import get_initial_conditions
 from phammer.simulation.funcs import set_settings
+from phammer.simulation.utils import set_coefficients
 
 class Simulation:
     """
@@ -30,6 +31,7 @@ class Simulation:
         self.wn = wntr.network.WaterNetworkModel(input_file)
         self.steady_state_sim = None
 
+        # Mesh is initialized here - updated later when running first step
         self.mesh = Mesh(
             self.fname + '.inp',
             self.time_step,
@@ -49,7 +51,13 @@ class Simulation:
 
         self.E = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
         self.D = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
-        self.curves = []
+
+        # store pairs (obj_id, scipy_interpolator)
+        self.pump_curves = []
+        self.valve_curves = []
+        self.emitter_curves = []
+
+        # store pairs (obj_id, settings array)
         self.pump_settings = []
         self.valve_settings = []
         self.emitter_settings = []
@@ -98,18 +106,19 @@ class Simulation:
         self._define_settings(self.mesh.node_ids[node], 'nodes', settings)
 
     def define_pump_curve(self, pump, X, Y):
-        self.mesh.properties['int']['pumps'].pump_curve_id[self.mesh.pump_ids[pump]] = len(self.curves)
-        self.curves.append(define_curve(X, Y))
+        pump_id = self.mesh.pump_ids[pump]
+        self.mesh.properties['int']['pumps'].pump_curve_id[pump_id] = len(self.curves)
+        self.pump_curves.append((pump_id, define_curve(X, Y),))
 
     def define_valve_curve(self, valve, X, Y):
         valve_id = self.mesh.valve_ids[valve]
         self.mesh.properties['int']['valves'].curve_id[valve_id] = len(self.curves)
-        self.curves.append(define_curve(X, Y))
+        self.valve_curves.append((valve_id, define_curve(X, Y),))
 
     def define_emitter_curve(self, node, X, Y):
         node_id = self.mesh.node_ids[node]
         self.mesh.properties['int']['nodes'].emitter_curve_id[node_id] = len(self.curves)
-        self.curves.append(define_curve(X, Y))
+        self.emitter_curves.append((node_id, define_curve(X, Y),))
 
     def start(self):
         self.mesh.create_mesh()
@@ -120,7 +129,15 @@ class Simulation:
             self.Q0, self.H0 = get_initial_conditions(self.mesh)
         self.t += 1
 
-    def update_settings(self):
+    def _update_settings(self):
         set_settings(self.t, self.pump_settings, self.mesh.properties['float']['pumps'].setting)
         set_settings(self.t, self.valve_settings, self.mesh.properties['float']['valves'].setting)
+        set_coefficients(
+            self.valve_curves,
+            self.mesh.properties['float']['valves'].valve_coeff,
+            self.mesh.properties['float']['valves'].setting)
         set_settings(self.t, self.emitter_settings, self.mesh.properties['float']['nodes'].setting)
+        set_coefficients(
+            self.emitter_curves,
+            self.mesh.properties['float']['nodes'].emitter_coeff,
+            self.mesh.properties['float']['nodes'].setting)

@@ -140,8 +140,6 @@ def run_valve_step(Q0, H0, Q1, H1, B, R, valves_int, valves_float, nodes_obj):
 @jit(nopython = True, cache = True)
 def set_settings(t, settings, setting_property):
     for i in range(len(settings)):
-        obj_id = settings[i][0]
-        if t > len(settings[i][1]) - 1:
-            continue
-        else:
+        if t < len(settings[i][1]) - 1:
+            obj_id = settings[i][0]
             setting_property[obj_id] = settings[i][1][t]
