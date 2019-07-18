@@ -4,6 +4,7 @@ from collections import namedtuple as ntuple
 
 WARNINGS = True
 PARALLEL = True
+DEFAULT_FLUID_DENSITY = 1000 # kg/m^3
 
 # ----- Constants for mesh creation -----
 

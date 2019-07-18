@@ -4,9 +4,9 @@ import numpy as np
 from phammer.simulation.constants import *
 
 class Mesh:
-    def __init__(self, input_file, time_step, default_wave_speed = None, wave_speed_file = None, delimiter=','):
-        self.wn = wntr.network.WaterNetworkModel(input_file)
-        self.steady_state_sim = wntr.sim.EpanetSimulator(self.wn).run_sim()
+    def __init__(self, input_file, time_step, wn, default_wave_speed = None, wave_speed_file = None, delimiter=','):
+        self.wn = wn
+        self.steady_state_sim = wntr.sim.WNTRSimulator(self.wn).run_sim()
         self.network_graph = self.get_network_graph()
         self.time_step = time_step
         self.wave_speeds = self.get_wave_speeds(default_wave_speed, wave_speed_file, delimiter)
