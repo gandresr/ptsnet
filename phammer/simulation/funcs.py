@@ -23,7 +23,7 @@ def run_interior_step(Q0, H0, Q1, H1, B, R):
         Q1[i] = (H1[i] - H0[i+1] + B[i]*Q0[i+1]) / (B[i] + R[i]*abs(Q0[i+1]))
 
 @jit(nopython = True, cache = True, parallel = PARALLEL)
-def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, nodes_int, nodes_float, nodes_obj, RESERVOIR, PIPE, EMITTER):
+def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, nodes_int, nodes_float, nodes_obj, RESERVOIR, JUNCTION):
     """Solves flow and head for boundary points attached to nodes
 
     All the numpy arrays are passed by reference,
@@ -57,6 +57,7 @@ def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, nodes_int, nodes_float, node
         node_type = nodes_int.node_type[node_id]
 
         # Junction is a reservoir
+        # TODO : INCLUDE EMITTER
         if node_type == RESERVOIR:
             for k in dpoints:
                 H1[k] = H0[k]
@@ -66,7 +67,7 @@ def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, nodes_int, nodes_float, node
                 H1[k] = H0[k]
                 Q1[k] = (H0[k-1] + B[k-1]*Q0[k-1] - H0[k]) \
                         / (B[k-1] + R[k-1]*abs(Q0[k-1]))
-        elif node_type == EMITTER or node_type == PIPE:
+        elif node_type == JUNCTION:
             sc = 0
             sb = 0
             Cm = [0 for i in range(len(dpoints))]
@@ -111,7 +112,6 @@ def run_valve_step(Q0, H0, Q1, H1, B, R, valves_int, valves_float, nodes_obj):
         unode = nodes_obj.upstream_points[start_id][0]
         dnode = nodes_obj.downstream_points[end_id]
         setting = valves_float.setting[v]
-        # TODO FUNCTION TO SET VALVE COEFF BASED ON SETTING AT EVERY TIME STEP
         valve_coeff = valves_float.valve_coeff[v]
         area = valves_float.area[v]
         Cp = H0[unode-1] + B[unode-1]*Q0[unode-1]

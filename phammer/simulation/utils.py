@@ -17,7 +17,6 @@ def set_settings(t, settings, setting_property):
             setting_property[obj_id] = settings[obj_id][t]
 
 def set_coefficients(obj_curves, coeff, obj_setting):
-    for obj_curve in obj_curves:
-            obj_id = obj_curve[0]
-            fcn = obj_curve[1]
-            coeff[obj_id] = fcn(obj_setting[obj_id])
+    for obj_id in obj_curves:
+        fcn = obj_curves[obj_id]
+        coeff[obj_id] = fcn(obj_setting[obj_id])

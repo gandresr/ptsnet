@@ -1,10 +1,12 @@
 import numpy as np
 import wntr
 
-from phammer.simulation.utils import define_curve, is_iterable
 from phammer.mesh.mesh import Mesh
+from phammer.simulation.utils import define_curve, is_iterable
 from phammer.simulation.initial_conditions import get_initial_conditions
 from phammer.simulation.utils import set_settings, set_coefficients
+from phammer.simulation.funcs import run_interior_step, run_valve_step, run_junction_step
+from phammer.simulation.constants import NODE_TYPES
 
 class Simulation:
     """
@@ -41,15 +43,17 @@ class Simulation:
 
         if full_results:
             self.Q = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
-            self.H = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
+            self.H = np.zeros_like(Q)
         else:
             self.Q0 = np.zeros(self.mesh.num_points, dtype=np.float)
-            self.H0 = np.zeros(self.mesh.num_points, dtype=np.float)
+            self.Q1 = np.zeros_like(Q0)
+            self.H0 = np.zeros_like(Q0)
+            self.H1 = np.zeros_like(Q0)
             self.Q = np.zeros((self.time_steps, 2*self.mesh.wn.num_pipes), dtype=np.float)
-            self.H = np.zeros((self.time_steps, 2*self.mesh.wn.num_pipes), dtype=np.float)
+            self.H = np.zeros_like(Q)
 
-        self.E = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
-        self.D = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
+        self.E = np.zeros((self.time_steps, self.mesh.num_nodes), dtype=np.float)
+        self.D = np.zeros_like(E)
 
         # store pairs (obj_id, scipy_interpolator)
         self.pump_curves = {}
@@ -140,3 +144,49 @@ class Simulation:
             self.emitter_curves,
             self.mesh.properties['float']['nodes'].emitter_coeff,
             self.mesh.properties['float']['nodes'].setting)
+
+    def run_step(self):
+        if self.t == 0:
+            self.start()
+            if not self.full_results:
+                self.Q = self.Q0[self.mesh.node_point_indexes]
+                self.H = self.H0[self.mesh.node_point_indexes]
+        else:
+            self.t += 1
+
+        if self.full_results:
+            Q0 = self.Q[self.t-1, :]
+            Q1 = self.Q[self.t, :]
+            H1 = self.H[self.t-1, :]
+            H2 = self.H[self.t, :]
+        else:
+            if self.t % 2 != 0:
+                Q0 = self.Q0
+                Q1 = self.Q1
+                H0 = self.H0
+                H1 = self.H1
+            else:
+                Q0 = self.Q1
+                Q1 = self.Q0
+                H0 = self.H1
+                H1 = self.H0
+
+        run_interior_step(
+            Q0, H0, Q1, H1,
+            self.mesh.properties['float']['points'].B,
+            self.mesh.properties['float']['points'].R)
+        run_junction_step(Q0, H0, Q1, H1, self.E, self.D,
+            self.mesh.properties['float']['points'].B,
+            self.mesh.properties['float']['points'].R,
+            self.mesh.properties['int']['nodes'],
+            self.mesh.properties['float']['nodes'],
+            self.mesh.properties['obj']['nodes'],
+            NODE_TYPES['junction'], NODE_TYPES['junction'])
+        run_valve_step(Q0, H0, Q1, H1,
+            self.mesh.properties['float']['points'].B,
+            self.mesh.properties['float']['points'].R,
+            valves_int, valves_float, nodes_obj)
+
+        if not self.full_results:
+            self.Q[t,:] = Q1[self.mesh.node_point_indexes]
+            self.H[t,:] = H1[self.mesh.node_point_indexes]

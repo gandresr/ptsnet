@@ -76,9 +76,3 @@ NODE_TYPES = {
     'valve': 2,
     'pump': 3
 }
-
-CURVE_TYPES = {
-    'valve': 0,
-    'pump': 1,
-    'emitter': 2
-}

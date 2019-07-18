@@ -6,7 +6,7 @@ from phammer.simulation.constants import POINTS_INT, POINTS_FLOAT
 from phammer.simulation.constants import NODES_INT, NODES_FLOAT, NODES_OBJ
 from phammer.simulation.constants import VALVES_INT, VALVES_FLOAT
 from phammer.simulation.constants import PUMPS_INT, PUMPS_FLOAT
-from phammer.simulation.constants import NODE_TYPES, POINT_TYPES, CURVE_TYPES
+from phammer.simulation.constants import NODE_TYPES, POINT_TYPES
 
 class Mesh:
     def __init__(self, input_file, time_step, wn, default_wave_speed = None, wave_speed_file = None, delimiter=','):
