@@ -1,5 +1,6 @@
 from numba import jit
 from phammer.simulation.constants import G, PARALLEL
+from numpy import size
 
 # ------------------ SIM STEPS ------------------
 
@@ -13,7 +14,7 @@ def run_interior_step(Q0, H0, Q1, H1, B, R):
 
     TODO: UPDATE ARGUMENTS
     """
-    for i in range(1, H0.shape[1]-1):
+    for i in range(1, len(Q0)-1):
         # The first and last nodes are skipped in the  loop considering
         # that they are boundary nodes (every interior node requires an
         # upstream and a downstream neighbor)
@@ -23,7 +24,7 @@ def run_interior_step(Q0, H0, Q1, H1, B, R):
         Q1[i] = (H1[i] - H0[i+1] + B[i]*Q0[i+1]) / (B[i] + R[i]*abs(Q0[i+1]))
 
 @jit(nopython = True, cache = True, parallel = PARALLEL)
-def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, nodes_int, nodes_float, nodes_obj, RESERVOIR, JUNCTION):
+def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, num_nodes, nodes_int, nodes_float, nodes_obj, RESERVOIR, JUNCTION):
     """Solves flow and head for boundary points attached to nodes
 
     All the numpy arrays are passed by reference,
@@ -50,7 +51,7 @@ def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, nodes_int, nodes_float, node
         DOWN {int} -- row index in junctions_int to extract downstream_neighbors_num
         N {int} -- row index to extract the first downstream node in table junctions_int
     """
-    for node_id in range(nodes_int.shape[1]):
+    for node_id in range(num_nodes):
 
         dpoints = nodes_obj.downstream_points[node_id]
         upoints = nodes_obj.upstream_points[node_id]

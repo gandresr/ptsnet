@@ -25,7 +25,7 @@ class Simulation:
         self.t = 0 # current time
         self.time_step = time_step
         self.time_steps = int(duration/time_step)
-        self.sim_range = range(1, len(self.time_steps))
+        self.sim_range = range(1, self.time_steps)
         self.full_results = full_results
 
         self.fname = input_file[:input_file.find('.inp')]
@@ -46,12 +46,13 @@ class Simulation:
             self.H = np.zeros_like(self.Q)
         else:
             self.Q0 = np.zeros(self.mesh.num_points, dtype=np.float)
-            self.Q1 = np.zeros_like(self.Q0)
             self.H0 = np.zeros_like(self.Q0)
+            self.Q1 = np.zeros_like(self.Q0)
             self.H1 = np.zeros_like(self.Q0)
             self.Q = np.zeros((self.time_steps, self.mesh.num_boundaries), dtype=np.float)
             self.H = np.zeros_like(self.Q)
 
+        # Emitter and demand flows
         self.E = np.zeros((self.time_steps, self.mesh.num_nodes), dtype=np.float)
         self.D = np.zeros_like(self.E)
 
@@ -145,20 +146,26 @@ class Simulation:
             self.mesh.properties['float']['nodes'].emitter_coeff,
             self.mesh.properties['float']['nodes'].setting)
 
+    def run_sim(self):
+        for _ in self.sim_range:
+            self.run_step()
+
     def run_step(self):
         if self.t == 0:
             self.start()
             if not self.full_results:
-                self.Q = self.Q0[self.mesh.boundary_ids]
-                self.H = self.H0[self.mesh.boundary_ids]
+                self.Q[0,:] = self.Q0[self.mesh.boundary_ids]
+                self.H[0,:] = self.H0[self.mesh.boundary_ids]
+        elif self.t == self.time_steps-1:
+            raise Exception("The simulation is over")
         else:
             self.t += 1
 
         if self.full_results:
-            Q0 = self.Q[self.t-1, :]
-            Q1 = self.Q[self.t, :]
-            H0 = self.H[self.t-1, :]
-            H1 = self.H[self.t, :]
+            Q0 = self.Q[self.t-1,:]
+            Q1 = self.Q[self.t,:]
+            H0 = self.H[self.t-1,:]
+            H1 = self.H[self.t,:]
         else:
             if self.t % 2 != 0:
                 Q0 = self.Q0
@@ -175,19 +182,20 @@ class Simulation:
             Q0, H0, Q1, H1,
             self.mesh.properties['float']['points'].B,
             self.mesh.properties['float']['points'].R)
-        run_junction_step(Q0, H0, Q1, H1, self.E, self.D,
-            self.mesh.properties['float']['points'].B,
-            self.mesh.properties['float']['points'].R,
-            self.mesh.properties['int']['nodes'],
-            self.mesh.properties['float']['nodes'],
-            self.mesh.properties['obj']['nodes'],
-            NODE_TYPES['junction'], NODE_TYPES['junction'])
-        run_valve_step(Q0, H0, Q1, H1,
-            self.mesh.properties['float']['points'].B,
-            self.mesh.properties['float']['points'].R,
-            self.mesh.properties['int']['valves'],
-            self.mesh.properties['float']['valves'],
-            self.mesh.properties['obj']['valves'])
+        # run_junction_step(Q0, H0, Q1, H1, self.E, self.D,
+        #     self.mesh.properties['float']['points'].B,
+        #     self.mesh.properties['float']['points'].R,
+        #     self.mesh.num_nodes,
+        #     self.mesh.properties['int']['nodes'],
+        #     self.mesh.properties['float']['nodes'],
+        #     self.mesh.properties['obj']['nodes'],
+        #     NODE_TYPES['junction'], NODE_TYPES['junction'])
+        # run_valve_step(Q0, H0, Q1, H1,
+        #     self.mesh.properties['float']['points'].B,
+        #     self.mesh.properties['float']['points'].R,
+        #     self.mesh.properties['int']['valves'],
+        #     self.mesh.properties['float']['valves'],
+        #     self.mesh.properties['obj']['valves'])
 
         if not self.full_results:
             self.Q[self.t,:] = Q1[self.mesh.boundary_ids]
