@@ -34,7 +34,7 @@ NODES_INT = ntuple('NODES_INT',
 NODES_FLOAT = ntuple('NODES_FLOAT', [
     'demand_coeff',
     'emitter_coeff',
-    'emmitter_setting'])
+    'setting'])
 
 NODES_OBJ = ntuple('NODES_OBJ', ['upstream_points', 'downstream_points'])
 

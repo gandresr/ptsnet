@@ -4,7 +4,7 @@ import wntr
 from phammer.simulation.utils import define_curve, is_iterable
 from phammer.mesh.mesh import Mesh
 from phammer.simulation.initial_conditions import get_initial_conditions
-from phammer.funcs 
+from funcs import *
 
 class Simulation:
     """
@@ -23,7 +23,9 @@ class Simulation:
         self.t = 0 # current time
         self.time_step = time_step
         self.time_steps = int(duration/time_step)
+        self.sim_range = range(1, len(self.time_steps))
         self.full_results = full_results
+
         self.fname = input_file[:input_file.find('.inp')]
         self.wn = wntr.network.WaterNetworkModel(input_file)
         self.steady_state_sim = None
@@ -50,40 +52,43 @@ class Simulation:
         self.curves = []
         self.settings = []
 
-    def _define_valves_setting(self, valves, settings):
-        for i, valve in enumerate(valves):
-            valve_id = self.mesh.valve_ids[valve]
-            self.mesh.properties['float']['valves'].setting[valve_id] = settings[i]
-
-    def _define_emitters_setting(self, nodes, settings):
-        for i, node in enumerate(nodes):
-            node_id = self.mesh.node_ids[node]
-            self.mesh.properties['float']['nodes'].emitter_setting[node_id] = settings[i]
-
-    def define_valve_setting(self, valve, setting):
-        if type(setting) in (int, float):
-            self._define_valves_setting((valve,), (setting,))
-        elif is_iterable(setting):
-            valve_id = self.mesh.valve_ids[valve]
-            self.mesh.properties['int']['valves'].setting_id[valve_id] = len(self.settings)
-            self.settings.append(setting)
-        else:
-            raise Exception("Type error: setting type should be numeric or iterable")
-
-    def add_emitter(self, node, area, discharge_coeff, setting):
+    def add_emitter(self, node, area, discharge_coeff, initial_setting=1):
+        if not (0 <= initial_setting <= 1):
+            raise Exception("Initial setting should be in [0, 1]")
         emitter_node = self.wn.get_node(node)
-        ss = setting
-        if type(setting) in (int, float):
-            # start_time has to be != None, be mindful about end_time
-            self._define_emitters_setting((node,), (setting,))
-        elif is_iterable(setting):
-            node_id = self.mesh.node_ids[node]
-            self.mesh.properties['int']['nodes'].setting_id[node_id] = len(self.settings)
-            self.settings.append(setting)
-            ss = ss[0]
+        emitter_node.add_leak(self.wn, area=area, discharge_coeff=discharge_coeff*initial_setting, start_time=0)
+        self.mesh.properties['int']['nodes'].emmitter_setting[self.mesh.node_ids[node]] = initial_setting
+
+    def set_pump_setting(self, pump, setting):
+        self.mesh.properties['int']['pumps'].setting[self.mesh.pump_ids[pump]] = setting
+
+    def set_valve_setting(self, valve, setting):
+        self.mesh.properties['int']['valves'].setting[self.mesh.valve_ids[valve]] = setting
+
+    def set_emitter_setting(self, node, setting):
+        self.mesh.properties['int']['nodes'].setting[self.mesh.node_ids[node]] = setting
+
+    def _define_settings(self, obj_id, obj_type, obj_settings):
+        if is_iterable(obj_settings):
+            if not all(0 <= x <= 1 for x in obj_settings):
+                raise Exception("Setting values should be in [0, 1]")
+            self.mesh.properties['int'][obj_type].setting_id[obj_id] = len(self.settings)
+            self.settings.append((obj_id, obj_type, obj_settings,))
         else:
-            raise Exception("Type error: setting type should be numeric or iterable")
-        emitter_node.add_leak(self.wn, area=area, discharge_coeff=discharge_coeff*ss, start_time=0)
+            raise Exception("Type error: setting type should be iterable")
+
+    def define_pump_settings(self, pump, settings):
+        self._define_settings(self.mesh.pump_ids[pump], 'pumps', settings)
+
+    def define_valve_settings(self, valve, settings):
+        self._define_settings(self.mesh.valve_ids[valve], 'valves', settings)
+
+    def define_emitter_settings(self, node, settings):
+        self._define_settings(self.mesh.node_ids[node], 'nodes', settings)
+
+    def define_pump_curve(self, pump, X, Y):
+        self.mesh.properties['int']['pumps'].pump_curve_id[self.mesh.pump_ids[pump]] = len(self.curves)
+        self.curves.append(define_curve(X, Y))
 
     def define_valve_curve(self, valve, X, Y):
         valve_id = self.mesh.valve_ids[valve]
@@ -102,5 +107,7 @@ class Simulation:
             self.Q[0,:], self.H[0,:] = get_initial_conditions(self.mesh)
         else:
             self.Q0, self.H0 = get_initial_conditions(self.mesh)
-    
-    def run_step()
+        self.t += 1
+
+    def update_settings(self):
+        update_settings(self.t, settings)

@@ -1,6 +1,8 @@
 from numba import njit
 from phammer.simulation.constants import G, PARALLEL
 
+# ------------------ SIM STEPS ------------------
+
 @njit(parallel = PARALLEL)
 def run_interior_step(Q0, H0, Q1, H1, B, R):
     """Solves flow and head for interior points
@@ -40,7 +42,7 @@ def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, nodes_int, nodes_float, node
         junction_type {array} -- array with constants associated to junction type
         demand {array} -- demands at junctions
         emitter_coeff {array} -- K coefficients of emitters, Q = K(2gH)**0.5
-        emitter_setting {array} -- setting value emitter \in [0, 1]
+        emitter_setting {array} -- setting value emitter in [0, 1]
         RESERVOIR {int} -- constant for junctions of type 'reservoir'
         PIPE {int} -- constant for junctions of type 'pipe'
         EMITTER {int} -- constant for junctions of type 'emitter'
@@ -132,3 +134,14 @@ def run_valve_step(Q0, H0, Q1, H1, B, R, valves_int, valves_float, nodes_obj):
             Q1[dnode] = Q1[unode]
             H1[unode] = Cp - Bp*Q1[unode]
             H1[dnode] = Cm + Bm*Q1[dnode]
+
+# ------------------ UTILS ------------------
+
+@njit(parallel = False)
+def update_settings(t, settings, properties):
+    for i in range(len(settings)):
+        obj_id = settings[i][0]
+        if t > len(settings[i][1]) - 1:
+            continue
+        else:
+            properties[obj_id] = settings[i][1][t]
