@@ -4,7 +4,7 @@ import wntr
 from phammer.simulation.utils import define_curve, is_iterable
 from phammer.mesh.mesh import Mesh
 from phammer.simulation.initial_conditions import get_initial_conditions
-from funcs import *
+from phammer.simulation.funcs import set_settings
 
 class Simulation:
     """
@@ -50,7 +50,9 @@ class Simulation:
         self.E = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
         self.D = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
         self.curves = []
-        self.settings = []
+        self.pump_settings = []
+        self.valve_settings = []
+        self.emitter_settings = []
 
     def add_emitter(self, node, area, discharge_coeff, initial_setting=1):
         if not (0 <= initial_setting <= 1):
@@ -66,14 +68,23 @@ class Simulation:
         self.mesh.properties['int']['valves'].setting[self.mesh.valve_ids[valve]] = setting
 
     def set_emitter_setting(self, node, setting):
-        self.mesh.properties['int']['nodes'].setting[self.mesh.node_ids[node]] = setting
+        self.mesh.properties['int']['nodes'].emitter_setting[self.mesh.node_ids[node]] = setting
 
     def _define_settings(self, obj_id, obj_type, obj_settings):
         if is_iterable(obj_settings):
             if not all(0 <= x <= 1 for x in obj_settings):
                 raise Exception("Setting values should be in [0, 1]")
-            self.mesh.properties['int'][obj_type].setting_id[obj_id] = len(self.settings)
-            self.settings.append((obj_id, obj_type, obj_settings,))
+            if obj_type == 'pumps':
+                self.mesh.properties['int'][obj_type].setting_id[obj_id] = len(self.pump_settings)
+                self.pump_settings.append((obj_id, obj_settings,))
+            elif obj_type == 'valves':
+                self.mesh.properties['int'][obj_type].setting_id[obj_id] = len(self.valve_settings)
+                self.valve_settings.append((obj_id, obj_settings,))
+            elif obj_type == 'nodes':
+                self.mesh.properties['int'][obj_type].setting_id[obj_id] = len(self.emitter_settings)
+                self.emitter_settings.append((obj_id, obj_settings,))
+            else:
+                raise Exception("Type error: obj_type not compatible (internal error)")
         else:
             raise Exception("Type error: setting type should be iterable")
 
@@ -110,4 +121,6 @@ class Simulation:
         self.t += 1
 
     def update_settings(self):
-        update_settings(self.t, settings)
+        set_settings(self.t, self.pump_settings, self.mesh.properties['float']['pumps'].setting)
+        set_settings(self.t, self.valve_settings, self.mesh.properties['float']['valves'].setting)
+        set_settings(self.t, self.emitter_settings, self.mesh.properties['float']['nodes'].setting)

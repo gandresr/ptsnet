@@ -1,9 +1,9 @@
-from numba import njit
+from numba import jit
 from phammer.simulation.constants import G, PARALLEL
 
 # ------------------ SIM STEPS ------------------
 
-@njit(parallel = PARALLEL)
+@jit(nopython = True, cache = True, parallel = PARALLEL)
 def run_interior_step(Q0, H0, Q1, H1, B, R):
     """Solves flow and head for interior points
 
@@ -22,7 +22,7 @@ def run_interior_step(Q0, H0, Q1, H1, B, R):
             / ((B[i] + R[i]*abs(Q0[i-1])) + (B[i] + R[i]*abs(Q0[i+1])))
         Q1[i] = (H1[i] - H0[i+1] + B[i]*Q0[i+1]) / (B[i] + R[i]*abs(Q0[i+1]))
 
-@njit(parallel = PARALLEL)
+@jit(nopython = True, cache = True, parallel = PARALLEL)
 def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, nodes_int, nodes_float, nodes_obj, RESERVOIR, PIPE, EMITTER):
     """Solves flow and head for boundary points attached to nodes
 
@@ -103,7 +103,7 @@ def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, nodes_int, nodes_float, node
                 H1[k] = HH
                 Q1[k] = (Cp[j] - HH) / Bp[j]
 
-@njit(parallel = PARALLEL)
+@jit(nopython = True, cache = True, parallel = PARALLEL)
 def run_valve_step(Q0, H0, Q1, H1, B, R, valves_int, valves_float, nodes_obj):
     for v in range(valves_int.shape[0]):
         start_id = valves_int.upstream_node[v]
@@ -137,11 +137,11 @@ def run_valve_step(Q0, H0, Q1, H1, B, R, valves_int, valves_float, nodes_obj):
 
 # ------------------ UTILS ------------------
 
-@njit(parallel = False)
-def update_settings(t, settings, properties):
+@jit(nopython = True, cache = True)
+def set_settings(t, settings, setting_property):
     for i in range(len(settings)):
         obj_id = settings[i][0]
         if t > len(settings[i][1]) - 1:
             continue
         else:
-            properties[obj_id] = settings[i][1][t]
+            setting_property[obj_id] = settings[i][1][t]

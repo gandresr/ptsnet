@@ -34,7 +34,7 @@ NODES_INT = ntuple('NODES_INT',
 NODES_FLOAT = ntuple('NODES_FLOAT', [
     'demand_coeff',
     'emitter_coeff',
-    'setting'])
+    'emitter_setting'])
 
 NODES_OBJ = ntuple('NODES_OBJ', ['upstream_points', 'downstream_points'])
 
@@ -55,7 +55,10 @@ VALVES_FLOAT = ntuple('VALVES_FLOAT',
 # ----- Index labels for Pump tables -----
 
 PUMPS_INT = ntuple('PUMPS_INT',
-    ['upstream_node' ,'downstream_node' ,'curve_id','setting_id'])
+    ['upstream_node',
+    'downstream_node',
+    'curve_id',
+    'setting_id'])
 
 PUMPS_FLOAT = ntuple('PUMPS_FLOAT',
     ['a', 'b', 'c', 'setting', 'max_speed'])
