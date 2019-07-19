@@ -164,15 +164,14 @@ class Mesh:
         self.steady_state_sim = wntr.sim.WNTRSimulator(self.wn).run_sim()
         self.network_graph = self._get_network_graph()
 
+        # Set default value for node_tye
+        self.properties['int']['nodes'].node_type.fill(NODE_TYPES['junction'])
+
         i = 0 # nodes index
 
         for start_node in self.network_graph:
 
             start_node_id = self.node_ids[start_node]
-
-            # Set default values for node_type
-            self.properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['junction']
-
             downstream_nodes = self.network_graph[start_node]
 
             downstream_link_names = [

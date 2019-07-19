@@ -156,16 +156,17 @@ class Simulation:
             if not self.full_results:
                 self.Q[0,:] = self.Q0[self.mesh.boundary_ids]
                 self.H[0,:] = self.H0[self.mesh.boundary_ids]
-        elif self.t == self.time_steps-1:
+                # TODO update E[0,:], D[0,:]
+        elif self.t == self.time_steps:
             raise Exception("The simulation is over")
         else:
             self.t += 1
 
         if self.full_results:
-            Q0 = self.Q[self.t-1,:]
-            Q1 = self.Q[self.t,:]
-            H0 = self.H[self.t-1,:]
-            H1 = self.H[self.t,:]
+            Q0 = self.Q[self.t-2,:]
+            Q1 = self.Q[self.t-1,:]
+            H0 = self.H[self.t-2,:]
+            H1 = self.H[self.t-1,:]
         else:
             if self.t % 2 != 0:
                 Q0 = self.Q0
@@ -178,18 +179,21 @@ class Simulation:
                 H0 = self.H1
                 H1 = self.H0
 
+        E1 = self.E[self.t-1,:]
+        D1 = self.D[self.t-1,:]
+
         run_interior_step(
             Q0, H0, Q1, H1,
             self.mesh.properties['float']['points'].B,
             self.mesh.properties['float']['points'].R)
-        # run_junction_step(Q0, H0, Q1, H1, self.E, self.D,
-        #     self.mesh.properties['float']['points'].B,
-        #     self.mesh.properties['float']['points'].R,
-        #     self.mesh.num_nodes,
-        #     self.mesh.properties['int']['nodes'],
-        #     self.mesh.properties['float']['nodes'],
-        #     self.mesh.properties['obj']['nodes'],
-        #     NODE_TYPES['junction'], NODE_TYPES['junction'])
+        run_junction_step(Q0, H0, Q1, H1, E1, D1,
+            self.mesh.properties['float']['points'].B,
+            self.mesh.properties['float']['points'].R,
+            self.mesh.num_nodes,
+            self.mesh.properties['int']['nodes'],
+            self.mesh.properties['float']['nodes'],
+            self.mesh.properties['obj']['nodes'],
+            NODE_TYPES['junction'], NODE_TYPES['junction'])
         # run_valve_step(Q0, H0, Q1, H1,
         #     self.mesh.properties['float']['points'].B,
         #     self.mesh.properties['float']['points'].R,

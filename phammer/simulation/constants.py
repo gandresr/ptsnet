@@ -5,11 +5,8 @@ from collections import namedtuple as ntuple
 WARNINGS = True
 PARALLEL = True
 DEFAULT_FLUID_DENSITY = 1000 # kg/m^3
-
-# ----- Constants for mesh creation -----
-
-TOL = 1E-6
 G = 9.807
+TOL = 1E-6
 
 # ----- Index labels for Node tables -----
 

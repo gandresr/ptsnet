@@ -1,6 +1,6 @@
 from numba import jit
 from phammer.simulation.constants import G, PARALLEL
-from numpy import size
+import numpy as np
 
 # ------------------ SIM STEPS ------------------
 
@@ -23,7 +23,7 @@ def run_interior_step(Q0, H0, Q1, H1, B, R):
             / ((B[i] + R[i]*abs(Q0[i-1])) + (B[i] + R[i]*abs(Q0[i+1])))
         Q1[i] = (H1[i] - H0[i+1] + B[i]*Q0[i+1]) / (B[i] + R[i]*abs(Q0[i+1]))
 
-@jit(nopython = True, cache = True, parallel = PARALLEL)
+# @jit(nopython = False, cache = True, parallel = PARALLEL)
 def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, num_nodes, nodes_int, nodes_float, nodes_obj, RESERVOIR, JUNCTION):
     """Solves flow and head for boundary points attached to nodes
 
@@ -56,6 +56,10 @@ def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, num_nodes, nodes_int, nodes_
         dpoints = nodes_obj.downstream_points[node_id]
         upoints = nodes_obj.upstream_points[node_id]
         node_type = nodes_int.node_type[node_id]
+        Cm = np.zeros(len(dpoints), dtype=np.float)
+        Bm = np.zeros(len(dpoints), dtype=np.float)
+        Cp = np.zeros(len(upoints), dtype=np.float)
+        Bp = np.zeros(len(upoints), dtype=np.float)
 
         # Junction is a reservoir
         # TODO : INCLUDE EMITTER
@@ -68,14 +72,9 @@ def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, num_nodes, nodes_int, nodes_
                 H1[k] = H0[k]
                 Q1[k] = (H0[k-1] + B[k-1]*Q0[k-1] - H0[k]) \
                         / (B[k-1] + R[k-1]*abs(Q0[k-1]))
-        elif node_type == JUNCTION:
+        if node_type == JUNCTION:
             sc = 0
             sb = 0
-            Cm = [0 for i in range(len(dpoints))]
-            Bm = [0 for i in range(len(dpoints))]
-            Cp = [0 for i in range(len(upoints))]
-            Bp = [0 for i in range(len(upoints))]
-
             for j, k in enumerate(dpoints): # C-
                 Cm[j] = H0[k+1] - B[k+1]*Q0[k+1]
                 Bm[j] = B[k+1] + R[k+1]*abs(Q0[k+1])
@@ -97,11 +96,11 @@ def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, num_nodes, nodes_int, nodes_
             E1[node_id] = Ke*(2*G*HH)**0.5
             D1[node_id] = Kd*(2*G*HH)**0.5
 
-            for k in dpoints: # C-
+            for j, k in enumerate(dpoints): # C-
                 H1[k] = HH
                 Q1[k] = (HH - Cm[j]) / Bm[j]
 
-            for k in upoints: # C+
+            for j, k in enumerate(upoints): # C+
                 H1[k] = HH
                 Q1[k] = (Cp[j] - HH) / Bp[j]
 
