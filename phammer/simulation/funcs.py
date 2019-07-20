@@ -1,4 +1,4 @@
-from numba import jit
+from numba import jit, prange
 from phammer.simulation.constants import G, PARALLEL
 import numpy as np
 
@@ -23,7 +23,7 @@ def run_interior_step(Q0, H0, Q1, H1, B, R):
             / ((B[i] + R[i]*abs(Q0[i-1])) + (B[i] + R[i]*abs(Q0[i+1])))
         Q1[i] = (H1[i] - H0[i+1] + B[i]*Q0[i+1]) / (B[i] + R[i]*abs(Q0[i+1]))
 
-# @jit(nopython = False, cache = True, parallel = PARALLEL)
+@jit(nopython = True, parallel = True)
 def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, num_nodes, nodes_int, nodes_float, nodes_obj, RESERVOIR, JUNCTION):
     """Solves flow and head for boundary points attached to nodes
 
@@ -51,15 +51,11 @@ def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, num_nodes, nodes_int, nodes_
         DOWN {int} -- row index in junctions_int to extract downstream_neighbors_num
         N {int} -- row index to extract the first downstream node in table junctions_int
     """
-    for node_id in range(num_nodes):
+    for node_id in prange(num_nodes):
 
         dpoints = nodes_obj.downstream_points[node_id]
         upoints = nodes_obj.upstream_points[node_id]
         node_type = nodes_int.node_type[node_id]
-        Cm = np.zeros(len(dpoints), dtype=np.float)
-        Bm = np.zeros(len(dpoints), dtype=np.float)
-        Cp = np.zeros(len(upoints), dtype=np.float)
-        Bp = np.zeros(len(upoints), dtype=np.float)
 
         # Junction is a reservoir
         # TODO : INCLUDE EMITTER
@@ -75,6 +71,12 @@ def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, num_nodes, nodes_int, nodes_
         if node_type == JUNCTION:
             sc = 0
             sb = 0
+
+            Cm = nodes_obj.Cm[node_id]
+            Bm = nodes_obj.Bm[node_id]
+            Cp = nodes_obj.Cp[node_id]
+            Bp = nodes_obj.Bp[node_id]
+
             for j, k in enumerate(dpoints): # C-
                 Cm[j] = H0[k+1] - B[k+1]*Q0[k+1]
                 Bm[j] = B[k+1] + R[k+1]*abs(Q0[k+1])

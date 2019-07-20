@@ -5,10 +5,10 @@ from time import time
 input_file = 'example_files/LoopedNet.inp'
 
 sim = Simulation(input_file,
-    duration = 20, # [s]
+    duration = 200, # [s]
     time_step = 0.01, # [s]
     default_wave_speed = 1200,
-    full_results = True)
+    full_results = False)
 
 sim.start()
 t = time()

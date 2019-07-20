@@ -3,7 +3,7 @@ import numpy as np
 
 from phammer.simulation.constants import TOL, WARNINGS, G
 from phammer.simulation.constants import POINTS_INT, POINTS_FLOAT
-from phammer.simulation.constants import NODES_INT, NODES_FLOAT, NODES_OBJ
+from phammer.simulation.constants import NODES_INT, NODES_FLOAT, NODES_OBJ, NODES_OBJ_DTYPES
 from phammer.simulation.constants import VALVES_INT, VALVES_FLOAT
 from phammer.simulation.constants import PUMPS_INT, PUMPS_FLOAT
 from phammer.simulation.constants import NODE_TYPES, POINT_TYPES
@@ -157,7 +157,7 @@ class Mesh:
         })
 
         self.properties['obj']['nodes'] =  NODES_OBJ(**{
-            prop: [[] for i in range(self.num_nodes)] for prop in NODES_OBJ._fields
+            prop: [np.array([], dtype=NODES_OBJ_DTYPES[j]) for i in range(self.num_nodes)] for j, prop in enumerate(NODES_OBJ._fields)
         })
 
     def create_mesh(self):
@@ -225,11 +225,21 @@ class Mesh:
                         self.properties['int']['points'].link_id[i] = link_id
                         if idx == 0: # downstream node of start_node
                             self.properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
-                            self.properties['obj']['nodes'].downstream_points[start_node_id].append(i)
+                            self.properties['obj']['nodes'].downstream_points[start_node_id] = \
+                                np.append(self.properties['obj']['nodes'].downstream_points[start_node_id], i)
+                            self.properties['obj']['nodes'].Cm[start_node_id] = \
+                                np.append(self.properties['obj']['nodes'].Cm[start_node_id], 0)
+                            self.properties['obj']['nodes'].Bm[start_node_id] = \
+                                np.append(self.properties['obj']['nodes'].Bm[start_node_id], 0)
                             self.boundary_ids.append(i)
                         elif idx == self.segments[link_name]: # upstream node of end_node
                             self.properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
-                            self.properties['obj']['nodes'].upstream_points[end_node_id].append(i)
+                            self.properties['obj']['nodes'].upstream_points[end_node_id] = \
+                                np.append(self.properties['obj']['nodes'].upstream_points[end_node_id], i)
+                            self.properties['obj']['nodes'].Cp[end_node_id] = \
+                                np.append(self.properties['obj']['nodes'].Cp[end_node_id], 0)
+                            self.properties['obj']['nodes'].Bp[end_node_id] = \
+                                np.append(self.properties['obj']['nodes'].Bp[end_node_id], 0)
                             self.boundary_ids.append(i)
                         else: # interior point
                             self.properties['int']['points'].point_type[i] = POINT_TYPES['interior']

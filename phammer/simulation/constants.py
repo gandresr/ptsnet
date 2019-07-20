@@ -33,7 +33,12 @@ NODES_FLOAT = ntuple('NODES_FLOAT', [
     'emitter_coeff',
     'emitter_setting'])
 
-NODES_OBJ = ntuple('NODES_OBJ', ['upstream_points', 'downstream_points'])
+NODES_OBJ = ntuple('NODES_OBJ',
+    ['upstream_points',
+    'downstream_points',
+    'Cm', 'Bm', 'Cp', 'Bp'])
+
+NODES_OBJ_DTYPES = ['int', 'int', 'float', 'float', 'float', 'float']
 
 # ----- Index labels for Valve tables -----
 
