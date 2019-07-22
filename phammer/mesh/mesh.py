@@ -1,6 +1,7 @@
 import wntr
 import numpy as np
 
+from time import time
 from phammer.simulation.constants import TOL, WARNINGS, G
 from phammer.simulation.constants import POINTS_INT, POINTS_FLOAT
 from phammer.simulation.constants import NODES_INT, NODES_FLOAT, NODES_OBJ, NODES_OBJ_DTYPES
@@ -9,9 +10,14 @@ from phammer.simulation.constants import PUMPS_INT, PUMPS_FLOAT
 from phammer.simulation.constants import NODE_TYPES, POINT_TYPES
 
 class Mesh:
-    def __init__(self, input_file, time_step, wn, default_wave_speed = None, wave_speed_file = None, delimiter=','):
+    def __init__(self, input_file, time_step, wn, period = 0, default_wave_speed = None, wave_speed_file = None, delimiter=','):
 
-        self.steady_state_sim = None
+        # Steady state results
+        self.steady_head = None
+        self.steady_leak_demand = None
+        self.steady_demand = None
+        self.steady_flowrate = None
+
         self.network_graph = None
         self.properties = {}
 
@@ -29,10 +35,15 @@ class Mesh:
 
         self.wn = wn
         self.time_step = time_step
+        self.period = period
+        self.period_size = 0
 
         self.wave_speeds = self._get_wave_speeds(default_wave_speed, wave_speed_file, delimiter)
         self.segments = self._get_segments(time_step)
 
+        # Initial conditions
+        self.Q0 = None
+        self.H0 = None
         self._initialize()
 
     def _get_network_graph(self):
@@ -41,13 +52,13 @@ class Mesh:
         for n1 in G:
             for n2 in G[n1]:
                 for link_name in G[n1][n2]:
-                    flow = float(self.steady_state_sim.link['flowrate'][link_name])
+                    flow = float(self.steady_flowrate[link_name])
                     if flow < -TOL:
                         switch_links.append((n1, n2))
-                        self.steady_state_sim.link['flowrate'][link_name] *= -1
+                        self.steady_flowrate[link_name] *= -1
                     elif flow == 0:
-                        ha = float(self.steady_state_sim.node['head'][n1])
-                        hb = float(self.steady_state_sim.node['head'][n2])
+                        ha = float(self.steady_head[n1])
+                        hb = float(self.steady_head[n2])
                         if ha < hb:
                             switch_links.append((n1, n2))
         for n1, n2 in switch_links:
@@ -126,6 +137,7 @@ class Mesh:
         self.num_valves = self.wn.num_valves
         self.num_pumps = self.wn.num_pumps
 
+        self.link_ids = {link : i for i, link in enumerate(self.wn.link_name_list)}
         self.node_ids = {node : i for i, node in enumerate(self.wn.node_name_list)}
         self.valve_ids = {valve : i for i, valve in enumerate(self.wn.valve_name_list)}
         self.pump_ids = {pump : i for i, pump in enumerate(self.wn.pump_name_list)}
@@ -161,17 +173,35 @@ class Mesh:
         })
 
     def create_mesh(self):
-        self.steady_state_sim = wntr.sim.WNTRSimulator(self.wn).run_sim()
+        print("START - EPANET")
+        t = time()
+        steady_state_results = wntr.sim.EpanetSimulator(self.wn).run_sim()
+        print("END - EPANET: %.2f[s]" % (time()-t))
+        self.Q0 = np.zeros(self.num_points, dtype = np.float)
+        self.H0 = np.zeros(self.num_points, dtype = np.float)
+        # Check if period is valid
+        if steady_state_results.link['flowrate'].shape[0] < 2:
+            if self.period >= 1:
+                raise Exception("Not valid period")
+        else:
+            self.period_size = steady_state_results.link['flowrate'].index[1]
+
+        self.steady_head = steady_state_results.node['head'].loc[self.period_size*self.period]
+        # TODO INCLUDE LEAK DEMAND
+        self.steady_leak_demand = steady_state_results.node['demand'].loc[self.period_size*self.period]
+        self.steady_demand = steady_state_results.node['demand'].loc[self.period_size*self.period]
+        self.steady_flowrate = steady_state_results.link['flowrate'].loc[self.period_size*self.period]
         self.network_graph = self._get_network_graph()
 
         # Set default value for node_tye
         self.properties['int']['nodes'].node_type.fill(NODE_TYPES['junction'])
 
-        i = 0 # nodes index
+        i = 0 # points index
 
         for start_node in self.network_graph:
 
             start_node_id = self.node_ids[start_node]
+            print("Node %d of %d" % (start_node_id, self.num_nodes))
             downstream_nodes = self.network_graph[start_node]
 
             downstream_link_names = [
@@ -184,9 +214,9 @@ class Mesh:
                 self.properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['reservoir']
 
             # Define start junction demand
-            H0_start = float(self.steady_state_sim.node['head'][start_node])
-            fixed_demand = float(self.steady_state_sim.node['demand'][start_node])
-            emitter_demand = float(self.steady_state_sim.node['leak_demand'][start_node])
+            H0_start = float(self.steady_head[start_node])
+            fixed_demand = float(self.steady_demand[start_node])
+            emitter_demand = float(self.steady_leak_demand[start_node])
             self.properties['float']['nodes'].demand_coeff[start_node_id] = fixed_demand / (2*G*H0_start**0.5)
             self.properties['float']['nodes'].emitter_coeff[start_node_id] = emitter_demand / (2*G*H0_start**0.5)
 
@@ -195,23 +225,22 @@ class Mesh:
                 end_node_id = self.node_ids[end_node]
                 link_name = downstream_link_names[j]
                 link = self.wn.get_link(link_name)
-                # link_id is based on the wntr data structure
-                link_id = self.steady_state_sim.link['status'].columns.get_loc(link_name)
+                link_id = self.link_ids[link_name]
 
                 # Check if end junction is a reservoir
                 if end_node in self.wn.reservoir_name_list:
                     self.properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['reservoir']
 
                 # Define end junction demand
-                H0_end = float(self.steady_state_sim.node['head'][end_node])
-                fixed_demand = float(self.steady_state_sim.node['demand'][end_node])
-                emitter_demand = float(self.steady_state_sim.node['leak_demand'][end_node])
+                H0_end = float(self.steady_head[end_node])
+                fixed_demand = float(self.steady_demand[end_node])
+                emitter_demand = float(self.steady_leak_demand[end_node])
                 self.properties['float']['nodes'].demand_coeff[end_node_id] = fixed_demand / (2*G*H0_end)**0.5
                 self.properties['float']['nodes'].emitter_coeff[end_node_id] = emitter_demand / (2*G*H0_end)**0.5
 
                 if link.link_type == 'Pipe':
                     # Friction factor based on D-W equation
-                    Q0 = float(self.steady_state_sim.link['flowrate'][link_name])
+                    Q0 = float(self.steady_flowrate[link_name])
                     pipe_diameter = link.diameter
                     pipe_area = (np.pi * link.diameter ** 2 / 4)
                     pipe_length = link.length
@@ -246,6 +275,10 @@ class Mesh:
                         dx = pipe_length / self.segments[link_name]
                         self.properties['float']['points'].B[i] = self.wave_speeds[link_name] / (G*pipe_area)
                         self.properties['float']['points'].R[i] = ffactor*dx / (2*G*pipe_diameter*pipe_area**2)
+                        self.Q0[i] = float(self.steady_flowrate[link_name])
+                        head_1 = float(self.steady_head[start_node])
+                        head_2 = float(self.steady_head[end_node])
+                        self.H0[i] = head_1 - (head_1 - head_2)*idx/self.segments[link_name]
                         i += 1
                 elif link.link_type == 'Valve':
                     self.properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['valve']
@@ -256,8 +289,8 @@ class Mesh:
                 elif link.link_type == 'Pump':
                     self.properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['pump']
                     self.properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['pump']
-                    self.properties['int']['pumps'].upstream_junction[self.pump_ids[link_name]] = self.node_ids[start_node]
-                    self.properties['int']['pumps'].downstream_junction[self.pump_ids[link_name]] = self.node_ids[end_node]
+                    self.properties['int']['pumps'].upstream_node[self.pump_ids[link_name]] = self.node_ids[start_node]
+                    self.properties['int']['pumps'].downstream_node[self.pump_ids[link_name]] = self.node_ids[end_node]
                     (a, b, c,) = link.get_head_curve_coefficients()
                     self.properties['float']['pumps'].a[self.pump_ids[link_name]] = a
                     self.properties['float']['pumps'].b[self.pump_ids[link_name]] = b

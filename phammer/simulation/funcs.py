@@ -1,4 +1,4 @@
-from numba import jit, prange
+from numba import jit
 from phammer.simulation.constants import G, PARALLEL
 import numpy as np
 
@@ -23,7 +23,7 @@ def run_interior_step(Q0, H0, Q1, H1, B, R):
             / ((B[i] + R[i]*abs(Q0[i-1])) + (B[i] + R[i]*abs(Q0[i+1])))
         Q1[i] = (H1[i] - H0[i+1] + B[i]*Q0[i+1]) / (B[i] + R[i]*abs(Q0[i+1]))
 
-@jit(nopython = True, parallel = True)
+# @jit(nopython = True)
 def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, num_nodes, nodes_int, nodes_float, nodes_obj, RESERVOIR, JUNCTION):
     """Solves flow and head for boundary points attached to nodes
 
@@ -51,7 +51,7 @@ def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, num_nodes, nodes_int, nodes_
         DOWN {int} -- row index in junctions_int to extract downstream_neighbors_num
         N {int} -- row index to extract the first downstream node in table junctions_int
     """
-    for node_id in prange(num_nodes):
+    for node_id in range(num_nodes):
 
         dpoints = nodes_obj.downstream_points[node_id]
         upoints = nodes_obj.upstream_points[node_id]

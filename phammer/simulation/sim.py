@@ -1,9 +1,9 @@
 import numpy as np
 import wntr
 
+from time import time
 from phammer.mesh.mesh import Mesh
 from phammer.simulation.utils import define_curve, is_iterable
-from phammer.simulation.initial_conditions import get_initial_conditions
 from phammer.simulation.utils import set_settings, set_coefficients
 from phammer.simulation.funcs import run_interior_step, run_valve_step, run_junction_step
 from phammer.simulation.constants import NODE_TYPES
@@ -18,7 +18,7 @@ class Simulation:
     * valves are not valid between two junctions
     * it is not possible to connect one valve to another
     """
-    def __init__(self, input_file, duration, time_step, default_wave_speed = None, wave_speed_file = None, delimiter=',', full_results=False):
+    def __init__(self, input_file, duration, time_step, period = 0, default_wave_speed = None, wave_speed_file = None, delimiter=',', full_results=False):
         if time_step > duration:
             raise Exception("Error: duration < time_step")
 
@@ -30,13 +30,13 @@ class Simulation:
 
         self.fname = input_file[:input_file.find('.inp')]
         self.wn = wntr.network.WaterNetworkModel(input_file)
-        self.steady_state_sim = None
 
         # Mesh is initialized here - updated later when running first step
         self.mesh = Mesh(
             self.fname + '.inp',
             self.time_step,
             self.wn,
+            period = period,
             default_wave_speed = default_wave_speed,
             wave_speed_file = wave_speed_file,
             delimiter = delimiter)
@@ -126,11 +126,10 @@ class Simulation:
 
     def start(self):
         self.mesh.create_mesh()
-        self.steady_state_sim = self.mesh.steady_state_sim
         if self.full_results:
-            self.Q[0,:], self.H[0,:] = get_initial_conditions(self.mesh)
+            self.Q[0,:], self.H[0,:] = self.mesh.Q0, self.mesh.H0
         else:
-            self.Q0, self.H0 = get_initial_conditions(self.mesh)
+            self.Q0, self.H0 = self.mesh.Q0, self.mesh.H0
         self.t += 1
 
     def _update_settings(self):
@@ -186,14 +185,14 @@ class Simulation:
             Q0, H0, Q1, H1,
             self.mesh.properties['float']['points'].B,
             self.mesh.properties['float']['points'].R)
-        run_junction_step(Q0, H0, Q1, H1, E1, D1,
-            self.mesh.properties['float']['points'].B,
-            self.mesh.properties['float']['points'].R,
-            self.mesh.num_nodes,
-            self.mesh.properties['int']['nodes'],
-            self.mesh.properties['float']['nodes'],
-            self.mesh.properties['obj']['nodes'],
-            NODE_TYPES['junction'], NODE_TYPES['junction'])
+        # run_junction_step(Q0, H0, Q1, H1, E1, D1,
+        #     self.mesh.properties['float']['points'].B,
+        #     self.mesh.properties['float']['points'].R,
+        #     self.mesh.num_nodes,
+        #     self.mesh.properties['int']['nodes'],
+        #     self.mesh.properties['float']['nodes'],
+        #     self.mesh.properties['obj']['nodes'],
+        #     NODE_TYPES['junction'], NODE_TYPES['junction'])
         # run_valve_step(Q0, H0, Q1, H1,
         #     self.mesh.properties['float']['points'].B,
         #     self.mesh.properties['float']['points'].R,
