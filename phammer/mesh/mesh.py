@@ -1,5 +1,6 @@
 import wntr
 import numpy as np
+import networkx as nx
 
 from time import time
 from phammer.simulation.constants import TOL, WARNINGS, G
@@ -29,8 +30,13 @@ class Mesh:
         self.num_pumps = 0
 
         self.boundary_ids = []
+        self.flow_directions = []
         self.node_ids = {}
-        self.valve_ids = {}
+        self.valve_ids = {}        for n1, n2 in switch_links:
+            attrs = G[n1][n2]
+            link = list(attrs.keys())[0]
+            G.add_edge(n2, n1, key=link, attr_dict=attrs[link])
+            G.remove_edge(n1, n2)
         self.pump_ids = {}
 
         self.wn = wn
@@ -49,18 +55,31 @@ class Mesh:
     def _get_network_graph(self):
         G = self.wn.get_graph()
         switch_links = []
+
+        zero_graph = nx.Graph()
+
         for n1 in G:
             for n2 in G[n1]:
                 for link_name in G[n1][n2]:
-                    flow = float(self.steady_flowrate[link_name])
-                    if flow < -TOL:
+                    hl = float(self.steady_head[n1] - self.steady_head[n2])
+                    if hl < -TOL:
                         switch_links.append((n1, n2))
                         self.steady_flowrate[link_name] *= -1
-                    elif flow == 0:
-                        ha = float(self.steady_head[n1])
-                        hb = float(self.steady_head[n2])
-                        if ha < hb:
-                            switch_links.append((n1, n2))
+                        self.flow_directions = -1
+                    elif hl > TOL:
+                        self.flow_directions = 1
+                    else:
+                        self.steady_flowrate[link_name] = 0
+                        link = self.wn.get_link(link_name)
+                        G.add_edge(link.start_node_name, link.end_node_name)
+
+        # Define flow convention for links with zero flow
+        for n1, n2 in nx.dfs_edges(zero_graph):
+            if not G.has_edge(n1, n2):
+                for link_name in G[n2][n1]:
+
+                switch_links.append((n2, n1))
+
         for n1, n2 in switch_links:
             attrs = G[n1][n2]
             link = list(attrs.keys())[0]
@@ -108,7 +127,7 @@ class Mesh:
             segments[pipe] /= self.wave_speeds[pipe]
 
         # Maximum time_step in the system to capture waves in all pipes
-        max_dt = segments[min(segments, key=segments.get)]
+        max_dt = 2*segments[min(segments, key=segments.get)] # at least 2 segments in critical pipe
 
         t_step = min(time_step, max_dt)
         if t_step != time_step and WARNINGS:
@@ -138,6 +157,7 @@ class Mesh:
         self.num_pumps = self.wn.num_pumps
 
         self.link_ids = {link : i for i, link in enumerate(self.wn.link_name_list)}
+        self.flow_directions = [0 for i in range(len(self.wn.link_name_list))]
         self.node_ids = {node : i for i, node in enumerate(self.wn.node_name_list)}
         self.valve_ids = {valve : i for i, valve in enumerate(self.wn.valve_name_list)}
         self.pump_ids = {pump : i for i, pump in enumerate(self.wn.pump_name_list)}
