@@ -13,7 +13,9 @@ sim = Simulation(input_file,
 t = time()
 sim.start()
 print(time() - t)
-sim.run_sim()
+t = time()
+sim.run_step()
+print(time() - t)
 
 plt.plot(sim.Q[:,0:10])
 plt.show()

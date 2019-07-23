@@ -194,6 +194,7 @@ class Mesh:
         print("END - EPANET: %.2f[s]" % (time()-t))
         self.Q0 = np.zeros(self.num_points, dtype = np.float)
         self.H0 = np.zeros(self.num_points, dtype = np.float)
+
         # Check if period is valid
         if steady_state_results.link['flowrate'].shape[0] < 2:
             if self.period >= 1:
@@ -202,7 +203,7 @@ class Mesh:
             self.period_size = steady_state_results.link['flowrate'].index[1]
 
         self.steady_head = steady_state_results.node['head'].loc[self.period_size*self.period]
-        # TODO INCLUDE LEAK DEMAND
+        # fix leak_demand
         self.steady_leak_demand = steady_state_results.node['demand'].loc[self.period_size*self.period]
         self.steady_demand = steady_state_results.node['demand'].loc[self.period_size*self.period]
         self.steady_flowrate = steady_state_results.link['flowrate'].loc[self.period_size*self.period]
@@ -212,20 +213,21 @@ class Mesh:
         self.properties['int']['nodes'].node_type.fill(NODE_TYPES['junction'])
 
         i = 0 # points index
-        k = 0 # pipe index
-        for start_node in self.network_graph:
 
+        for link_name, link in self.wn.links():
+            link_id = self.link_ids[link_name]
+            start_node = link.start_node_name
+            end_node = link.end_node_name
+            if self.flow_directions[link_name] == -1:
+                start_node, end_node = end_node, start_node
             start_node_id = self.node_ids[start_node]
-            downstream_nodes = self.network_graph[start_node]
-
-            downstream_link_names = [
-                link for end_node_name in downstream_nodes
-                for link in self.network_graph[start_node][end_node_name]
-            ]
+            end_node_id = self.node_ids[end_node]
 
             # Check if start junction is a reservoir
             if start_node in self.wn.reservoir_name_list:
                 self.properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['reservoir']
+            if end_node in self.wn.reservoir_name_list:
+                self.properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['reservoir']
 
             # Define start junction demand
             H0_start = float(self.steady_head[start_node])
@@ -234,84 +236,73 @@ class Mesh:
             self.properties['float']['nodes'].demand_coeff[start_node_id] = fixed_demand / (2*G*H0_start**0.5)
             self.properties['float']['nodes'].emitter_coeff[start_node_id] = emitter_demand / (2*G*H0_start**0.5)
 
-            # Update downstream nodes
-            for j, end_node in enumerate(downstream_nodes):
-                end_node_id = self.node_ids[end_node]
-                link_name = downstream_link_names[j]
-                link = self.wn.get_link(link_name)
-                link_id = self.link_ids[link_name]
+            # Define end junction demand
+            H0_end = float(self.steady_head[end_node])
+            fixed_demand = float(self.steady_demand[end_node])
+            emitter_demand = float(self.steady_leak_demand[end_node])
+            self.properties['float']['nodes'].demand_coeff[end_node_id] = fixed_demand / (2*G*H0_end)**0.5
+            self.properties['float']['nodes'].emitter_coeff[end_node_id] = emitter_demand / (2*G*H0_end)**0.5
 
-                # Check if end junction is a reservoir
-                if end_node in self.wn.reservoir_name_list:
-                    self.properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['reservoir']
+            if link.link_type == 'Pipe':
+                # Friction factor based on D-W equation
+                Q0 = float(self.steady_flowrate[link_name])
+                pipe_diameter = link.diameter
+                pipe_area = (np.pi * link.diameter ** 2 / 4)
+                pipe_length = link.length
+                if Q0 < TOL:
+                    ffactor = DEFAULT_FFACTOR
+                else:
+                    ffactor = (abs(H0_start - H0_end)*2*G*pipe_diameter) / (pipe_length * (Q0 / pipe_area)**2)
 
-                # Define end junction demand
-                H0_end = float(self.steady_head[end_node])
-                fixed_demand = float(self.steady_demand[end_node])
-                emitter_demand = float(self.steady_leak_demand[end_node])
-                self.properties['float']['nodes'].demand_coeff[end_node_id] = fixed_demand / (2*G*H0_end)**0.5
-                self.properties['float']['nodes'].emitter_coeff[end_node_id] = emitter_demand / (2*G*H0_end)**0.5
-
-                if link.link_type == 'Pipe':
-                    k += 1
-                    # Friction factor based on D-W equation
-                    Q0 = float(self.steady_flowrate[link_name])
-                    pipe_diameter = link.diameter
-                    pipe_area = (np.pi * link.diameter ** 2 / 4)
-                    pipe_length = link.length
-                    if Q0 < TOL:
-                        ffactor = DEFAULT_FFACTOR
-                    else:
-                        ffactor = (abs(H0_start - H0_end)*2*G*pipe_diameter) / (pipe_length * (Q0 / pipe_area)**2)
-
-                    #  Points are stored in order, such that the i-1 and the i+1 points
-                    #  correspond to the upstream and downstream points of the
-                    #  i-th point
-                    for idx in range(self.segments[link_name]+1):
-                        self.properties['int']['points'].subindex[i] = idx
-                        self.properties['int']['points'].link_id[i] = link_id
-                        if idx == 0: # downstream node of start_node
-                            self.properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
-                            self.properties['obj']['nodes'].downstream_points[start_node_id] = \
-                                np.append(self.properties['obj']['nodes'].downstream_points[start_node_id], i)
-                            self.properties['obj']['nodes'].Cm[start_node_id] = \
-                                np.append(self.properties['obj']['nodes'].Cm[start_node_id], 0)
-                            self.properties['obj']['nodes'].Bm[start_node_id] = \
-                                np.append(self.properties['obj']['nodes'].Bm[start_node_id], 0)
-                            self.boundary_ids.append(i)
-                        elif idx == self.segments[link_name]: # upstream node of end_node
-                            self.properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
-                            self.properties['obj']['nodes'].upstream_points[end_node_id] = \
-                                np.append(self.properties['obj']['nodes'].upstream_points[end_node_id], i)
-                            self.properties['obj']['nodes'].Cp[end_node_id] = \
-                                np.append(self.properties['obj']['nodes'].Cp[end_node_id], 0)
-                            self.properties['obj']['nodes'].Bp[end_node_id] = \
-                                np.append(self.properties['obj']['nodes'].Bp[end_node_id], 0)
-                            self.boundary_ids.append(i)
-                        else: # interior point
-                            self.properties['int']['points'].point_type[i] = POINT_TYPES['interior']
-                        dx = pipe_length / self.segments[link_name]
-                        self.properties['float']['points'].B[i] = self.wave_speeds[link_name] / (G*pipe_area)
-                        self.properties['float']['points'].R[i] = ffactor*dx / (2*G*pipe_diameter*pipe_area**2)
-                        self.Q0[i] = float(self.steady_flowrate[link_name])
-                        head_1 = float(self.steady_head[start_node])
-                        head_2 = float(self.steady_head[end_node])
-                        self.H0[i] = head_1 - (head_1 - head_2)*idx/self.segments[link_name]
-                        i += 1
-                elif link.link_type == 'Valve':
-                    self.properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['valve']
-                    self.properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['valve']
-                    self.properties['int']['valves'].upstream_node[self.valve_ids[link_name]] = self.node_ids[start_node]
-                    self.properties['int']['valves'].downstream_node[self.valve_ids[link_name]] = self.node_ids[end_node]
-                    self.properties['float']['valves'].area[self.valve_ids[link_name]] = (np.pi * link.diameter ** 2 / 4)
-                elif link.link_type == 'Pump':
-                    self.properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['pump']
-                    self.properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['pump']
-                    self.properties['int']['pumps'].upstream_node[self.pump_ids[link_name]] = self.node_ids[start_node]
-                    self.properties['int']['pumps'].downstream_node[self.pump_ids[link_name]] = self.node_ids[end_node]
-                    (a, b, c,) = link.get_head_curve_coefficients()
-                    self.properties['float']['pumps'].a[self.pump_ids[link_name]] = a
-                    self.properties['float']['pumps'].b[self.pump_ids[link_name]] = b
-                    self.properties['float']['pumps'].c[self.pump_ids[link_name]] = c
+                #  Points are stored in order, such that the i-1 and the i+1 points
+                #  correspond to the upstream and downstream points of the
+                #  i-th point
+                for idx in range(self.segments[link_name]+1):
+                    self.properties['int']['points'].subindex[i] = idx
+                    self.properties['int']['points'].link_id[i] = link_id
+                    if idx == 0: # downstream node of start_node
+                        self.properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
+                        self.properties['obj']['nodes'].downstream_points[start_node_id] = \
+                            np.append(self.properties['obj']['nodes'].downstream_points[start_node_id], i)
+                        self.properties['obj']['nodes'].Cm[start_node_id] = \
+                            np.append(self.properties['obj']['nodes'].Cm[start_node_id], 0)
+                        self.properties['obj']['nodes'].Bm[start_node_id] = \
+                            np.append(self.properties['obj']['nodes'].Bm[start_node_id], 0)
+                        self.boundary_ids.append(i)
+                    elif idx == self.segments[link_name]: # upstream node of end_node
+                        self.properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
+                        self.properties['obj']['nodes'].upstream_points[end_node_id] = \
+                            np.append(self.properties['obj']['nodes'].upstream_points[end_node_id], i)
+                        self.properties['obj']['nodes'].Cp[end_node_id] = \
+                            np.append(self.properties['obj']['nodes'].Cp[end_node_id], 0)
+                        self.properties['obj']['nodes'].Bp[end_node_id] = \
+                            np.append(self.properties['obj']['nodes'].Bp[end_node_id], 0)
+                        self.boundary_ids.append(i)
+                    else: # interior point
+                        self.properties['int']['points'].point_type[i] = POINT_TYPES['interior']
+                    dx = pipe_length / self.segments[link_name]
+                    self.properties['float']['points'].B[i] = self.wave_speeds[link_name] / (G*pipe_area)
+                    self.properties['float']['points'].R[i] = ffactor*dx / (2*G*pipe_diameter*pipe_area**2)
+                    self.Q0[i] = float(self.steady_flowrate[link_name])
+                    head_1 = float(self.steady_head[start_node])
+                    head_2 = float(self.steady_head[end_node])
+                    self.H0[i] = head_1 - (head_1 - head_2)*idx/self.segments[link_name]
+                    i += 1
+            elif link.link_type == 'Valve':
+                self.properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['valve']
+                self.properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['valve']
+                self.properties['int']['valves'].upstream_node[self.valve_ids[link_name]] = self.node_ids[start_node]
+                self.properties['int']['valves'].downstream_node[self.valve_ids[link_name]] = self.node_ids[end_node]
+                self.properties['float']['valves'].area[self.valve_ids[link_name]] = (np.pi * link.diameter ** 2 / 4)
+            elif link.link_type == 'Pump':
+                self.properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['pump']
+                self.properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['pump']
+                self.properties['int']['pumps'].upstream_node[self.pump_ids[link_name]] = self.node_ids[start_node]
+                self.properties['int']['pumps'].downstream_node[self.pump_ids[link_name]] = self.node_ids[end_node]
+                (a, b, c,) = link.get_head_curve_coefficients()
+                self.properties['float']['pumps'].a[self.pump_ids[link_name]] = a
+                self.properties['float']['pumps'].b[self.pump_ids[link_name]] = b
+                self.properties['float']['pumps'].c[self.pump_ids[link_name]] = c
+        print(i, self.num_points)
         if (i != self.num_points):
             raise Exception ("Internal error: number of nodes does not match data structures (%d)", i)

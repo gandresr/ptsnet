@@ -4,7 +4,7 @@ import numpy as np
 
 # ------------------ SIM STEPS ------------------
 
-# @jit(nopython = True, cache = True, parallel = PARALLEL)
+@jit(nopython = True, cache = True, parallel = PARALLEL)
 def run_interior_step(Q0, H0, Q1, H1, B, R):
     """Solves flow and head for interior points
 

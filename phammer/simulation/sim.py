@@ -185,14 +185,14 @@ class Simulation:
             Q0, H0, Q1, H1,
             self.mesh.properties['float']['points'].B,
             self.mesh.properties['float']['points'].R)
-        # run_junction_step(Q0, H0, Q1, H1, E1, D1,
-        #     self.mesh.properties['float']['points'].B,
-        #     self.mesh.properties['float']['points'].R,
-        #     self.mesh.num_nodes,
-        #     self.mesh.properties['int']['nodes'].node_type,
-        #     self.mesh.properties['float']['nodes'],
-        #     self.mesh.properties['obj']['nodes'],
-        #     NODE_TYPES['junction'], NODE_TYPES['junction'])
+        run_junction_step(Q0, H0, Q1, H1, E1, D1,
+            self.mesh.properties['float']['points'].B,
+            self.mesh.properties['float']['points'].R,
+            self.mesh.num_nodes,
+            self.mesh.properties['int']['nodes'].node_type,
+            self.mesh.properties['float']['nodes'],
+            self.mesh.properties['obj']['nodes'],
+            NODE_TYPES['junction'], NODE_TYPES['junction'])
         # run_valve_step(Q0, H0, Q1, H1,
         #     self.mesh.properties['float']['points'].B,
         #     self.mesh.properties['float']['points'].R,
