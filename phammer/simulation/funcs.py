@@ -4,7 +4,7 @@ import numpy as np
 
 # ------------------ SIM STEPS ------------------
 
-@jit(nopython = True, cache = True, parallel = PARALLEL)
+# @jit(nopython = True, cache = True, parallel = PARALLEL)
 def run_interior_step(Q0, H0, Q1, H1, B, R):
     """Solves flow and head for interior points
 
@@ -24,7 +24,9 @@ def run_interior_step(Q0, H0, Q1, H1, B, R):
         Q1[i] = (H1[i] - H0[i+1] + B[i]*Q0[i+1]) / (B[i] + R[i]*abs(Q0[i+1]))
 
 # @jit(nopython = True)
-def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, num_nodes, nodes_int, nodes_float, nodes_obj, RESERVOIR, JUNCTION):
+def run_junction_step(
+    Q0, H0, Q1, H1, D1, E1, B, R,
+    num_nodes, nodes_type, nodes_float, nodes_obj, RESERVOIR, JUNCTION):
     """Solves flow and head for boundary points attached to nodes
 
     All the numpy arrays are passed by reference,
@@ -55,11 +57,10 @@ def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, num_nodes, nodes_int, nodes_
 
         dpoints = nodes_obj.downstream_points[node_id]
         upoints = nodes_obj.upstream_points[node_id]
-        node_type = nodes_int.node_type[node_id]
 
         # Junction is a reservoir
         # TODO : INCLUDE EMITTER
-        if node_type == RESERVOIR:
+        if nodes_type[node_id] == RESERVOIR:
             for k in dpoints:
                 H1[k] = H0[k]
                 Q1[k] = (H0[k] - H0[k+1] + B[k+1]*Q0[k+1]) \
@@ -68,7 +69,7 @@ def run_junction_step(Q0, H0, Q1, H1, D1, E1, B, R, num_nodes, nodes_int, nodes_
                 H1[k] = H0[k]
                 Q1[k] = (H0[k-1] + B[k-1]*Q0[k-1] - H0[k]) \
                         / (B[k-1] + R[k-1]*abs(Q0[k-1]))
-        if node_type == JUNCTION:
+        if nodes_type[node_id] == JUNCTION:
             sc = 0
             sb = 0
 

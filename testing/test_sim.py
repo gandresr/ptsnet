@@ -2,7 +2,7 @@ from phammer.simulation.sim import Simulation
 import matplotlib.pyplot as plt
 from time import time
 
-input_file = '/home/griano/Documents/Github/hammer-net/example_files/PHFC_SIM_17_4_13.inp'
+input_file = '/home/watsup/Documents/Github/hammer-net/example_files/PHFC_SIM_17_4_13.inp'
 
 sim = Simulation(input_file,
     duration = 2, # [s]
@@ -17,4 +17,3 @@ sim.run_sim()
 
 plt.plot(sim.Q[:,0:10])
 plt.show()
-

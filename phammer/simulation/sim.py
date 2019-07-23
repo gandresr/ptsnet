@@ -189,7 +189,7 @@ class Simulation:
         #     self.mesh.properties['float']['points'].B,
         #     self.mesh.properties['float']['points'].R,
         #     self.mesh.num_nodes,
-        #     self.mesh.properties['int']['nodes'],
+        #     self.mesh.properties['int']['nodes'].node_type,
         #     self.mesh.properties['float']['nodes'],
         #     self.mesh.properties['obj']['nodes'],
         #     NODE_TYPES['junction'], NODE_TYPES['junction'])

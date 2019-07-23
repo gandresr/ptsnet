@@ -5,6 +5,7 @@ from collections import namedtuple as ntuple
 WARNINGS = True
 PARALLEL = False
 DEFAULT_FLUID_DENSITY = 997 # kg/m^3
+DEFAULT_FFACTOR = 0.035
 G = 9.807
 TOL = 1E-6
 

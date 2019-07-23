@@ -3,7 +3,7 @@ import numpy as np
 import networkx as nx
 
 from time import time
-from phammer.simulation.constants import TOL, WARNINGS, G
+from phammer.simulation.constants import TOL, WARNINGS, G, DEFAULT_FFACTOR
 from phammer.simulation.constants import POINTS_INT, POINTS_FLOAT
 from phammer.simulation.constants import NODES_INT, NODES_FLOAT, NODES_OBJ, NODES_OBJ_DTYPES
 from phammer.simulation.constants import VALVES_INT, VALVES_FLOAT
@@ -30,13 +30,9 @@ class Mesh:
         self.num_pumps = 0
 
         self.boundary_ids = []
-        self.flow_directions = []
+        self.flow_directions = {}
         self.node_ids = {}
-        self.valve_ids = {}        for n1, n2 in switch_links:
-            attrs = G[n1][n2]
-            link = list(attrs.keys())[0]
-            G.add_edge(n2, n1, key=link, attr_dict=attrs[link])
-            G.remove_edge(n1, n2)
+        self.valve_ids = {}
         self.pump_ids = {}
 
         self.wn = wn
@@ -54,37 +50,37 @@ class Mesh:
 
     def _get_network_graph(self):
         G = self.wn.get_graph()
-        switch_links = []
 
         zero_graph = nx.Graph()
+
+        k = 0
+        j = 0
 
         for n1 in G:
             for n2 in G[n1]:
                 for link_name in G[n1][n2]:
-                    hl = float(self.steady_head[n1] - self.steady_head[n2])
-                    if hl < -TOL:
-                        switch_links.append((n1, n2))
+                    flow = float(self.steady_flowrate[self.link_ids[link_name]])
+                    if flow < -TOL:
                         self.steady_flowrate[link_name] *= -1
-                        self.flow_directions = -1
-                    elif hl > TOL:
-                        self.flow_directions = 1
+                        self.flow_directions[link_name] = -1
+                        k += 1
+                    elif flow > TOL:
+                        self.flow_directions[link_name] = 1
+                        k += 1
                     else:
                         self.steady_flowrate[link_name] = 0
                         link = self.wn.get_link(link_name)
-                        G.add_edge(link.start_node_name, link.end_node_name)
+                        zero_graph.add_edge(link.start_node_name, link.end_node_name)
 
         # Define flow convention for links with zero flow
         for n1, n2 in nx.dfs_edges(zero_graph):
             if not G.has_edge(n1, n2):
                 for link_name in G[n2][n1]:
-
-                switch_links.append((n2, n1))
-
-        for n1, n2 in switch_links:
-            attrs = G[n1][n2]
-            link = list(attrs.keys())[0]
-            G.add_edge(n2, n1, key=link, attr_dict=attrs[link])
-            G.remove_edge(n1, n2)
+                    self.flow_directions[link_name] = -1
+            else:
+                for link_name in G[n1][n2]:
+                    j += 1
+                    self.flow_directions[link_name] = 1
 
         return G
 
@@ -127,7 +123,7 @@ class Mesh:
             segments[pipe] /= self.wave_speeds[pipe]
 
         # Maximum time_step in the system to capture waves in all pipes
-        max_dt = 2*segments[min(segments, key=segments.get)] # at least 2 segments in critical pipe
+        max_dt = segments[min(segments, key=segments.get)] / 2 # at least 2 segments in critical pipe
 
         t_step = min(time_step, max_dt)
         if t_step != time_step and WARNINGS:
@@ -138,10 +134,9 @@ class Mesh:
         self.num_segments = 0
         for pipe in segments:
             segments[pipe] /= t_step
-            int_segments = int(segments[pipe])
+            int_segments = round(segments[pipe])
             # The wave_speed is adjusted to compensate the truncation error
-            e = int_segments-segments[pipe] # truncation error
-            self.wave_speeds[pipe] = self.wave_speeds[pipe]/(1 + e/segments[pipe])
+            self.wave_speeds[pipe] = self.wave_speeds[pipe]*segments[pipe]/int_segments
             self.num_segments += int_segments
             segments[pipe] = int_segments
 
@@ -157,7 +152,7 @@ class Mesh:
         self.num_pumps = self.wn.num_pumps
 
         self.link_ids = {link : i for i, link in enumerate(self.wn.link_name_list)}
-        self.flow_directions = [0 for i in range(len(self.wn.link_name_list))]
+        self.flow_directions = {}
         self.node_ids = {node : i for i, node in enumerate(self.wn.node_name_list)}
         self.valve_ids = {valve : i for i, valve in enumerate(self.wn.valve_name_list)}
         self.pump_ids = {pump : i for i, pump in enumerate(self.wn.pump_name_list)}
@@ -217,11 +212,10 @@ class Mesh:
         self.properties['int']['nodes'].node_type.fill(NODE_TYPES['junction'])
 
         i = 0 # points index
-
+        k = 0 # pipe index
         for start_node in self.network_graph:
 
             start_node_id = self.node_ids[start_node]
-            print("Node %d of %d" % (start_node_id, self.num_nodes))
             downstream_nodes = self.network_graph[start_node]
 
             downstream_link_names = [
@@ -259,12 +253,16 @@ class Mesh:
                 self.properties['float']['nodes'].emitter_coeff[end_node_id] = emitter_demand / (2*G*H0_end)**0.5
 
                 if link.link_type == 'Pipe':
+                    k += 1
                     # Friction factor based on D-W equation
                     Q0 = float(self.steady_flowrate[link_name])
                     pipe_diameter = link.diameter
                     pipe_area = (np.pi * link.diameter ** 2 / 4)
                     pipe_length = link.length
-                    ffactor = (abs(H0_start - H0_end)*2*G*pipe_diameter) / (pipe_length * (Q0 / pipe_area)**2)
+                    if Q0 < TOL:
+                        ffactor = DEFAULT_FFACTOR
+                    else:
+                        ffactor = (abs(H0_start - H0_end)*2*G*pipe_diameter) / (pipe_length * (Q0 / pipe_area)**2)
 
                     #  Points are stored in order, such that the i-1 and the i+1 points
                     #  correspond to the upstream and downstream points of the
@@ -315,3 +313,5 @@ class Mesh:
                     self.properties['float']['pumps'].a[self.pump_ids[link_name]] = a
                     self.properties['float']['pumps'].b[self.pump_ids[link_name]] = b
                     self.properties['float']['pumps'].c[self.pump_ids[link_name]] = c
+        if (i != self.num_points):
+            raise Exception ("Internal error: number of nodes does not match data structures (%d)", i)
