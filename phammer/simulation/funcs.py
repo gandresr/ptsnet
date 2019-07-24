@@ -16,9 +16,9 @@ def run_interior_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm):
     """
     # Extreme points
     Cm[0] = H0[1] - B[0]*Q0[1]
-    Cp[len(Q0)-1] = H0[len(Q0)-2] + B[len(Q0)-1]*Q0[len(Q0)-2]
+    Cp[-1] = H0[-2] + B[-1]*Q0[-2]
     Bm[0] = B[0] + R[0]*abs(Q0[1])
-    Bp[len(Q0)-1] = B[len(Q0)-1] + R[len(Q0)-1]*abs(Q0[len(Q0)-2])
+    Bp[-1] = B[-1] + R[-1]*abs(Q0[-2])
 
     for i in range(1, len(Q0)-1):
         # The first and last nodes are skipped in the  loop considering
@@ -72,19 +72,13 @@ def run_junction_step(
             Kd = nodes_float.demand_coeff[node_id]
             kk = None
             for k in dpoints:
-                if kk == None: kk = k
                 H1[k] = H0[k]
                 Q1[k] = (H0[k] - H0[k+1] + B[k+1]*Q0[k+1]) \
                         / (B[k+1] + R[k+1]*abs(Q0[k+1]))
             for k in upoints:
-                if kk == None: kk = k
                 H1[k] = H0[k]
                 Q1[k] = (H0[k-1] + B[k-1]*Q0[k-1] - H0[k]) \
                         / (B[k-1] + R[k-1]*abs(Q0[k-1]))
-
-            E1[node_id] = Ke*(2*G*H1[kk])**0.5
-            D1[node_id] = Kd*(2*G*H1[kk])**0.5
-
         if nodes_type[node_id] == JUNCTION:
             sc = 0
             sb = 0
