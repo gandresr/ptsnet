@@ -21,11 +21,12 @@ def run_interior_step(Q0, H0, Q1, H1, B, R):
         H1[i] = ((H0[i-1] + B[i]*Q0[i-1])*(B[i] + R[i]*abs(Q0[i+1])) \
             + (H0[i+1] - B[i]*Q0[i+1])*(B[i] + R[i]*abs(Q0[i-1]))) \
             / ((B[i] + R[i]*abs(Q0[i-1])) + (B[i] + R[i]*abs(Q0[i+1])))
-        Q1[i] = (H1[i] - H0[i+1] + B[i]*Q0[i+1]) / (B[i] + R[i]*abs(Q0[i+1]))
+        Q1[i] = ((H0[i-1] + B[i]*Q0[i-1]) - (H0[i+1] - B[i]*Q0[i+1])) \
+            / ((B[i] + R[i]*abs(Q0[i-1])) + (B[i] + R[i]*abs(Q0[i+1])))
 
 # @jit(nopython = True)
 def run_junction_step(
-    Q0, H0, Q1, H1, D1, E1, B, R,
+    Q0, H0, Q1, H1, E1, D1, B, R,
     num_nodes, nodes_type, nodes_float, nodes_obj, RESERVOIR, JUNCTION):
     """Solves flow and head for boundary points attached to nodes
 

@@ -146,8 +146,9 @@ class Simulation:
             self.mesh.properties['float']['nodes'].setting)
 
     def run_sim(self):
-        for _ in self.sim_range:
+        while self.t < self.time_steps:
             self.run_step()
+            self.t += 1
 
     def run_step(self):
         if self.t == 0:
@@ -156,16 +157,15 @@ class Simulation:
                 self.Q[0,:] = self.Q0[self.mesh.boundary_ids]
                 self.H[0,:] = self.H0[self.mesh.boundary_ids]
                 # TODO update E[0,:], D[0,:]
-        elif self.t == self.time_steps:
-            raise Exception("The simulation is over")
-        else:
-            self.t += 1
 
         if self.full_results:
-            Q0 = self.Q[self.t-2,:]
-            Q1 = self.Q[self.t-1,:]
-            H0 = self.H[self.t-2,:]
-            H1 = self.H[self.t-1,:]
+            self._run_all(
+                self.Q[self.t-1,:],
+                self.H[self.t-1,:],
+                self.Q[self.t,:],
+                self.H[self.t,:],
+                self.E[self.t,:],
+                self.D[self.t,:])
         else:
             if self.t % 2 != 0:
                 Q0 = self.Q0
@@ -178,9 +178,11 @@ class Simulation:
                 H0 = self.H1
                 H1 = self.H0
 
-        E1 = self.E[self.t-1,:]
-        D1 = self.D[self.t-1,:]
+        if not self.full_results:
+            self.Q[self.t,:] = Q1[self.mesh.boundary_ids]
+            self.H[self.t,:] = H1[self.mesh.boundary_ids]
 
+    def _run_all(self, Q0, H0, Q1, H1, E1, D1):
         run_interior_step(
             Q0, H0, Q1, H1,
             self.mesh.properties['float']['points'].B,
@@ -192,14 +194,10 @@ class Simulation:
             self.mesh.properties['int']['nodes'].node_type,
             self.mesh.properties['float']['nodes'],
             self.mesh.properties['obj']['nodes'],
-            NODE_TYPES['junction'], NODE_TYPES['junction'])
+            NODE_TYPES['reservoir'], NODE_TYPES['junction'])
         # run_valve_step(Q0, H0, Q1, H1,
         #     self.mesh.properties['float']['points'].B,
         #     self.mesh.properties['float']['points'].R,
         #     self.mesh.properties['int']['valves'],
         #     self.mesh.properties['float']['valves'],
         #     self.mesh.properties['obj']['valves'])
-
-        if not self.full_results:
-            self.Q[self.t,:] = Q1[self.mesh.boundary_ids]
-            self.H[self.t,:] = H1[self.mesh.boundary_ids]

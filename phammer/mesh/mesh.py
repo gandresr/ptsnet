@@ -188,10 +188,8 @@ class Mesh:
         })
 
     def create_mesh(self):
-        print("START - EPANET")
         t = time()
         steady_state_results = wntr.sim.EpanetSimulator(self.wn).run_sim()
-        print("END - EPANET: %.2f[s]" % (time()-t))
         self.Q0 = np.zeros(self.num_points, dtype = np.float)
         self.H0 = np.zeros(self.num_points, dtype = np.float)
 
@@ -209,7 +207,7 @@ class Mesh:
         self.steady_flowrate = steady_state_results.link['flowrate'].loc[self.period_size*self.period]
         self.network_graph = self._get_network_graph()
 
-        # Set default value for node_tye
+        # Set default value for node_type
         self.properties['int']['nodes'].node_type.fill(NODE_TYPES['junction'])
 
         i = 0 # points index
@@ -303,6 +301,3 @@ class Mesh:
                 self.properties['float']['pumps'].a[self.pump_ids[link_name]] = a
                 self.properties['float']['pumps'].b[self.pump_ids[link_name]] = b
                 self.properties['float']['pumps'].c[self.pump_ids[link_name]] = c
-        print(i, self.num_points)
-        if (i != self.num_points):
-            raise Exception ("Internal error: number of nodes does not match data structures (%d)", i)
