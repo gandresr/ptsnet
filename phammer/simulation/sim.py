@@ -98,6 +98,7 @@ class Simulation:
             self.mesh.properties['float']['nodes'].setting)
 
     def _run_all(self, Q0, H0, Q1, H1, E1, D1):
+        # The order of the calls matter
         run_interior_step(
             Q0, H0, Q1, H1,
             self.mesh.properties['float']['points'].B,

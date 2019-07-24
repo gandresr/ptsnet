@@ -261,19 +261,11 @@ class Mesh:
                         self.properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
                         self.properties['obj']['nodes'].downstream_points[start_node_id] = \
                             np.append(self.properties['obj']['nodes'].downstream_points[start_node_id], i)
-                        self.properties['obj']['nodes'].Cm[start_node_id] = \
-                            np.append(self.properties['obj']['nodes'].Cm[start_node_id], 0)
-                        self.properties['obj']['nodes'].Bm[start_node_id] = \
-                            np.append(self.properties['obj']['nodes'].Bm[start_node_id], 0)
                         self.boundary_ids.append(i)
                     elif idx == self.segments[link_name]: # upstream node of end_node
                         self.properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
                         self.properties['obj']['nodes'].upstream_points[end_node_id] = \
                             np.append(self.properties['obj']['nodes'].upstream_points[end_node_id], i)
-                        self.properties['obj']['nodes'].Cp[end_node_id] = \
-                            np.append(self.properties['obj']['nodes'].Cp[end_node_id], 0)
-                        self.properties['obj']['nodes'].Bp[end_node_id] = \
-                            np.append(self.properties['obj']['nodes'].Bp[end_node_id], 0)
                         self.boundary_ids.append(i)
                     else: # interior point
                         self.properties['int']['points'].point_type[i] = POINT_TYPES['interior']

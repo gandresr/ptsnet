@@ -37,8 +37,7 @@ NODES_FLOAT = ntuple('NODES_FLOAT', [
 
 NODES_OBJ = ntuple('NODES_OBJ',
     ['upstream_points',
-    'downstream_points',
-    'Cm', 'Bm', 'Cp', 'Bp'])
+    'downstream_points'])
 
 NODES_OBJ_DTYPES = ['int', 'int', 'float', 'float', 'float', 'float']
 

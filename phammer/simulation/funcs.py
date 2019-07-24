@@ -70,15 +70,12 @@ def run_junction_step(
         if nodes_type[node_id] == RESERVOIR:
             Ke = nodes_float.emitter_setting[node_id]*nodes_float.emitter_coeff[node_id]
             Kd = nodes_float.demand_coeff[node_id]
-            kk = None
             for k in dpoints:
                 H1[k] = H0[k]
-                Q1[k] = (H0[k] - H0[k+1] + B[k+1]*Q0[k+1]) \
-                        / (B[k+1] + R[k+1]*abs(Q0[k+1]))
+                Q1[k] = (H0[k] - Cm[k]) / Bm[k]
             for k in upoints:
                 H1[k] = H0[k]
-                Q1[k] = (H0[k-1] + B[k-1]*Q0[k-1] - H0[k]) \
-                        / (B[k-1] + R[k-1]*abs(Q0[k-1]))
+                Q1[k] = (Cp[k] - H0[k]) / Bp[k]
         if nodes_type[node_id] == JUNCTION:
             sc = 0
             sb = 0
