@@ -19,7 +19,8 @@ POINTS_INT = ntuple('POINTS_INT',
     'is_ghost']
 )
 
-POINTS_FLOAT = ntuple('POINTS_FLOAT', ['B', 'R'])
+POINTS_FLOAT = ntuple('POINTS_FLOAT',
+    ['B', 'R', 'Cm', 'Bm', 'Cp', 'Bp'])
 
 # ----- Index labels for Junction tables -----
 

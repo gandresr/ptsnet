@@ -188,7 +188,6 @@ class Mesh:
         })
 
     def create_mesh(self):
-        t = time()
         steady_state_results = wntr.sim.EpanetSimulator(self.wn).run_sim()
         self.Q0 = np.zeros(self.num_points, dtype = np.float)
         self.H0 = np.zeros(self.num_points, dtype = np.float)

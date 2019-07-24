@@ -66,22 +66,6 @@ class Simulation:
         self.valve_settings = {}
         self.emitter_settings = {}
 
-    def add_emitter(self, node, area, discharge_coeff, initial_setting=1):
-        if not (0 <= initial_setting <= 1):
-            raise Exception("Initial setting should be in [0, 1]")
-        emitter_node = self.wn.get_node(node)
-        emitter_node.add_leak(self.wn, area=area, discharge_coeff=discharge_coeff*initial_setting, start_time=0)
-        self.mesh.properties['int']['nodes'].emmitter_setting[self.mesh.node_ids[node]] = initial_setting
-
-    def set_pump_setting(self, pump, setting):
-        self.mesh.properties['int']['pumps'].setting[self.mesh.pump_ids[pump]] = setting
-
-    def set_valve_setting(self, valve, setting):
-        self.mesh.properties['int']['valves'].setting[self.mesh.valve_ids[valve]] = setting
-
-    def set_emitter_setting(self, node, setting):
-        self.mesh.properties['int']['nodes'].emitter_setting[self.mesh.node_ids[node]] = setting
-
     def _define_settings(self, obj_id, obj_type, obj_settings):
         if is_iterable(obj_settings):
             if not all(0 <= x <= 1 for x in obj_settings):
@@ -99,6 +83,63 @@ class Simulation:
                 raise Exception("Type error: obj_type not compatible (internal error)")
         else:
             raise Exception("Type error: setting type should be iterable")
+
+    def _update_settings(self):
+        set_settings(self.t, self.pump_settings, self.mesh.properties['float']['pumps'].setting)
+        set_settings(self.t, self.valve_settings, self.mesh.properties['float']['valves'].setting)
+        set_coefficients(
+            self.valve_curves,
+            self.mesh.properties['float']['valves'].valve_coeff,
+            self.mesh.properties['float']['valves'].setting)
+        set_settings(self.t, self.emitter_settings, self.mesh.properties['float']['nodes'].setting)
+        set_coefficients(
+            self.emitter_curves,
+            self.mesh.properties['float']['nodes'].emitter_coeff,
+            self.mesh.properties['float']['nodes'].setting)
+
+    def _run_all(self, Q0, H0, Q1, H1, E1, D1):
+        run_interior_step(
+            Q0, H0, Q1, H1,
+            self.mesh.properties['float']['points'].B,
+            self.mesh.properties['float']['points'].R,
+            self.mesh.properties['float']['points'].Cp,
+            self.mesh.properties['float']['points'].Bp,
+            self.mesh.properties['float']['points'].Cm,
+            self.mesh.properties['float']['points'].Bm)
+        run_junction_step(Q0, H0, Q1, H1, E1, D1,
+            self.mesh.properties['float']['points'].B,
+            self.mesh.properties['float']['points'].R,
+            self.mesh.properties['float']['points'].Cp,
+            self.mesh.properties['float']['points'].Bp,
+            self.mesh.properties['float']['points'].Cm,
+            self.mesh.properties['float']['points'].Bm,
+            self.mesh.num_nodes,
+            self.mesh.properties['int']['nodes'].node_type,
+            self.mesh.properties['float']['nodes'],
+            self.mesh.properties['obj']['nodes'],
+            NODE_TYPES['reservoir'], NODE_TYPES['junction'])
+        # run_valve_step(Q0, H0, Q1, H1,
+        #     self.mesh.properties['float']['points'].B,
+        #     self.mesh.properties['float']['points'].R,
+        #     self.mesh.properties['int']['valves'],
+        #     self.mesh.properties['float']['valves'],
+        #     self.mesh.properties['obj']['valves'])
+
+    def add_emitter(self, node, area, discharge_coeff, initial_setting=1):
+        if not (0 <= initial_setting <= 1):
+            raise Exception("Initial setting should be in [0, 1]")
+        emitter_node = self.wn.get_node(node)
+        emitter_node.add_leak(self.wn, area=area, discharge_coeff=discharge_coeff*initial_setting, start_time=0)
+        self.mesh.properties['int']['nodes'].emmitter_setting[self.mesh.node_ids[node]] = initial_setting
+
+    def set_pump_setting(self, pump, setting):
+        self.mesh.properties['int']['pumps'].setting[self.mesh.pump_ids[pump]] = setting
+
+    def set_valve_setting(self, valve, setting):
+        self.mesh.properties['int']['valves'].setting[self.mesh.valve_ids[valve]] = setting
+
+    def set_emitter_setting(self, node, setting):
+        self.mesh.properties['int']['nodes'].emitter_setting[self.mesh.node_ids[node]] = setting
 
     def define_pump_settings(self, pump, settings):
         self._define_settings(self.mesh.pump_ids[pump], 'pumps', settings)
@@ -132,24 +173,6 @@ class Simulation:
             self.Q0, self.H0 = self.mesh.Q0, self.mesh.H0
         self.t += 1
 
-    def _update_settings(self):
-        set_settings(self.t, self.pump_settings, self.mesh.properties['float']['pumps'].setting)
-        set_settings(self.t, self.valve_settings, self.mesh.properties['float']['valves'].setting)
-        set_coefficients(
-            self.valve_curves,
-            self.mesh.properties['float']['valves'].valve_coeff,
-            self.mesh.properties['float']['valves'].setting)
-        set_settings(self.t, self.emitter_settings, self.mesh.properties['float']['nodes'].setting)
-        set_coefficients(
-            self.emitter_curves,
-            self.mesh.properties['float']['nodes'].emitter_coeff,
-            self.mesh.properties['float']['nodes'].setting)
-
-    def run_sim(self):
-        while self.t < self.time_steps:
-            self.run_step()
-            self.t += 1
-
     def run_step(self):
         if self.t == 0:
             self.start()
@@ -159,45 +182,21 @@ class Simulation:
                 # TODO update E[0,:], D[0,:]
 
         if self.full_results:
-            self._run_all(
-                self.Q[self.t-1,:],
-                self.H[self.t-1,:],
-                self.Q[self.t,:],
-                self.H[self.t,:],
-                self.E[self.t,:],
-                self.D[self.t,:])
+            self._run_all(self.Q[self.t-1,:], self.H[self.t-1,:],
+                self.Q[self.t,:], self.H[self.t,:], self.E[self.t,:], self.D[self.t,:])
         else:
             if self.t % 2 != 0:
-                Q0 = self.Q0
-                Q1 = self.Q1
-                H0 = self.H0
-                H1 = self.H1
+                self._run_all(Q0 = self.Q0, H0 = self.H0,
+                    Q1 = self.Q1, H1 = self.H1, E1 = self.E, D1 = self.D)
+                self.Q[self.t,:] = self.Q1[self.mesh.boundary_ids]
+                self.H[self.t,:] = self.H1[self.mesh.boundary_ids]
             else:
-                Q0 = self.Q1
-                Q1 = self.Q0
-                H0 = self.H1
-                H1 = self.H0
+                self._run_all(Q0 = self.Q1, H0 = self.H1,
+                    Q1 = self.Q0, H1 = self.H0, E1 = self.E, D1 = self.D)
+                self.Q[self.t,:] = self.Q0[self.mesh.boundary_ids]
+                self.H[self.t,:] = self.H0[self.mesh.boundary_ids]
 
-        if not self.full_results:
-            self.Q[self.t,:] = Q1[self.mesh.boundary_ids]
-            self.H[self.t,:] = H1[self.mesh.boundary_ids]
-
-    def _run_all(self, Q0, H0, Q1, H1, E1, D1):
-        run_interior_step(
-            Q0, H0, Q1, H1,
-            self.mesh.properties['float']['points'].B,
-            self.mesh.properties['float']['points'].R)
-        run_junction_step(Q0, H0, Q1, H1, E1, D1,
-            self.mesh.properties['float']['points'].B,
-            self.mesh.properties['float']['points'].R,
-            self.mesh.num_nodes,
-            self.mesh.properties['int']['nodes'].node_type,
-            self.mesh.properties['float']['nodes'],
-            self.mesh.properties['obj']['nodes'],
-            NODE_TYPES['reservoir'], NODE_TYPES['junction'])
-        # run_valve_step(Q0, H0, Q1, H1,
-        #     self.mesh.properties['float']['points'].B,
-        #     self.mesh.properties['float']['points'].R,
-        #     self.mesh.properties['int']['valves'],
-        #     self.mesh.properties['float']['valves'],
-        #     self.mesh.properties['obj']['valves'])
+    def run_sim(self):
+        while self.t < self.time_steps:
+            self.run_step()
+            self.t += 1

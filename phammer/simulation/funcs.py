@@ -5,7 +5,7 @@ import numpy as np
 # ------------------ SIM STEPS ------------------
 
 @jit(nopython = True, cache = True, parallel = PARALLEL)
-def run_interior_step(Q0, H0, Q1, H1, B, R):
+def run_interior_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm):
     """Solves flow and head for interior points
 
     All the numpy arrays are passed by reference,
@@ -14,19 +14,25 @@ def run_interior_step(Q0, H0, Q1, H1, B, R):
 
     TODO: UPDATE ARGUMENTS
     """
+    # Extreme points
+    Cm[0] = H0[1] - B[0]*Q0[1]
+    Cp[len(Q0)-1] = H0[len(Q0)-2] + B[len(Q0)-1]*Q0[len(Q0)-2]
+    Bm[0] = B[0] + R[0]*abs(Q0[1])
+    Bp[len(Q0)-1] = B[len(Q0)-1] + R[len(Q0)-1]*abs(Q0[len(Q0)-2])
+
     for i in range(1, len(Q0)-1):
         # The first and last nodes are skipped in the  loop considering
         # that they are boundary nodes (every interior node requires an
         # upstream and a downstream neighbor)
-        H1[i] = ((H0[i-1] + B[i]*Q0[i-1])*(B[i] + R[i]*abs(Q0[i+1])) \
-            + (H0[i+1] - B[i]*Q0[i+1])*(B[i] + R[i]*abs(Q0[i-1]))) \
-            / ((B[i] + R[i]*abs(Q0[i-1])) + (B[i] + R[i]*abs(Q0[i+1])))
-        Q1[i] = ((H0[i-1] + B[i]*Q0[i-1]) - (H0[i+1] - B[i]*Q0[i+1])) \
-            / ((B[i] + R[i]*abs(Q0[i-1])) + (B[i] + R[i]*abs(Q0[i+1])))
+        Cm[i] = H0[i+1] - B[i]*Q0[i+1]
+        Cp[i] = H0[i-1] + B[i]*Q0[i-1]
+        Bm[i] = B[i] + R[i]*abs(Q0[i+1])
+        Bp[i] = B[i] + R[i]*abs(Q0[i-1])
+        H1[i] = (Cp[i]*Bm[i] + Cm[i]*Bp[i]) / (Bp[i] + Bm[i])
+        Q1[i] = (H1[i] - Cm[i]) / Bm[i]
 
-# @jit(nopython = True)
 def run_junction_step(
-    Q0, H0, Q1, H1, E1, D1, B, R,
+    Q0, H0, Q1, H1, E1, D1, B, R, Cp, Bp, Cm, Bm,
     num_nodes, nodes_type, nodes_float, nodes_obj, RESERVOIR, JUNCTION):
     """Solves flow and head for boundary points attached to nodes
 
@@ -62,34 +68,34 @@ def run_junction_step(
         # Junction is a reservoir
         # TODO : INCLUDE EMITTER
         if nodes_type[node_id] == RESERVOIR:
+            Ke = nodes_float.emitter_setting[node_id]*nodes_float.emitter_coeff[node_id]
+            Kd = nodes_float.demand_coeff[node_id]
+            kk = None
             for k in dpoints:
+                if kk == None: kk = k
                 H1[k] = H0[k]
                 Q1[k] = (H0[k] - H0[k+1] + B[k+1]*Q0[k+1]) \
                         / (B[k+1] + R[k+1]*abs(Q0[k+1]))
             for k in upoints:
+                if kk == None: kk = k
                 H1[k] = H0[k]
                 Q1[k] = (H0[k-1] + B[k-1]*Q0[k-1] - H0[k]) \
                         / (B[k-1] + R[k-1]*abs(Q0[k-1]))
+
+            E1[node_id] = Ke*(2*G*H1[kk])**0.5
+            D1[node_id] = Kd*(2*G*H1[kk])**0.5
+
         if nodes_type[node_id] == JUNCTION:
             sc = 0
             sb = 0
 
-            Cm = nodes_obj.Cm[node_id]
-            Bm = nodes_obj.Bm[node_id]
-            Cp = nodes_obj.Cp[node_id]
-            Bp = nodes_obj.Bp[node_id]
+            for k in dpoints: # C-
+                sc += Cm[k] / Bm[k]
+                sb += 1 / Bm[k]
 
-            for j, k in enumerate(dpoints): # C-
-                Cm[j] = H0[k+1] - B[k+1]*Q0[k+1]
-                Bm[j] = B[k+1] + R[k+1]*abs(Q0[k+1])
-                sc += Cm[j] / Bm[j]
-                sb += 1 / Bm[j]
-
-            for j, k in enumerate(upoints): # C+
-                Cp[j] = H0[k-1] + B[k-1]*Q0[k-1]
-                Bp[j] = B[k-1] + R[k-1]*abs(Q0[k-1])
-                sc += Cp[j] / Bp[j]
-                sb += 1 / Bp[j]
+            for k in upoints: # C+
+                sc += Cp[k] / Bp[k]
+                sb += 1 / Bp[k]
 
             Z = sc/sb
             Ke = nodes_float.emitter_setting[node_id]*nodes_float.emitter_coeff[node_id]
@@ -100,13 +106,13 @@ def run_junction_step(
             E1[node_id] = Ke*(2*G*HH)**0.5
             D1[node_id] = Kd*(2*G*HH)**0.5
 
-            for j, k in enumerate(dpoints): # C-
+            for k in dpoints: # C-
                 H1[k] = HH
-                Q1[k] = (HH - Cm[j]) / Bm[j]
+                Q1[k] = (HH - Cm[k]) / Bm[k]
 
-            for j, k in enumerate(upoints): # C+
+            for k in upoints: # C+
                 H1[k] = HH
-                Q1[k] = (Cp[j] - HH) / Bp[j]
+                Q1[k] = (Cp[k] - HH) / Bp[k]
 
 @jit(nopython = True, cache = True, parallel = PARALLEL)
 def run_valve_step(Q0, H0, Q1, H1, B, R, valves_int, valves_float, nodes_obj):
