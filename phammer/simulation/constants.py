@@ -3,6 +3,7 @@ from collections import namedtuple as ntuple
 # ----- Global -----
 
 WARNINGS = True
+TIMEIT = True
 PARALLEL = False
 DEFAULT_FLUID_DENSITY = 997 # kg/m^3
 DEFAULT_FFACTOR = 0.035

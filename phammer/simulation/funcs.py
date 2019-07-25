@@ -31,9 +31,20 @@ def run_interior_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm):
         H1[i] = (Cp[i]*Bm[i] + Cm[i]*Bp[i]) / (Bp[i] + Bm[i])
         Q1[i] = (H1[i] - Cm[i]) / Bm[i]
 
+def run_reservoir_step(Q0, H0, Q1, H1, E1, D1, B, R, Cp, Bp, Cm, Bm, nodes_float):
+    for node_id in reservoir_ids:
+        Ke = nodes_float.emitter_setting[node_id]*nodes_float.emitter_coeff[node_id]
+        Kd = nodes_float.demand_coeff[node_id]
+        for k in dpoints:
+            H1[k] = H0[k]
+            Q1[k] = (H0[k] - Cm[k]) / Bm[k]
+        for k in upoints:
+            H1[k] = H0[k]
+            Q1[k] = (Cp[k] - H0[k]) / Bp[k]
+
 def run_junction_step(
     Q0, H0, Q1, H1, E1, D1, B, R, Cp, Bp, Cm, Bm,
-    num_nodes, nodes_type, nodes_float, nodes_obj, RESERVOIR, JUNCTION):
+    num_nodes, nodes_type, nodes_float, nodes_obj):
     """Solves flow and head for boundary points attached to nodes
 
     All the numpy arrays are passed by reference,
@@ -60,33 +71,11 @@ def run_junction_step(
         DOWN {int} -- row index in junctions_int to extract downstream_neighbors_num
         N {int} -- row index to extract the first downstream node in table junctions_int
     """
-    for node_id in range(num_nodes):
 
-        dpoints = nodes_obj.downstream_points[node_id]
-        upoints = nodes_obj.upstream_points[node_id]
-
-        # Junction is a reservoir
-        # TODO : INCLUDE EMITTER
-        if nodes_type[node_id] == RESERVOIR:
-            Ke = nodes_float.emitter_setting[node_id]*nodes_float.emitter_coeff[node_id]
-            Kd = nodes_float.demand_coeff[node_id]
-            for k in dpoints:
-                H1[k] = H0[k]
-                Q1[k] = (H0[k] - Cm[k]) / Bm[k]
-            for k in upoints:
-                H1[k] = H0[k]
-                Q1[k] = (Cp[k] - H0[k]) / Bp[k]
-        if nodes_type[node_id] == JUNCTION:
-            sc = 0
-            sb = 0
-
-            for k in dpoints: # C-
-                sc += Cm[k] / Bm[k]
-                sb += 1 / Bm[k]
-
-            for k in upoints: # C+
-                sc += Cp[k] / Bp[k]
-                sb += 1 / Bp[k]
+    scm = Cm[dpoints] / Bm[dpoints]
+    sbm = 1 / Bm[dpoints]
+    scp = Cp[upoints] / Bp[upoints]
+    sbp = 1 / Bp[upoints]
 
             Z = sc/sb
             Ke = nodes_float.emitter_setting[node_id]*nodes_float.emitter_coeff[node_id]

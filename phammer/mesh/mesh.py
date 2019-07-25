@@ -3,7 +3,7 @@ import numpy as np
 import networkx as nx
 
 from time import time
-from phammer.simulation.constants import TOL, WARNINGS, G, DEFAULT_FFACTOR
+from phammer.simulation.constants import TOL, TIMEIT, WARNINGS, G, DEFAULT_FFACTOR
 from phammer.simulation.constants import POINTS_INT, POINTS_FLOAT
 from phammer.simulation.constants import NODES_INT, NODES_FLOAT, NODES_OBJ, NODES_OBJ_DTYPES
 from phammer.simulation.constants import VALVES_INT, VALVES_FLOAT
@@ -187,10 +187,15 @@ class Mesh:
             prop: [np.array([], dtype=NODES_OBJ_DTYPES[j]) for i in range(self.num_nodes)] for j, prop in enumerate(NODES_OBJ._fields)
         })
 
-    def create_mesh(self):
-        steady_state_results = wntr.sim.EpanetSimulator(self.wn).run_sim()
-        self.Q0 = np.zeros(self.num_points, dtype = np.float)
-        self.H0 = np.zeros(self.num_points, dtype = np.float)
+    def _run_steady_state(self):
+        if TIMEIT:
+            t = time()
+            print("START - EPANET")
+
+        steady_state_results = wntr.sim.WNTRSimulator(self.wn, mode='DD').run_sim()
+
+        if TIMEIT:
+            print("END - EPANET [%.3f s]" % (time() - t))
 
         # Check if period is valid
         if steady_state_results.link['flowrate'].shape[0] < 2:
@@ -199,12 +204,17 @@ class Mesh:
         else:
             self.period_size = steady_state_results.link['flowrate'].index[1]
 
-        self.steady_head = steady_state_results.node['head'].loc[self.period_size*self.period]
         # fix leak_demand
         self.steady_leak_demand = steady_state_results.node['demand'].loc[self.period_size*self.period]
+        self.steady_head = steady_state_results.node['head'].loc[self.period_size*self.period]
         self.steady_demand = steady_state_results.node['demand'].loc[self.period_size*self.period]
         self.steady_flowrate = steady_state_results.link['flowrate'].loc[self.period_size*self.period]
         self.network_graph = self._get_network_graph()
+
+    def create_mesh(self):
+        self._run_steady_state()
+        self.Q0 = np.zeros(self.num_points, dtype = np.float)
+        self.H0 = np.zeros(self.num_points, dtype = np.float)
 
         # Set default value for node_type
         self.properties['int']['nodes'].node_type.fill(NODE_TYPES['junction'])

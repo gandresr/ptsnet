@@ -4,9 +4,9 @@ import numpy as np
 from phammer.simulation.sim import Simulation
 from time import time
 
-input_file = '/home/watsup/Documents/Github/hammer-net/example_files/LoopedNet.inp'
+input_file = '/home/watsup/Documents/Github/hammer-net/example_files/PHFC_SIM_17_4_13.inp'
 
-T = 20
+T = 1
 dt = 0.01
 
 sim = Simulation(input_file,
@@ -15,12 +15,4 @@ sim = Simulation(input_file,
     default_wave_speed = 1200,
     full_results=False)
 
-t = time()
-sim.start()
-print(time() - t)
-t = time()
-sim.run_sim()
-print(time() - t)
-
-plt.plot(sim.H)
-plt.show()
+sim.mesh._run_steady_state()
