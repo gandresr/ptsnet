@@ -5,7 +5,7 @@ from time import time
 from phammer.mesh.mesh import Mesh
 from phammer.simulation.utils import define_curve, is_iterable
 from phammer.simulation.utils import set_settings, set_coefficients
-from phammer.simulation.funcs import run_interior_step, run_valve_step, run_junction_step
+from phammer.simulation.funcs import run_interior_step, run_boundary_step, run_valve_step
 from phammer.simulation.constants import NODE_TYPES
 
 class Simulation:
@@ -97,7 +97,7 @@ class Simulation:
             self.mesh.properties['float']['nodes'].emitter_coeff,
             self.mesh.properties['float']['nodes'].setting)
 
-    def _run_all(self, Q0, H0, Q1, H1, E1, D1):
+    def _run_all(self, HH0, Q0, H0, Q1, H1, E1, D1):
         # The order of the calls matter
         run_interior_step(
             Q0, H0, Q1, H1,
@@ -106,19 +106,24 @@ class Simulation:
             self.mesh.properties['float']['points'].Cp,
             self.mesh.properties['float']['points'].Bp,
             self.mesh.properties['float']['points'].Cm,
-            self.mesh.properties['float']['points'].Bm)
-        run_junction_step(Q0, H0, Q1, H1, E1, D1,
-            self.mesh.properties['float']['points'].B,
-            self.mesh.properties['float']['points'].R,
-            self.mesh.properties['float']['points'].Cp,
-            self.mesh.properties['float']['points'].Bp,
-            self.mesh.properties['float']['points'].Cm,
             self.mesh.properties['float']['points'].Bm,
-            self.mesh.num_nodes,
-            self.mesh.properties['int']['nodes'].node_type,
-            self.mesh.properties['float']['nodes'],
-            self.mesh.properties['obj']['nodes'],
-            NODE_TYPES['reservoir'], NODE_TYPES['junction'])
+            self.mesh.properties['float']['points'].is_pboundary,
+            self.mesh.properties['float']['points'].is_mboundary,)
+        # run_boundary_step(
+        #     HH0, Q1, H1, E1, D1,
+        #     self.mesh.properties['float']['points'].Cp,
+        #     self.mesh.properties['float']['points'].Bp,
+        #     self.mesh.properties['float']['points'].Cm,
+        #     self.mesh.properties['float']['points'].Bm,
+        #     self.mesh.properties['float']['nodes'].emitter_setting * \
+        #         self.mesh.properties['float']['nodes'].emitter_coeff,
+        #     self.mesh.properties['float']['nodes'].demand_coeff,
+        #     self.mesh.mboundary_ids,
+        #     self.mesh.pboundary_ids,
+        #     self.mesh.reservoir_ids,
+        #     self.mesh.boundary_ids,
+        #     self.mesh.head_reps,
+        #     self.mesh.bindices)
         # run_valve_step(Q0, H0, Q1, H1,
         #     self.mesh.properties['float']['points'].B,
         #     self.mesh.properties['float']['points'].R,
@@ -183,21 +188,21 @@ class Simulation:
                 # TODO update E[0,:], D[0,:]
 
         if self.full_results:
-            self._run_all(self.Q[self.t-1,:], self.H[self.t-1,:],
+            self._run_all(self.H[0,:], self.Q[self.t-1,:], self.H[self.t-1,:],
                 self.Q[self.t,:], self.H[self.t,:], self.E[self.t,:], self.D[self.t,:])
         else:
             if self.t % 2 != 0:
-                self._run_all(Q0 = self.Q0, H0 = self.H0,
-                    Q1 = self.Q1, H1 = self.H1, E1 = self.E, D1 = self.D)
+                self._run_all(self.H[0,:], self.Q0, self.H0,
+                    self.Q1, self.H1, self.E[self.t,:], self.D[self.t,:])
                 self.Q[self.t,:] = self.Q1[self.mesh.boundary_ids]
                 self.H[self.t,:] = self.H1[self.mesh.boundary_ids]
             else:
-                self._run_all(Q0 = self.Q1, H0 = self.H1,
-                    Q1 = self.Q0, H1 = self.H0, E1 = self.E, D1 = self.D)
+                self._run_all(self.H[0,:], self.Q1, self.H1,
+                    self.Q0, self.H0, self.E[self.t,:], self.D[self.t,:])
                 self.Q[self.t,:] = self.Q0[self.mesh.boundary_ids]
                 self.H[self.t,:] = self.H0[self.mesh.boundary_ids]
+        self.t += 1
 
     def run_sim(self):
         while self.t < self.time_steps:
             self.run_step()
-            self.t += 1

@@ -15,7 +15,6 @@ def sy(y):
 
 sy(y)
 
-
 x += 1
 x -= 1
 yy = [ctypes.pointer(ctypes.c_float(x[i])) for i in index]

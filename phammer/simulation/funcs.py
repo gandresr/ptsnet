@@ -5,7 +5,8 @@ import numpy as np
 # ------------------ SIM STEPS ------------------
 
 @jit(nopython = True, cache = True, parallel = PARALLEL)
-def run_interior_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm):
+def run_interior_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm,
+    is_pboundary, is_mboundary):
     """Solves flow and head for interior points
 
     All the numpy arrays are passed by reference,
@@ -16,35 +17,24 @@ def run_interior_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm):
     """
     # Extreme points
     Cm[0] = H0[1] - B[0]*Q0[1]
-    Cp[-1] = H0[-2] + B[-1]*Q0[-2]
+    Cp[-1] = H0[-2] + B[-2]*Q0[-2]
     Bm[0] = B[0] + R[0]*abs(Q0[1])
-    Bp[-1] = B[-1] + R[-1]*abs(Q0[-2])
+    Bp[-1] = B[-2] + R[-2]*abs(Q0[-2])
 
     for i in range(1, len(Q0)-1):
         # The first and last nodes are skipped in the  loop considering
         # that they are boundary nodes (every interior node requires an
         # upstream and a downstream neighbor)
-        Cm[i] = H0[i+1] - B[i]*Q0[i+1]
-        Cp[i] = H0[i-1] + B[i]*Q0[i-1]
-        Bm[i] = B[i] + R[i]*abs(Q0[i+1])
-        Bp[i] = B[i] + R[i]*abs(Q0[i-1])
+        Cm[i] = (H0[i+1] - B[i]*Q0[i+1]) * is_mboundary[i]
+        Bm[i] = (B[i] + R[i]*abs(Q0[i+1])) * is_mboundary[i]
+        Cp[i] = (H0[i-1] + B[i]*Q0[i-1]) * is_pboundary[i]
+        Bp[i] = (B[i] + R[i]*abs(Q0[i-1])) * is_pboundary[i]
         H1[i] = (Cp[i]*Bm[i] + Cm[i]*Bp[i]) / (Bp[i] + Bm[i])
-        Q1[i] = (H1[i] - Cm[i]) / Bm[i]
+        Q1[i] = (Cp[i] - Cm[i]) / (Bp[i] + Bm[i])
 
-def run_reservoir_step(Q0, H0, Q1, H1, E1, D1, B, R, Cp, Bp, Cm, Bm, nodes_float):
-    for node_id in reservoir_ids:
-        Ke = nodes_float.emitter_setting[node_id]*nodes_float.emitter_coeff[node_id]
-        Kd = nodes_float.demand_coeff[node_id]
-        for k in dpoints:
-            H1[k] = H0[k]
-            Q1[k] = (H0[k] - Cm[k]) / Bm[k]
-        for k in upoints:
-            H1[k] = H0[k]
-            Q1[k] = (Cp[k] - H0[k]) / Bp[k]
-
-def run_junction_step(
-    Q0, H0, Q1, H1, E1, D1, B, R, Cp, Bp, Cm, Bm,
-    num_nodes, nodes_type, nodes_float, nodes_obj):
+def run_boundary_step(
+    H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd,
+    mboundary_ids, pboundary_ids, reservoirs, boundary_ids, head_reps, bindices):
     """Solves flow and head for boundary points attached to nodes
 
     All the numpy arrays are passed by reference,
@@ -53,46 +43,22 @@ def run_junction_step(
 
     Arguments:
         TODO: UPDATE ARGUMENTS
-        junctions_int {2D array} -- table with junction properties (integers)
-        Q1 {array} -- initial flow
-        Q2 {array} -- flow solution for the next time step
-        H1 {array} -- initial head
-        H2 {array} -- head solution for the next time step
-        B {array} -- coefficients B[i] = a/(g*A)
-        R {array} -- coefficients R[i] = f*dx/(2*g*D*A**2)
-        junction_type {array} -- array with constants associated to junction type
-        demand {array} -- demands at junctions
-        emitter_coeff {array} -- K coefficients of emitters, Q = K(2gH)**0.5
-        emitter_setting {array} -- setting value emitter in [0, 1]
-        RESERVOIR {int} -- constant for junctions of type 'reservoir'
-        PIPE {int} -- constant for junctions of type 'pipe'
-        EMITTER {int} -- constant for junctions of type 'emitter'
-        UP {int} -- row index in junctions_int to extract upstream_neighbors_num
-        DOWN {int} -- row index in junctions_int to extract downstream_neighbors_num
-        N {int} -- row index to extract the first downstream node in table junctions_int
     """
+    sc = Cm[boundary_ids] / Bm[boundary_ids] + Cp[boundary_ids] / Bp[boundary_ids]
+    sb = 1 / Bm[boundary_ids] + 1 / Bp[boundary_ids]
+    print(bindices)
+    sc = np.add.reduceat(sc, bindices)
+    sb = np.add.reduceat(sb, bindices)
 
-    scm = Cm[dpoints] / Bm[dpoints]
-    sbm = 1 / Bm[dpoints]
-    scp = Cp[upoints] / Bp[upoints]
-    sbp = 1 / Bp[upoints]
-
-            Z = sc/sb
-            Ke = nodes_float.emitter_setting[node_id]*nodes_float.emitter_coeff[node_id]
-            Kd = nodes_float.demand_coeff[node_id]
-            K = ((Ke+Kd)/sb)**2
-            HH = ((2*Z + K) - (K**2 + 4*Z*K)**0.5) / 2
-
-            E1[node_id] = Ke*(2*G*HH)**0.5
-            D1[node_id] = Kd*(2*G*HH)**0.5
-
-            for k in dpoints: # C-
-                H1[k] = HH
-                Q1[k] = (HH - Cm[k]) / Bm[k]
-
-            for k in upoints: # C+
-                H1[k] = HH
-                Q1[k] = (Cp[k] - HH) / Bp[k]
+    Z = sc / sb
+    K = ((Ke+Kd)/sb)**2
+    HH = ((2*Z + K) - np.sqrt(K**2 + 4*Z*K)) / 2
+    H1[boundary_ids] = HH[head_reps]
+    H1[reservoirs] = H0[reservoirs]
+    E1[:] = Ke*np.sqrt(2*G*HH)
+    D1[:] = Kd*np.sqrt(2*G*HH)
+    Q1[mboundary_ids] = (H1[mboundary_ids] - Cm[mboundary_ids]) / Bm[mboundary_ids]
+    Q1[pboundary_ids] = (Cp[pboundary_ids] - H1[pboundary_ids]) / Bp[pboundary_ids]
 
 @jit(nopython = True, cache = True, parallel = PARALLEL)
 def run_valve_step(Q0, H0, Q1, H1, B, R, valves_int, valves_float, nodes_obj):

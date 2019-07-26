@@ -5,7 +5,7 @@ import networkx as nx
 from time import time
 from phammer.simulation.constants import TOL, TIMEIT, WARNINGS, G, DEFAULT_FFACTOR
 from phammer.simulation.constants import POINTS_INT, POINTS_FLOAT
-from phammer.simulation.constants import NODES_INT, NODES_FLOAT, NODES_OBJ, NODES_OBJ_DTYPES
+from phammer.simulation.constants import NODES_INT, NODES_FLOAT
 from phammer.simulation.constants import VALVES_INT, VALVES_FLOAT
 from phammer.simulation.constants import PUMPS_INT, PUMPS_FLOAT
 from phammer.simulation.constants import NODE_TYPES, POINT_TYPES
@@ -19,7 +19,6 @@ class Mesh:
         self.steady_demand = None
         self.steady_flowrate = None
 
-        self.network_graph = None
         self.properties = {}
 
         self.num_segments = 0
@@ -29,7 +28,15 @@ class Mesh:
         self.num_valves = 0
         self.num_pumps = 0
 
-        self.boundary_ids = []
+        # IDs of boundary nodes at junctions
+        self.pboundary_ids = [] # Boundaries with C+
+        self.mboundary_ids = [] # Boundaries with C-
+        self.boundary_ids = [] # All boundary nodes at junctions
+        # IDs of reservoirs
+        self.reservoir_ids = []
+        self.head_reps = [] # TODO explain
+        self.bindices = [] # TODO explain
+        self.node_points = None
         self.flow_directions = {}
         self.node_ids = {}
         self.valve_ids = {}
@@ -40,6 +47,7 @@ class Mesh:
         self.period = period
         self.period_size = 0
 
+        self.network_graph = self.wn.get_graph()
         self.wave_speeds = self._get_wave_speeds(default_wave_speed, wave_speed_file, delimiter)
         self.segments = self._get_segments(time_step)
 
@@ -48,17 +56,16 @@ class Mesh:
         self.H0 = None
         self._initialize()
 
-    def _get_network_graph(self):
-        G = self.wn.get_graph()
+    def _define_flow_directions(self):
 
         zero_graph = nx.Graph()
 
         k = 0
         j = 0
 
-        for n1 in G:
-            for n2 in G[n1]:
-                for link_name in G[n1][n2]:
+        for n1 in self.network_graph:
+            for n2 in self.network_graph[n1]:
+                for link_name in self.network_graph[n1][n2]:
                     flow = float(self.steady_flowrate[self.link_ids[link_name]])
                     if flow < -TOL:
                         self.steady_flowrate[link_name] *= -1
@@ -74,15 +81,13 @@ class Mesh:
 
         # Define flow convention for links with zero flow
         for n1, n2 in nx.dfs_edges(zero_graph):
-            if not G.has_edge(n1, n2):
-                for link_name in G[n2][n1]:
+            if not self.network_graph.has_edge(n1, n2):
+                for link_name in self.network_graph[n2][n1]:
                     self.flow_directions[link_name] = -1
             else:
-                for link_name in G[n1][n2]:
+                for link_name in self.network_graph[n1][n2]:
                     j += 1
                     self.flow_directions[link_name] = 1
-
-        return G
 
     def _get_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
         wave_speeds = {}
@@ -183,16 +188,15 @@ class Mesh:
             prop: np.zeros(self.num_pumps, dtype = np.float) for prop in PUMPS_FLOAT._fields
         })
 
-        self.properties['obj']['nodes'] =  NODES_OBJ(**{
-            prop: [np.array([], dtype=NODES_OBJ_DTYPES[j]) for i in range(self.num_nodes)] for j, prop in enumerate(NODES_OBJ._fields)
-        })
+        max_degree = max(dict(self.network_graph.degree()).values())
+        self.node_points = np.full((self.num_nodes, max_degree), -1, dtype = np.int)
 
     def _run_steady_state(self):
         if TIMEIT:
             t = time()
             print("START - EPANET")
 
-        steady_state_results = wntr.sim.WNTRSimulator(self.wn, mode='DD').run_sim()
+        steady_state_results = wntr.sim.EpanetSimulator(self.wn).run_sim()
 
         if TIMEIT:
             print("END - EPANET [%.3f s]" % (time() - t))
@@ -209,7 +213,7 @@ class Mesh:
         self.steady_head = steady_state_results.node['head'].loc[self.period_size*self.period]
         self.steady_demand = steady_state_results.node['demand'].loc[self.period_size*self.period]
         self.steady_flowrate = steady_state_results.link['flowrate'].loc[self.period_size*self.period]
-        self.network_graph = self._get_network_graph()
+        self._define_flow_directions()
 
     def create_mesh(self):
         self._run_steady_state()
@@ -218,6 +222,10 @@ class Mesh:
 
         # Set default value for node_type
         self.properties['int']['nodes'].node_type.fill(NODE_TYPES['junction'])
+        self.properties['int']['nodes'].num_upoints.fill(0)
+        self.properties['int']['nodes'].num_dpoints.fill(0)
+        self.properties['float']['points'].is_mboundary.fill(1)
+        self.properties['float']['points'].is_pboundary.fill(1)
 
         i = 0 # points index
 
@@ -268,15 +276,25 @@ class Mesh:
                     self.properties['int']['points'].subindex[i] = idx
                     self.properties['int']['points'].link_id[i] = link_id
                     if idx == 0: # downstream node of start_node
+                        if self.properties['int']['nodes'].node_type[start_node_id] == NODE_TYPES['reservoir']:
+                            self.reservoir_ids.append(i)
                         self.properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
-                        self.properties['obj']['nodes'].downstream_points[start_node_id] = \
-                            np.append(self.properties['obj']['nodes'].downstream_points[start_node_id], i)
-                        self.boundary_ids.append(i)
+                        num_dpoints = self.properties['int']['nodes'].num_dpoints[start_node_id]
+                        num_upoints = self.properties['int']['nodes'].num_upoints[start_node_id]
+                        self.node_points[start_node_id, num_dpoints+num_upoints] = i
+                        self.properties['float']['points'].is_pboundary[i] = 0
+                        self.mboundary_ids.append(i)
+                        self.properties['int']['nodes'].num_dpoints[start_node_id] += 1
                     elif idx == self.segments[link_name]: # upstream node of end_node
+                        if self.properties['int']['nodes'].node_type[end_node_id] == NODE_TYPES['reservoir']:
+                            self.reservoir_ids.append(i)
                         self.properties['int']['points'].point_type[i] = POINT_TYPES['boundary']
-                        self.properties['obj']['nodes'].upstream_points[end_node_id] = \
-                            np.append(self.properties['obj']['nodes'].upstream_points[end_node_id], i)
-                        self.boundary_ids.append(i)
+                        num_dpoints = self.properties['int']['nodes'].num_dpoints[end_node_id]
+                        num_upoints = self.properties['int']['nodes'].num_upoints[end_node_id]
+                        self.node_points[end_node_id, num_dpoints+num_upoints] = i
+                        self.properties['float']['points'].is_mboundary[i] = 0
+                        self.pboundary_ids.append(i)
+                        self.properties['int']['nodes'].num_upoints[end_node_id] += 1
                     else: # interior point
                         self.properties['int']['points'].point_type[i] = POINT_TYPES['interior']
                     dx = pipe_length / self.segments[link_name]
@@ -302,3 +320,11 @@ class Mesh:
                 self.properties['float']['pumps'].a[self.pump_ids[link_name]] = a
                 self.properties['float']['pumps'].b[self.pump_ids[link_name]] = b
                 self.properties['float']['pumps'].c[self.pump_ids[link_name]] = c
+
+        self.boundary_ids = self.node_points[self.node_points != -1]
+        temp_node_points = np.copy(self.node_points)
+        temp_node_points[temp_node_points != -1] = 0
+        reps = temp_node_points.shape[1] + temp_node_points.sum(axis = 1)
+        self.head_reps = [i for i in range(temp_node_points.shape[0]) for j in range(reps[i])]
+        self.bindices = np.zeros(len(reps), dtype = np.int)
+        self.bindices[1:] = np.cumsum(reps)[:-1]

@@ -21,12 +21,21 @@ POINTS_INT = ntuple('POINTS_INT',
 )
 
 POINTS_FLOAT = ntuple('POINTS_FLOAT',
-    ['B', 'R', 'Cm', 'Bm', 'Cp', 'Bp'])
+    ['B',
+    'R',
+    'Cm',
+    'Bm',
+    'Cp',
+    'Bp',
+    'is_mboundary', # TODO explain or choose better name
+    'is_pboundary']) # TODO explain or choose better name
 
 # ----- Index labels for Junction tables -----
 
 NODES_INT = ntuple('NODES_INT',
     ['node_type',
+    'num_upoints',
+    'num_dpoints',
     'emitter_curve_id',
     'emitter_setting_id']
 )
@@ -35,12 +44,6 @@ NODES_FLOAT = ntuple('NODES_FLOAT', [
     'demand_coeff',
     'emitter_coeff',
     'emitter_setting'])
-
-NODES_OBJ = ntuple('NODES_OBJ',
-    ['upstream_points',
-    'downstream_points'])
-
-NODES_OBJ_DTYPES = ['int', 'int', 'float', 'float', 'float', 'float']
 
 # ----- Index labels for Valve tables -----
 
