@@ -1,4 +1,4 @@
-from numba import jit
+from numba import jit, vectorize
 from phammer.simulation.constants import G, PARALLEL
 import numpy as np
 
@@ -32,9 +32,10 @@ def run_interior_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm,
         H1[i] = (Cp[i]*Bm[i] + Cm[i]*Bp[i]) / (Bp[i] + Bm[i])
         Q1[i] = (Cp[i] - Cm[i]) / (Bp[i] + Bm[i])
 
+# @jit(nopython = True, cache = True, nogil=True, parallel=True)
 def run_boundary_step(
     H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd,
-    mboundary_ids, pboundary_ids, reservoir_ids, jboundary_ids, head_reps, bindices):
+    mboundary_ids, pboundary_ids, reservoir_ids, jboundary_ids, jnode_ids, head_reps, bindices):
     """Solves flow and head for boundary points attached to nodes
 
     All the numpy arrays are passed by reference,
@@ -44,21 +45,23 @@ def run_boundary_step(
     Arguments:
         TODO: UPDATE ARGUMENTS
     """
-    sc = Cm[jboundary_ids] / Bm[jboundary_ids] + Cp[jboundary_ids] / Bp[jboundary_ids]
-    sb = 1 / Bm[jboundary_ids] + 1 / Bp[jboundary_ids]
-    print(bindices)
-    sc = np.add.reduceat(sc, bindices)
-    sb = np.add.reduceat(sb, bindices)
+    Cm[mboundary_ids] /= Bm[mboundary_ids]
+    Cp[pboundary_ids] /= Bp[pboundary_ids]
+    Bm[mboundary_ids] = 1 / Bm[mboundary_ids]
+    Bp[pboundary_ids] = 1 / Bp[pboundary_ids]
 
-    Z = sc / sb
-    K = ((Ke+Kd)/sb)**2
+    sc = np.add.reduceat(Cm[jboundary_ids], bindices) + np.add.reduceat(Cp[jboundary_ids], bindices)
+    sb = np.add.reduceat(Bm[jboundary_ids], bindices) + np.add.reduceat(Bp[jboundary_ids], bindices)
+
+    Z =  sc / sb
+    K = ((Ke[jnode_ids] + Kd[jnode_ids])/sb)**2
     HH = ((2*Z + K) - np.sqrt(K**2 + 4*Z*K)) / 2
     H1[jboundary_ids] = HH[head_reps]
     H1[reservoir_ids] = H0[reservoir_ids]
-    E1[:] = Ke*np.sqrt(2*G*HH)
-    D1[:] = Kd*np.sqrt(2*G*HH)
-    Q1[mboundary_ids] = (H1[mboundary_ids] - Cm[mboundary_ids]) / Bm[mboundary_ids]
-    Q1[pboundary_ids] = (Cp[pboundary_ids] - H1[pboundary_ids]) / Bp[pboundary_ids]
+    E1[jnode_ids] = Ke[jnode_ids] * np.sqrt(2*G*HH)
+    D1[jnode_ids] = Kd[jnode_ids] * np.sqrt(2*G*HH)
+    Q1[mboundary_ids] = H1[mboundary_ids]*Bm[mboundary_ids] - Cm[mboundary_ids]
+    Q1[pboundary_ids] = Cp[pboundary_ids] - H1[pboundary_ids]*Bp[pboundary_ids]
 
 @jit(nopython = True, cache = True, parallel = PARALLEL)
 def run_valve_step(Q0, H0, Q1, H1, B, R, valves_int, valves_float, nodes_obj):

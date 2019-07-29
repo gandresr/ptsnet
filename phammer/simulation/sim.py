@@ -23,9 +23,6 @@ class Simulation:
             raise Exception("Error: duration < time_step")
 
         self.t = 0 # current time
-        self.time_step = time_step
-        self.time_steps = int(duration/time_step)
-        self.sim_range = range(1, self.time_steps)
         self.full_results = full_results
 
         self.fname = input_file[:input_file.find('.inp')]
@@ -34,12 +31,16 @@ class Simulation:
         # Mesh is initialized here - updated later when running first step
         self.mesh = Mesh(
             self.fname + '.inp',
-            self.time_step,
+            time_step,
             self.wn,
             period = period,
             default_wave_speed = default_wave_speed,
             wave_speed_file = wave_speed_file,
             delimiter = delimiter)
+
+        self.time_step = self.mesh.time_step
+        self.time_steps = int(duration/self.time_step)
+        self.sim_range = range(1, self.time_steps)
 
         if full_results:
             self.Q = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
@@ -122,6 +123,7 @@ class Simulation:
             self.mesh.pboundary_ids,
             self.mesh.reservoir_ids,
             self.mesh.jboundary_ids,
+            self.mesh.jnode_ids,
             self.mesh.head_reps,
             self.mesh.bindices)
         # run_valve_step(Q0, H0, Q1, H1,
@@ -183,8 +185,8 @@ class Simulation:
         if self.t == 0:
             self.start()
             if not self.full_results:
-                self.Q[0,:] = self.Q0[self.mesh.boundary_ids]
-                self.H[0,:] = self.H0[self.mesh.boundary_ids]
+                self.Q[0,:] = self.Q0[self.mesh.jboundary_ids]
+                self.H[0,:] = self.H0[self.mesh.jboundary_ids]
                 # TODO update E[0,:], D[0,:]
 
         if self.full_results:
@@ -194,13 +196,13 @@ class Simulation:
             if self.t % 2 != 0:
                 self._run_all(self.H[0,:], self.Q0, self.H0,
                     self.Q1, self.H1, self.E[self.t,:], self.D[self.t,:])
-                self.Q[self.t,:] = self.Q1[self.mesh.boundary_ids]
-                self.H[self.t,:] = self.H1[self.mesh.boundary_ids]
+                self.Q[self.t,:] = self.Q1[self.mesh.jboundary_ids]
+                self.H[self.t,:] = self.H1[self.mesh.jboundary_ids]
             else:
                 self._run_all(self.H[0,:], self.Q1, self.H1,
                     self.Q0, self.H0, self.E[self.t,:], self.D[self.t,:])
-                self.Q[self.t,:] = self.Q0[self.mesh.boundary_ids]
-                self.H[self.t,:] = self.H0[self.mesh.boundary_ids]
+                self.Q[self.t,:] = self.Q0[self.mesh.jboundary_ids]
+                self.H[self.t,:] = self.H0[self.mesh.jboundary_ids]
         self.t += 1
 
     def run_sim(self):

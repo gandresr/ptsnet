@@ -30,12 +30,7 @@ POINTS_FLOAT = ntuple('POINTS_FLOAT',
     'is_mboundary', # TODO explain or choose better name
     'is_pboundary']) # TODO explain or choose better name
 
-# ----- Index labels for Junction tables -----
-
-# ----- Index labels for Valve Node tables -----
-
-# ----- Index labels for Pump Node tables -----
-
+# ----- Index labels for Node tables -----
 
 NODES_INT = ntuple('NODES_INT',
     ['node_type',
