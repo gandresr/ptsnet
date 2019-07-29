@@ -31,7 +31,9 @@ class Mesh:
         # IDs of boundary nodes at junctions
         self.pboundary_ids = [] # Boundaries with C+
         self.mboundary_ids = [] # Boundaries with C-
-        self.boundary_ids = [] # All boundary nodes at junctions
+        self.jboundary_ids = [] # All boundary nodes at junctions
+        self.valve_node_ids = []
+        self.pump_node_ids = []
         # IDs of reservoirs
         self.reservoir_ids = []
         self.head_reps = [] # TODO explain
@@ -161,6 +163,7 @@ class Mesh:
         self.node_ids = {node : i for i, node in enumerate(self.wn.node_name_list)}
         self.valve_ids = {valve : i for i, valve in enumerate(self.wn.valve_name_list)}
         self.pump_ids = {pump : i for i, pump in enumerate(self.wn.pump_name_list)}
+        self.junction_node_ids = set(range(self.num_nodes))
 
         self.properties['int']['points'] = POINTS_INT(**{
             prop: np.full(self.num_points, np.nan, dtype = np.int) for prop in POINTS_INT._fields
@@ -306,12 +309,14 @@ class Mesh:
                     self.H0[i] = head_1 - (head_1 - head_2)*idx/self.segments[link_name]
                     i += 1
             elif link.link_type == 'Valve':
+                self.valve_node_ids += [start_node_id, end_node_id]
                 self.properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['valve']
                 self.properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['valve']
                 self.properties['int']['valves'].upstream_node[self.valve_ids[link_name]] = self.node_ids[start_node]
                 self.properties['int']['valves'].downstream_node[self.valve_ids[link_name]] = self.node_ids[end_node]
                 self.properties['float']['valves'].area[self.valve_ids[link_name]] = (np.pi * link.diameter ** 2 / 4)
             elif link.link_type == 'Pump':
+                self.pump_node_ids += [start_node_id, end_node_id]
                 self.properties['int']['nodes'].node_type[start_node_id] = NODE_TYPES['pump']
                 self.properties['int']['nodes'].node_type[end_node_id] = NODE_TYPES['pump']
                 self.properties['int']['pumps'].upstream_node[self.pump_ids[link_name]] = self.node_ids[start_node]
@@ -321,10 +326,14 @@ class Mesh:
                 self.properties['float']['pumps'].b[self.pump_ids[link_name]] = b
                 self.properties['float']['pumps'].c[self.pump_ids[link_name]] = c
 
-        self.boundary_ids = self.node_points[self.node_points != -1]
-        temp_node_points = np.copy(self.node_points)
+        self.jnode_ids = np.delete(np.arange(self.num_nodes), self.valve_node_ids + self.pump_node_ids)
+        self.jboundary_ids = self.node_points[self.jnode_ids, :]
+        temp_node_points = np.copy(self.jboundary_ids)
+        self.jboundary_ids = self.jboundary_ids[self.jboundary_ids != -1]
         temp_node_points[temp_node_points != -1] = 0
         reps = temp_node_points.shape[1] + temp_node_points.sum(axis = 1)
+        print(reps)
         self.head_reps = [i for i in range(temp_node_points.shape[0]) for j in range(reps[i])]
         self.bindices = np.zeros(len(reps), dtype = np.int)
         self.bindices[1:] = np.cumsum(reps)[:-1]
+        print(self.bindices)

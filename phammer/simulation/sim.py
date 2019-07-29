@@ -109,21 +109,21 @@ class Simulation:
             self.mesh.properties['float']['points'].Bm,
             self.mesh.properties['float']['points'].is_pboundary,
             self.mesh.properties['float']['points'].is_mboundary,)
-        # run_boundary_step(
-        #     HH0, Q1, H1, E1, D1,
-        #     self.mesh.properties['float']['points'].Cp,
-        #     self.mesh.properties['float']['points'].Bp,
-        #     self.mesh.properties['float']['points'].Cm,
-        #     self.mesh.properties['float']['points'].Bm,
-        #     self.mesh.properties['float']['nodes'].emitter_setting * \
-        #         self.mesh.properties['float']['nodes'].emitter_coeff,
-        #     self.mesh.properties['float']['nodes'].demand_coeff,
-        #     self.mesh.mboundary_ids,
-        #     self.mesh.pboundary_ids,
-        #     self.mesh.reservoir_ids,
-        #     self.mesh.boundary_ids,
-        #     self.mesh.head_reps,
-        #     self.mesh.bindices)
+        run_boundary_step(
+            HH0, Q1, H1, E1, D1,
+            self.mesh.properties['float']['points'].Cp,
+            self.mesh.properties['float']['points'].Bp,
+            self.mesh.properties['float']['points'].Cm,
+            self.mesh.properties['float']['points'].Bm,
+            self.mesh.properties['float']['nodes'].emitter_setting * \
+                self.mesh.properties['float']['nodes'].emitter_coeff,
+            self.mesh.properties['float']['nodes'].demand_coeff,
+            self.mesh.mboundary_ids,
+            self.mesh.pboundary_ids,
+            self.mesh.reservoir_ids,
+            self.mesh.jboundary_ids,
+            self.mesh.head_reps,
+            self.mesh.bindices)
         # run_valve_step(Q0, H0, Q1, H1,
         #     self.mesh.properties['float']['points'].B,
         #     self.mesh.properties['float']['points'].R,

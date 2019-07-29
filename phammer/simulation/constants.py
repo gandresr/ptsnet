@@ -32,6 +32,11 @@ POINTS_FLOAT = ntuple('POINTS_FLOAT',
 
 # ----- Index labels for Junction tables -----
 
+# ----- Index labels for Valve Node tables -----
+
+# ----- Index labels for Pump Node tables -----
+
+
 NODES_INT = ntuple('NODES_INT',
     ['node_type',
     'num_upoints',
