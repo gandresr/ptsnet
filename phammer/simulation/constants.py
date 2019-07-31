@@ -1,4 +1,20 @@
-from collections import namedtuple as ntuple
+point_properties = {
+    'are_start' : np.bool,
+    'are_end' : np.bool,
+    'B' : np.float,
+    'R' : np.float,
+    'Cm' : np.float,
+    'Cp' : np.float,
+    'Bm' : np.float,
+    'Bp' : np.float,
+    'flowrate' : np.float,
+    'head' : np.float
+}
+
+points = Table(point_properties, 5)
+print(points.are_start)
+points['are_ghost'] = np.array([1,5,6], dtype=np.int)
+print(points['are_ghost'])
 
 # ----- Global -----
 

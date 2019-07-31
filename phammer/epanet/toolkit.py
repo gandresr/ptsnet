@@ -1,5 +1,5 @@
 """
-The wntr.epanet.toolkit module is a Python extensions for the EPANET 
+The wntr.epanet.toolkit module is a Python extensions for the EPANET
 Programmers Toolkit DLLs.
 
 .. rubric:: Contents
@@ -62,7 +62,7 @@ def ENgetwarning(code, sec=-1):
 
 def runepanet(inpfile):
     """Run an EPANET command-line simulation
-    
+
     Parameters
     ----------
     inpfile : str
@@ -87,7 +87,7 @@ class ENepanet():
     """Wrapper class to load the EPANET DLL object, then perform operations on
     the EPANET object that is created when a file is loaded.
     """
-    
+
     ENlib = None
     """The variable that holds the ctypes Library object"""
 
@@ -172,7 +172,7 @@ class ENepanet():
             Output file to create (default to constructor value)
         binfile : str
             Binary output file to create (default to constructor value)
-            
+
         """
         if self.fileLoaded: self.ENclose()
         if self.fileLoaded:
@@ -230,7 +230,7 @@ class ENepanet():
             if link flows should be re-initialized (1) or
             not (0) and 2nd digit indicates if hydraulic
             results should be saved to file (1) or not (0)
-            
+
         """
         self.errcode = self.ENlib.ENinitH(iFlag)
         self._error()
@@ -238,15 +238,15 @@ class ENepanet():
 
     def ENrunH(self):
         """Solves hydraulics for conditions at time t
-        
+
         This function is used in a loop with ENnextH() to run
         an extended period hydraulic simulation.
         See ENsolveH() for an example.
-        
+
         Returns
         --------
         Current simulation time (seconds)
-        
+
         """
         lT = ctypes.c_long()
         self.errcode = self.ENlib.ENrunH(byref(lT))
@@ -256,15 +256,15 @@ class ENepanet():
 
     def ENnextH(self):
         """Determines time until next hydraulic event
-        
+
         This function is used in a loop with ENrunH() to run
         an extended period hydraulic simulation.
         See ENsolveH() for an example.
-        
+
         Returns
         ---------
          Time (seconds) until next hydraulic event (0 marks end of simulation period)
-         
+
         """
         lTstep = ctypes.c_long()
         self.errcode = self.ENlib.ENnextH(byref(lTstep))
@@ -284,7 +284,7 @@ class ENepanet():
         -------------
         filename : str
             Name of file
-            
+
         """
         self.errcode = self.ENlib.ENsavehydfile(filename.encode('ascii'))
         self._error()
@@ -297,7 +297,7 @@ class ENepanet():
         -------------
         filename : str
             Name of file
-            
+
         """
         self.errcode = self.ENlib.ENusehydfile(filename.encode('ascii'))
         self._error()
@@ -322,7 +322,7 @@ class ENepanet():
         -------------
          iSaveflag : int
              EN_SAVE (1) if results saved to file, EN_NOSAVE (0) if not
-             
+
         """
         self.errcode = self.ENlib.ENinitQ(iSaveflag)
         self._error()
@@ -330,15 +330,15 @@ class ENepanet():
 
     def ENrunQ(self):
         """Retrieves hydraulic and water quality results at time t
-        
+
         This function is used in a loop with ENnextQ() to run
         an extended period water quality simulation. See ENsolveQ() for
         an example.
-        
+
         Returns
         -------
         Current simulation time (seconds)
-         
+
         """
         lT = ctypes.c_long()
         self.errcode = self.ENlib.ENrunQ(byref(lT))
@@ -351,11 +351,11 @@ class ENepanet():
         This function is used in a loop with ENrunQ() to run
         an extended period water quality simulation. See ENsolveQ() for
         an example.
-        
+
         Returns
         --------
         Time (seconds) until next hydraulic event (0 marks end of simulation period)
-         
+
         """
         lTstep = ctypes.c_long()
         self.errcode = self.ENlib.ENnextQ(byref(lTstep))
@@ -385,7 +385,7 @@ class ENepanet():
         Returns
         ---------
         Number of components in network
-        
+
         """
         iCount = ctypes.c_int()
         self.errcode = self.ENlib.ENgetcount(iCode, byref(iCount))
@@ -398,7 +398,7 @@ class ENepanet():
         Returns
         -----------
         Code of flow units in use (see toolkit.optFlowUnits)
-        
+
         """
         iCode = ctypes.c_int()
         self.errcode = self.ENlib.ENgetflowunits(byref(iCode))
@@ -416,12 +416,40 @@ class ENepanet():
         Returns
         ---------
         Index of node in list of nodes
-        
+
         """
         iIndex = ctypes.c_int()
         self.errcode = self.ENlib.ENgetnodeindex(sId.encode('ascii'), byref(iIndex))
         self._error()
         return iIndex.value
+
+    def ENgetnodeid(self, iIndex):
+        """[summary]
+
+        TODO DOCS
+
+        Arguments:
+            iIndex {[type]} -- [description]
+        """
+
+        fValue = ctypes.create_string_buffer(b'', 100)
+        self.errcode = self.ENlib.ENgetnodeid(iIndex, fValue)
+        self._error()
+        return fValue.value.decode()
+
+    def ENgetlinkid(self, iIndex):
+        """[summary]
+
+        TODO DOCS
+
+        Arguments:
+            iIndex {[type]} -- [description]
+        """
+
+        fValue = ctypes.create_string_buffer(b'', 100)
+        self.errcode = self.ENlib.ENgetlinkid(iIndex, fValue)
+        self._error()
+        return fValue.value.decode()
 
     def ENgetnodevalue(self, iIndex, iCode):
         """Retrieves parameter value for a node
@@ -499,4 +527,3 @@ class ENepanet():
         return
 
 
-    

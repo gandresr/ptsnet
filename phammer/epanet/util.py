@@ -184,7 +184,7 @@ class FlowUnits(enum.Enum):
         >>> FlowUnits.MLD.is_metric
         True
         >>> FlowUnits.SI.is_metric
-        False
+        Falseflow_factor
 
         """
         return self in [FlowUnits.LPS, FlowUnits.LPM, FlowUnits.MLD, FlowUnits.CMH, FlowUnits.CMD]
