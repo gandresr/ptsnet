@@ -451,6 +451,20 @@ class ENepanet():
         self._error()
         return fValue.value.decode()
 
+    def ENgetlinknodes(self, iIndex):
+        """[summary]
+
+        TODO DOCS
+
+        Arguments:
+            iIndex {[type]} -- [description]
+        """
+        n1 = ctypes.c_int()
+        n2 = ctypes.c_int()
+        self.errcode = self.ENlib.ENgetlinknodes(iIndex, byref(n1), byref(n2))
+        self._error()
+        return n1.value, n2.value
+
     def ENgetnodevalue(self, iIndex, iCode):
         """Retrieves parameter value for a node
 

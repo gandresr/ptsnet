@@ -40,7 +40,7 @@ def get_initial_conditions(inpfile, period = 0):
         'diameter' : np.float,
         'area' : np.float,
         'wave_speed' : np.float,
-        'direction' : np.bool,
+        'direction' : np.int,
         'ffactor' : np.float,
         'start_node' : np.int,
         'end_node' : np.int
@@ -67,10 +67,10 @@ def get_initial_conditions(inpfile, period = 0):
         links.length[i] = EPANET.ENgetlinkvalue(i, EN.LENGTH)
         links.diameter[i] = EPANET.ENgetlinkvalue(i, EN.DIAMETER)
         links.area[i] = EPANET.ENgetlinkvalue(i, np.pi * links.diameter[i] ** 2 / 4)
-        links.direction[i] = EPANET.ENgetlinkvalue(i, EN.
-        links.ffactor[i] = EPANET.ENgetlinkvalue(i, EN.
-        links.start_node[i] = EPANET.ENgetlinkvalue(i, EN.
-        links.end_node[i] = EPANET.ENgetlinkvalue(i, EN.
+        links.direction[i] = EPANET.ENgetlinkvalue(i, links.flowrate[i] > 0)
+        hl = EPANET.ENgetlinkvalue(i, EN.HEADLOSS) # Head loss
+        links.ffactor[i] = 2*G*links.diameter[i]*hf / (links.length[i]*EPANET.ENgetlinkvalue(i, EN.VELOCITY) ** 2)
+        links.start_node[i], links.end_node[i] = EPANET.ENgetlinknodes(i)
 
     EPANET_.ENcloseH()
     EPANET_.ENclose()
