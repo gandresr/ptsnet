@@ -10,8 +10,10 @@ class Table:
         self.__dict__['selectors'] = {}
 
     def __setattr__(self, name, value):
-        if len(self.__dict__) != 0:
+        if name not in self.__dict__:
             raise TypeError("'Table' object does not support attribute assignment")
+        else:
+            object.__setattr__(self, name, value)
 
     def __getitem__(self, selector):
         if type(selector) is tuple:

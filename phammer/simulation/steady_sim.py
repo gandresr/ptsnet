@@ -1,11 +1,11 @@
 import os
 import numpy as np
-import phammer.epanet.toolkit.ENepanet as ENepanet
 
 from phammer.arrays.table import Table
-from phammer.epanet.util import EN, FlowUnits
-
-inpfile = '/home/watsup/Documents/Github/hammer-net/example_files/PHFC_SIM_17_4_13.inp'
+from phammer.epanet.toolkit import ENepanet
+from phammer.epanet.util import EN, FlowUnits, HydParam, to_si
+from phammer.simulation.constants import G, TOL, DEFAULT_FFACTOR
+from phammer.simulation.constants import NODE_INITIAL_CONDITIONS, LINK_INITIAL_CONDITIONS
 
 def get_initial_conditions(inpfile, period = 0):
 
@@ -14,38 +14,18 @@ def get_initial_conditions(inpfile, period = 0):
     file_prefix, file_ext = os.path.splitext(inpfile)
     rptfile = file_prefix + '.rpt'
     outfile = file_prefix + '.bin'
-    flow_units = FlowUnits(EPANET_.ENgetflowunits())
 
     EPANET = ENepanet()
     EPANET.ENopen(inpfile, rptfile, outfile)
-    EPANET_.ENopenH()
-    EPANET_.ENinitH(0)
+    EPANET.ENopenH()
+    EPANET.ENinitH(0)
 
-    num_nodes = EPANET_.ENgetcount(EN.NODECOUNT)
-    num_links = EPANET_.ENgetcount(EN.LINKCOUNT)
+    num_nodes = EPANET.ENgetcount(EN.NODECOUNT)
+    num_links = EPANET.ENgetcount(EN.LINKCOUNT)
 
     # Data structures for node and link initial conditions
-
-    nodes = Table({
-        'ID' : '<U3',
-        'emitter_coefficient' : np.float,
-        'demand' : np.bool,
-        'head' : np.float,
-    }, num_nodes)
-
-    links = Table({
-        'ID' : '<U3'
-        'flowrate' : np.float,
-        'length' : np.float,
-        'diameter' : np.float,
-        'area' : np.float,
-        'wave_speed' : np.float,
-        'direction' : np.int,
-        'ffactor' : np.float,
-        'start_node' : np.int,
-        'end_node' : np.int
-    }, num_links)
-
+    nodes = Table(NODE_INITIAL_CONDITIONS, num_nodes)
+    links = Table(LINK_INITIAL_CONDITIONS, num_links)
     conditions = {'links' : links, 'nodes' : nodes}
 
     # Run EPANET simulation
@@ -54,26 +34,44 @@ def get_initial_conditions(inpfile, period = 0):
         tx = EPANET.ENrunH()
         t += 1
 
+    flow_units = FlowUnits(EPANET.ENgetflowunits())
+
     # Retrieve node conditions
     for i in range(1, num_nodes+1):
-        nodes.ID[i] = EPANET.ENgetnodeid(i)
-        nodes.emitter_coefficient[i] = EPANET.ENgetnodevalue(i, EN.EMITTER)
-        nodes.demand[i] = EPANET.ENgetnodevalue(i, EN.DEMAND)
-        nodes.head[i] = EPANET.ENgetnodevalue(i, EN.HEAD)
+        conditions['nodes'].ID[i-1] = EPANET.ENgetnodeid(i)
+        conditions['nodes'].emitter_coefficient[i-1] = EPANET.ENgetnodevalue(i, EN.EMITTER)
+        conditions['nodes'].demand[i-1] = to_si(flow_units, EPANET.ENgetnodevalue(i, EN.DEMAND), HydParam.Flow)
+        conditions['nodes'].head[i-1] = to_si(flow_units, EPANET.ENgetnodevalue(i, EN.HEAD), HydParam.HydraulicHead)
     # Retrieve link conditions
     for i in range(1, num_links+1):
-        links.ID[i] = EPANET.ENgetlinkid(i)
-        links.flowrate[i] = EPANET.ENgetlinkvalue(i, EN.FLOW)
-        links.length[i] = EPANET.ENgetlinkvalue(i, EN.LENGTH)
-        links.diameter[i] = EPANET.ENgetlinkvalue(i, EN.DIAMETER)
-        links.area[i] = EPANET.ENgetlinkvalue(i, np.pi * links.diameter[i] ** 2 / 4)
-        links.direction[i] = EPANET.ENgetlinkvalue(i, links.flowrate[i] > 0)
-        hl = EPANET.ENgetlinkvalue(i, EN.HEADLOSS) # Head loss
-        links.ffactor[i] = 2*G*links.diameter[i]*hf / (links.length[i]*EPANET.ENgetlinkvalue(i, EN.VELOCITY) ** 2)
-        links.start_node[i], links.end_node[i] = EPANET.ENgetlinknodes(i)
+        conditions['links'].ID[i-1] = EPANET.ENgetlinkid(i)
+        conditions['links'].start_node[i-1], conditions['links'].end_node[i-1] = EPANET.ENgetlinknodes(i)
+        conditions['links'].length[i-1] = to_si(flow_units, EPANET.ENgetlinkvalue(i, EN.LENGTH), HydParam.Length)
+        conditions['links'].diameter[i-1] = to_si(flow_units, EPANET.ENgetlinkvalue(i, EN.DIAMETER), HydParam.PipeDiameter)
+        conditions['links'].area[i-1] = np.pi * conditions['links'].diameter[i-1] ** 2 / 4
+        conditions['links'].flowrate[i-1] = to_si(flow_units, EPANET.ENgetlinkvalue(i, EN.FLOW), HydParam.Flow)
 
-    EPANET_.ENcloseH()
-    EPANET_.ENclose()
+        if conditions['links'].flowrate[i-1] > TOL:
+            conditions['links'].direction[i-1] = 1
+        elif -TOL < conditions['links'].flowrate[i-1] < TOL:
+            conditions['links'].direction[i-1] = 0
+            conditions['links'].flowrate[i-1] = 0
+        else:
+            conditions['links'].direction[i-1] = -1
+
+        hl = to_si(flow_units, EPANET.ENgetlinkvalue(i, EN.HEADLOSS), HydParam.HeadLoss) # Head loss
+
+        den = (conditions['links'].length[i-1]*(conditions['links'].flowrate[i-1]/conditions['links'].area[i-1])**2)
+        if not (-TOL < den < TOL):
+            conditions['links'].ffactor[i-1] = min(DEFAULT_FFACTOR, 2*G*conditions['links'].diameter[i-1]*hl / den )
+        else:
+            conditions['links'].ffactor[i-1] = DEFAULT_FFACTOR
+
+    EPANET.ENcloseH()
+    EPANET.ENclose()
+
+    # Unit conversion
+    conditions['nodes'].emitter_coefficient[:] = to_si(flow_units, conditions['nodes'].emitter_coefficient, HydParam.EmitterCoeff)
 
     return conditions
 

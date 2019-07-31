@@ -9,15 +9,13 @@ file_prefix, file_ext = os.path.splitext(inpfile)
 rptfile = file_prefix + '.rpt'
 outfile = file_prefix + '.bin'
 
-FT_TO_M = 0.3048
-IN_TO_MM = 25.4
+
 
 EPANET_ = EPANET.ENepanet()
 EPANET_.ENopen(inpfile, rptfile, outfile)
 
 flow_units = FlowUnits(EPANET_.ENgetflowunits())
-HEAD_TO_SI = FT_TO_M if not flow_units.is_metric else 1
-FLOW_TO_SI = flow_units.factor
+
 
 EPANET_.ENopenH()
 EPANET_.ENinitH(0)
