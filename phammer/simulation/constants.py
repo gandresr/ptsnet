@@ -15,6 +15,7 @@ TOL = 1E-6
 POINTS_INT = ntuple('POINTS_INT',
     ['subindex',
     'point_type',
+    'point_subtype',
     'link_id',
     'processor',
     'is_ghost']
@@ -27,16 +28,13 @@ POINTS_FLOAT = ntuple('POINTS_FLOAT',
     'Bm',
     'Cp',
     'Bp',
-    'is_mboundary', # TODO explain or choose better name
-    'is_pboundary']) # TODO explain or choose better name
+    'has_Cm',
+    'has_Cp'])
 
 # ----- Index labels for Node tables -----
 
-NODES_INT = ntuple('NODES_INT',
-    ['node_type',
-    'num_upoints',
-    'num_dpoints',
-    'emitter_curve_id',
+NODES_INT = ntuple('NODESunodes
+    ['emitter_curve_id',
     'emitter_setting_id']
 )
 
@@ -56,7 +54,6 @@ VALVES_INT = ntuple('VALVES_INT',
 
 VALVES_FLOAT = ntuple('VALVES_FLOAT',
     ['setting',
-    'area',
     'valve_coeff'])
 
 # ----- Index labels for Pump tables -----
@@ -77,7 +74,8 @@ POINT_TYPES = {
     'boundary' : 1
 }
 
-NODE_TYPES = {
+POINT_SUBTYPES = {
+    'none': -1,
     'reservoir': 0,
     'junction': 1,
     'valve': 2,

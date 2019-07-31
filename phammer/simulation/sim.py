@@ -73,13 +73,13 @@ class Simulation:
                 raise Exception("Setting values should be in [0, 1]")
             if obj_type == 'pumps':
                 self.mesh.properties['int'][obj_type].setting_id[obj_id] = len(self.pump_settings)
-                self.pump_settings[obj_id] = obj_settings
+                self.pump_settings[obj_id] = np.array(obj_settings, dtype=np.float)
             elif obj_type == 'valves':
                 self.mesh.properties['int'][obj_type].setting_id[obj_id] = len(self.valve_settings)
-                self.valve_settings[obj_id] = obj_settings
+                self.valve_settings[obj_id] = np.array(obj_settings, dtype=np.float)
             elif obj_type == 'nodes':
                 self.mesh.properties['int'][obj_type].setting_id[obj_id] = len(self.emitter_settings)
-                self.emitter_settings[obj_id] = obj_settings
+                self.emitter_settings[obj_id] = np.array(obj_settings, dtype=np.float)
             else:
                 raise Exception("Type error: obj_type not compatible (internal error)")
         else:
@@ -108,8 +108,8 @@ class Simulation:
             self.mesh.properties['float']['points'].Bp,
             self.mesh.properties['float']['points'].Cm,
             self.mesh.properties['float']['points'].Bm,
-            self.mesh.properties['float']['points'].is_pboundary,
-            self.mesh.properties['float']['points'].is_mboundary,)
+            self.mesh.properties['float']['points'].has_Cp,
+            self.mesh.properties['float']['points'].has_Cm,)
         run_boundary_step(
             HH0, Q1, H1, E1, D1,
             self.mesh.properties['float']['points'].Cp,
@@ -163,10 +163,10 @@ class Simulation:
         self.mesh.properties['int']['pumps'].pump_curve_id[pump_id] = len(self.pump_curves)
         self.pump_curves[pump_id] = define_curve(X, Y)
 
-    def define_valve_curve(self, valve, X, Y):
-        valve_id = self.mesh.valve_ids[valve]
-        self.mesh.properties['int']['valves'].curve_id[valve_id] = len(self.valve_curves)
-        self.valve_curves[valve_id] = define_curve(X, Y)
+    def define_valves_curve(self, valves, X, Y):
+        curve = define_curve(X, Y)
+        for valve in valves:
+            self.valve_curves[self.mesh.valve_ids[valve]] = curve
 
     def define_emitter_curve(self, node, X, Y):
         node_id = self.mesh.node_ids[node]

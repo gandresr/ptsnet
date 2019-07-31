@@ -4,10 +4,10 @@ import numpy as np
 from phammer.simulation.sim import Simulation
 from time import time
 
-input_file = '/home/watsup/Documents/Github/hammer-net/example_files/PHFC_SIM_17_4_13.inp'
+input_file = '/home/watsup/Documents/Github/hammer-net/example_files/LoopedNet.inp'
 
-T = 0.04
-dt = 0.001
+T = 20
+dt = 0.01
 
 sim = Simulation(input_file,
     duration = T, # [s]
