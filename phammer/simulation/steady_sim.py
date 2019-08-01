@@ -68,16 +68,16 @@ def get_initial_conditions(inpfile, period = 0):
         link = wn.get_link(EPANET.ENgetlinkid(i))
         ltype = link.link_type.lower() + 's'
         if link.link_type == 'Pipe':
-            k = p
-            p += 1
+            k = p; p += 1
             ic[ltype].length[k] = link.length
             ic[ltype].head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
         elif link.link_type == 'Pump':
-            k = pp
-            pp += 1
+            k = pp; pp += 1
+            ic[ltype].initial_status[k] = link.initial_status
+            ic[ltype].A[k], ic[ltype].B[k], ic[ltype].C[k] = link.get_head_curve_coefficients()
         elif link.link_type == 'Valve':
-            k = v
-            v += 1
+            k = v; v += 1
+            ic[ltype].initial_status[k] = EPANET.ENgetlinkvalue(i, EN.INITSTATUS)
 
         if link.link_type in ('Pipe', 'Valve'):
             ic[ltype].diameter[k] = link.diameter
@@ -112,6 +112,10 @@ def get_initial_conditions(inpfile, period = 0):
     to_si(flow_units, ic['pipes'].velocity, HydParam.Velocity)
     to_si(flow_units, ic['pumps'].velocity, HydParam.Velocity)
     to_si(flow_units, ic['valves'].velocity, HydParam.Velocity)
+
+    # Indexes are adjusted to fit the new Table / Indexing in C code starts in 1
+    ic[ltype].start_node[k] -= 1
+    ic[ltype].end_node[k] -= 1
 
     idx = ic['pipes'].ffactor == 0
     ic['pipes'].ffactor[idx] = \

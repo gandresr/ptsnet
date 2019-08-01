@@ -15,10 +15,10 @@ TOL = 1E-6
 # ----- Initial Conditions -----
 
 NODE_INITIAL_CONDITIONS = {
-    'ID' : '<U50',
-    'emitter_coefficient' : np.float,
-    'demand' : np.float,
-    'head' : np.float,
+    'ID' : '<U50', #
+    'emitter_coefficient' : np.float, #
+    'demand' : np.float, #
+    'head' : np.float, #
 }
 
 PIPE_INITIAL_CONDITIONS = {
@@ -29,36 +29,36 @@ PIPE_INITIAL_CONDITIONS = {
     'diameter' : np.float, #
     'area' : np.float, #
     'wave_speed' : np.float,
-    'flowrate' : np.float,
-    'velocity' : np.float,
-    'head_loss' : np.float,
-    'direction' : np.int,
-    'ffactor' : np.float,
+    'flowrate' : np.float, #
+    'velocity' : np.float, #
+    'head_loss' : np.float, #
+    'direction' : np.int, #
+    'ffactor' : np.float, #
     'B' : np.float,
     'R' : np.float,
 }
 
 PUMP_INITIAL_CONDITIONS = {
-    'ID' : '<U50',
-    'start_node' : np.int,
-    'end_node' : np.int,
-    'flowrate' : np.float,
-    'velocity' : np.float,
-    'direction' : np.int,
-    'initial_status' : np.bool,
-    'A' : np.float,
-    'B' : np.float,
-    'C' : np.float,
+    'ID' : '<U50', #
+    'start_node' : np.int, #
+    'end_node' : np.int, #
+    'flowrate' : np.float, #
+    'velocity' : np.float, #
+    'direction' : np.int, #
+    'initial_status' : np.int, #
+    'A' : np.float, #
+    'B' : np.float, #
+    'C' : np.float, #
 }
 
 VALVE_INITIAL_CONDITIONS = {
-    'ID' : '<U50',
-    'start_node' : np.int,
-    'end_node' : np.int,
-    'diameter' : np.float,
-    'area' : np.float,
-    'flowrate' : np.float,
-    'velocity' : np.float,
-    'direction' : np.int,
-    'initial_setting' : np.float,
+    'ID' : '<U50', #
+    'start_node' : np.int, #
+    'end_node' : np.int, #
+    'diameter' : np.float, #
+    'area' : np.float, #
+    'flowrate' : np.float, #
+    'velocity' : np.float, #
+    'direction' : np.int, #
+    'initial_status' : np.int, #
 }

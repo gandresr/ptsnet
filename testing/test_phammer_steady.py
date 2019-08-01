@@ -5,11 +5,14 @@ from time import time
 inpfile = '/home/watsup/Documents/Github/hammer-net/example_files/PHFC_SIM_17_4_13.inp'
 
 t = time()
-conditions = get_initial_conditions(inpfile)
+ic = get_initial_conditions(inpfile)
 print(time() - t)
-Ke = conditions['nodes'].emitter_coefficient
-d = conditions['nodes'].demand
-print(conditions['pipes'].ffactor)
 
-plt.plot(conditions['pipes'].ffactor, 'o')
+Ke = ic['nodes'].emitter_coefficient
+d = ic['nodes'].demand
+print(ic['pumps'].A)
+print(ic['pumps'].B)
+print(ic['pumps'].C)
+
+plt.plot(ic['valves'].initial_setting, 'o')
 plt.show()
