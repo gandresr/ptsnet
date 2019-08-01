@@ -1,0 +1,4 @@
+SUPPORTED_NETWORK_FORMATS = (
+    'METIS',
+    'PICKLE',
+)

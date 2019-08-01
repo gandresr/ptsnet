@@ -1,210 +1,67 @@
 import numpy as np
-import wntr
+from phammer.simulation.ic import get_initial_conditions
+from phammer.arrays.table import Table2D
+from phammer.simulation.constants import RESULTS
 
-from time import time
-from phammer.mesh.mesh import Mesh
-from phammer.simulation.utils import define_curve, is_iterable
-from phammer.simulation.utils import set_settings, set_coefficients
-from phammer.simulation.funcs import run_interior_step, run_boundary_step, run_valve_step
-from phammer.simulation.constants import NODE_TYPES
+class Settings:
+    def __init__(self,
+        time_step : float = 0.01,
+        duration: float = 20,
+        warnings_on: bool = True,
+        parallel : bool = False,
+        gpu : bool = False):
 
-class Simulation:
-    """
-    Here all the tables and properties required to
-    run a MOC simulation are defined. Tables for
-    simulations in parallel are created
+        self.time_step = time_step
+        self.duration = duration
+        self.time_steps = int(duration/time_step)
+        self.warnings_on = warnings_on
+        self.parallel = parallel
+        self.gpu = gpu
 
-    In the meantime:
-    * valves are not valid between two junctions
-    * it is not possible to connect one valve to another
-    """
-    def __init__(self, input_file, duration, time_step, period = 0, default_wave_speed = None, wave_speed_file = None, delimiter=',', full_results=False):
-        if time_step > duration:
-            raise Exception("Error: duration < time_step")
+    def __repr__(self):
+        rep = "\nSimulation settings:\n\n"
 
-        self.t = 0 # current time
-        self.full_results = full_results
+        for setting, val in self.__dict__.items():
+            rep += '%s: %s\n' % (setting, str(val))
+        return rep
 
-        self.fname = input_file[:input_file.find('.inp')]
-        self.wn = wntr.network.WaterNetworkModel(input_file)
+    def __setattr__(self, name, value):
+        try:
+            if self.__getattribute__(name) != value:
+                print("Warning: '%s' value has been changed to %s" % (name, str(value)))
+        except:
+            pass
+        object.__setattr__(self, name, value)
 
-        # Mesh is initialized here - updated later when running first step
-        self.mesh = Mesh(
-            self.fname + '.inp',
-            time_step,
-            self.wn,
-            period = period,
-            default_wave_speed = default_wave_speed,
-            wave_speed_file = wave_speed_file,
-            delimiter = delimiter)
+class HammerSimulation:
+    def __init__(self, inpfile, settings):
+        if type(settings) != dict:
+            raise TypeError("'settings' are not properly defined, use dict object")
+        self.settings = Settings(**settings)
+        self.ic = get_initial_conditions(inpfile)
+        self.num_points = 0
+        self.results = Table(RESULTS, self.num_points)
 
-        self.time_step = self.mesh.time_step
-        self.time_steps = int(duration/self.time_step)
-        self.sim_range = range(1, self.time_steps)
+    def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
+        # wave_speeds = np.
 
-        if full_results:
-            self.Q = np.zeros((self.time_steps, self.mesh.num_points), dtype=np.float)
-            self.H = np.zeros_like(self.Q)
-        else:
-            self.Q0 = np.zeros(self.mesh.num_points, dtype=np.float)
-            self.H0 = np.zeros_like(self.Q0)
-            self.Q1 = np.zeros_like(self.Q0)
-            self.H1 = np.zeros_like(self.Q0)
-            self.Q = np.zeros((self.time_steps, self.mesh.num_boundaries), dtype=np.float)
-            self.H = np.zeros_like(self.Q)
+        if default_wave_speed is None and wave_speed_file is None:
+            raise Exception("Wave speed values not specified")
 
-        # Emitter and demand flows
-        self.E = np.zeros((self.time_steps, self.mesh.num_nodes), dtype=np.float)
-        self.D = np.zeros_like(self.E)
+        if default_wave_speed is not None:
+            wave_speeds = dict.fromkeys(self.ss.pipes, default_wave_speed)
 
-        # store pairs (obj_id, scipy_interpolator)
-        self.pump_curves = {}
-        self.valve_curves = {}
-        self.emitter_curves = {}
+        if wave_speed_file:
+            with open(wave_speed_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    pipe, wave_speed = line.split(delimiter)
+                    wave_speeds[pipe] = float(wave_speed)
 
-        # store pairs (obj_id, settings array)
-        self.pump_settings = {}
-        self.valve_settings = {}
-        self.emitter_settings = {}
+        if len(wave_speeds) != self.ss.num_pipes:
+            wave_speeds = {}
+            raise Exception("""
+            The file does not specify wave speed values for all the pipes,
+            it is necessary to define a default wave speed value""")
 
-    def _define_settings(self, obj_id, obj_type, obj_settings):
-        if is_iterable(obj_settings):
-            if not all(0 <= x <= 1 for x in obj_settings):
-                raise Exception("Setting values should be in [0, 1]")
-            if obj_type == 'pumps':
-                self.mesh.properties['int'][obj_type].setting_id[obj_id] = len(self.pump_settings)
-                self.pump_settings[obj_id] = np.array(obj_settings, dtype=np.float)
-            elif obj_type == 'valves':
-                self.mesh.properties['int'][obj_type].setting_id[obj_id] = len(self.valve_settings)
-                self.valve_settings[obj_id] = np.array(obj_settings, dtype=np.float)
-            elif obj_type == 'nodes':
-                self.mesh.properties['int'][obj_type].setting_id[obj_id] = len(self.emitter_settings)
-                self.emitter_settings[obj_id] = np.array(obj_settings, dtype=np.float)
-            else:
-                raise Exception("Type error: obj_type not compatible (internal error)")
-        else:
-            raise Exception("Type error: setting type should be iterable")
-
-    def _update_settings(self):
-        set_settings(self.t, self.pump_settings, self.mesh.properties['float']['pumps'].setting)
-        set_settings(self.t, self.valve_settings, self.mesh.properties['float']['valves'].setting)
-        set_coefficients(
-            self.valve_curves,
-            self.mesh.properties['float']['valves'].valve_coeff,
-            self.mesh.properties['float']['valves'].setting)
-        set_settings(self.t, self.emitter_settings, self.mesh.properties['float']['nodes'].setting)
-        set_coefficients(
-            self.emitter_curves,
-            self.mesh.properties['float']['nodes'].emitter_coeff,
-            self.mesh.properties['float']['nodes'].setting)
-
-    def _run_all(self, HH0, Q0, H0, Q1, H1, E1, D1):
-        # The order of the calls matter
-        run_interior_step(
-            Q0, H0, Q1, H1,
-            self.mesh.properties['float']['points'].B,
-            self.mesh.properties['float']['points'].R,
-            self.mesh.properties['float']['points'].Cp,
-            self.mesh.properties['float']['points'].Bp,
-            self.mesh.properties['float']['points'].Cm,
-            self.mesh.properties['float']['points'].Bm,
-            self.mesh.properties['float']['points'].has_Cp,
-            self.mesh.properties['float']['points'].has_Cm,)
-        run_boundary_step(
-            HH0, Q1, H1, E1, D1,
-            self.mesh.properties['float']['points'].Cp,
-            self.mesh.properties['float']['points'].Bp,
-            self.mesh.properties['float']['points'].Cm,
-            self.mesh.properties['float']['points'].Bm,
-            self.mesh.properties['float']['nodes'].emitter_setting * \
-                self.mesh.properties['float']['nodes'].emitter_coeff,
-            self.mesh.properties['float']['nodes'].demand_coeff,
-            self.mesh.mboundary_ids,
-            self.mesh.pboundary_ids,
-            self.mesh.reservoir_ids,
-            self.mesh.jboundary_ids,
-            self.mesh.jnode_ids,
-            self.mesh.head_reps,
-            self.mesh.bindices)
-        # run_valve_step(Q0, H0, Q1, H1,
-        #     self.mesh.properties['float']['points'].B,
-        #     self.mesh.properties['float']['points'].R,
-        #     self.mesh.properties['int']['valves'],
-        #     self.mesh.properties['float']['valves'],
-        #     self.mesh.properties['obj']['valves'])
-
-    def add_emitter(self, node, area, discharge_coeff, initial_setting=1):
-        if not (0 <= initial_setting <= 1):
-            raise Exception("Initial setting should be in [0, 1]")
-        emitter_node = self.wn.get_node(node)
-        emitter_node.add_leak(self.wn, area=area, discharge_coeff=discharge_coeff*initial_setting, start_time=0)
-        self.mesh.properties['int']['nodes'].emmitter_setting[self.mesh.node_ids[node]] = initial_setting
-
-    def set_pump_setting(self, pump, setting):
-        self.mesh.properties['int']['pumps'].setting[self.mesh.pump_ids[pump]] = setting
-
-    def set_valve_setting(self, valve, setting):
-        self.mesh.properties['int']['valves'].setting[self.mesh.valve_ids[valve]] = setting
-
-    def set_emitter_setting(self, node, setting):
-        self.mesh.properties['int']['nodes'].emitter_setting[self.mesh.node_ids[node]] = setting
-
-    def define_pump_settings(self, pump, settings):
-        self._define_settings(self.mesh.pump_ids[pump], 'pumps', settings)
-
-    def define_valve_settings(self, valve, settings):
-        self._define_settings(self.mesh.valve_ids[valve], 'valves', settings)
-
-    def define_emitter_settings(self, node, settings):
-        self._define_settings(self.mesh.node_ids[node], 'nodes', settings)
-
-    def define_pump_curve(self, pump, X, Y):
-        pump_id = self.mesh.pump_ids[pump]
-        self.mesh.properties['int']['pumps'].pump_curve_id[pump_id] = len(self.pump_curves)
-        self.pump_curves[pump_id] = define_curve(X, Y)
-
-    def define_valves_curve(self, valves, X, Y):
-        curve = define_curve(X, Y)
-        for valve in valves:
-            self.valve_curves[self.mesh.valve_ids[valve]] = curve
-
-    def define_emitter_curve(self, node, X, Y):
-        node_id = self.mesh.node_ids[node]
-        self.mesh.properties['int']['nodes'].emitter_curve_id[node_id] = len(self.emitter_curves)
-        self.emitter_curves[node_id] = define_curve(X, Y)
-
-    def start(self):
-        self.mesh.create_mesh()
-        if self.full_results:
-            self.Q[0,:], self.H[0,:] = self.mesh.Q0, self.mesh.H0
-        else:
-            self.Q0, self.H0 = self.mesh.Q0, self.mesh.H0
-        self.t += 1
-
-    def run_step(self):
-        if self.t == 0:
-            self.start()
-            if not self.full_results:
-                self.Q[0,:] = self.Q0[self.mesh.jboundary_ids]
-                self.H[0,:] = self.H0[self.mesh.jboundary_ids]
-                # TODO update E[0,:], D[0,:]
-
-        if self.full_results:
-            self._run_all(self.H[0,:], self.Q[self.t-1,:], self.H[self.t-1,:],
-                self.Q[self.t,:], self.H[self.t,:], self.E[self.t,:], self.D[self.t,:])
-        else:
-            if self.t % 2 != 0:
-                self._run_all(self.H[0,:], self.Q0, self.H0,
-                    self.Q1, self.H1, self.E[self.t,:], self.D[self.t,:])
-                self.Q[self.t,:] = self.Q1[self.mesh.jboundary_ids]
-                self.H[self.t,:] = self.H1[self.mesh.jboundary_ids]
-            else:
-                self._run_all(self.H[0,:], self.Q1, self.H1,
-                    self.Q0, self.H0, self.E[self.t,:], self.D[self.t,:])
-                self.Q[self.t,:] = self.Q0[self.mesh.jboundary_ids]
-                self.H[self.t,:] = self.H0[self.mesh.jboundary_ids]
-        self.t += 1
-
-    def run_sim(self):
-        while self.t < self.time_steps:
-            self.run_step()
+        return wave_speeds

@@ -127,8 +127,7 @@ def get_initial_conditions(inpfile, period = 0):
 
     return ic
 
-def get_network_graph():
-    pass
-
-def export_network_graph():
-    pass
+def get_network_graph(inpfile):
+    ENFile = InpFile()
+    wn = ENFile.read(inpfile)
+    return wn.get_graph()

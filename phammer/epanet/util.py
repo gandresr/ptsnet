@@ -1004,7 +1004,6 @@ class ResultType(enum.Enum):
             return True
         return False
 
-
 class EN(enum.IntEnum):
     """All the ``EN_`` constants for the EPANET toolkit.
 

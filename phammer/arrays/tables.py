@@ -49,3 +49,8 @@ class Table:
                 self.selectors[index] = self.Selector(value, None)
             else:
                 raise TypeError('Only numpy arrays with dtype = np.int are valid as context')
+
+class Table2D(Table):
+    def __init__(self, properties, num_rows, num_cols):
+        for property, dtype in properties.items():
+            self.__dict__[property] = np.zeros((num_rows, num_cols), dtype = dtype)
