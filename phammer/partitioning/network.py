@@ -26,13 +26,3 @@ def get_dense_graph(G, weights = None):
         add_dense_edge(weights[edge_name], edge[0], edge[1], G, D)
 
     return D
-
-def export_network_graph(G, filename, format = 'METIS'):
-    if nx.is_directed(G):
-        raise TypeError("Only undirected graphs are supported")
-    if format not in SUPPORTED_NETWORK_FORMATS:
-        raise ValueError("Format '%s' is not supported" % format)
-
-    for node in G:
-        G.neigh
-
