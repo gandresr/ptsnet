@@ -132,7 +132,8 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
 
     return ic
 
-def get_network_graph(inpfile):
-    ENFile = InpFile()
-    wn = ENFile.read(inpfile)
+def get_network_graph(inpfile = None, wn = None):
+    if inpfile is None and wn is None:
+        raise ValueError("'inpfile' or 'wn' has to be defined")
+    wn = get_network_graph(inpfile)
     return wn.get_graph()
