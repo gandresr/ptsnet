@@ -8,12 +8,20 @@ class Table:
         for p, dtype in properties.items():
             self.__dict__[p] = np.zeros(size, dtype=dtype)
         self.__dict__['selectors'] = {}
+        self.__dict__['shape'] = (len(properties), size,)
 
     def __setattr__(self, name, value):
         if name not in self.__dict__:
             raise TypeError("'Table' object does not support attribute assignment")
         else:
-            object.__setattr__(self, name, value)
+            if type(value) != type(self.__dict__[name]):
+                raise ValueError("Property '%s' can only be updated not replaced" % name)
+            elif value.shape != self.__dict__[name].shape:
+                raise ValueError("Property '%s' can only be updated not replaced by new size array" % name)
+            elif value.dtype != self.__dict__[name].dtype:
+                raise ValueError("Property '%s' can only be updated not replaced by ndarray of different type" % name)
+            else:
+                object.__setattr__(self, name, value)
 
     def __getitem__(self, selector):
         if type(selector) is tuple:
