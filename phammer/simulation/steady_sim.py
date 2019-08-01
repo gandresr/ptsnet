@@ -5,7 +5,7 @@ from wntr.epanet.io import InpFile
 from phammer.arrays.table import Table
 from phammer.epanet.toolkit import ENepanet
 from phammer.epanet.util import EN, FlowUnits, HydParam, to_si
-from phammer.simulation.constants import G, TOL, DEFAULT_FFACTOR
+from phammer.simulation.constants import G, TOL, FLOOR_FFACTOR, CEIL_FFACTOR, DEFAULT_FFACTOR
 from phammer.simulation.constants import NODE_INITIAL_CONDITIONS, PIPE_INITIAL_CONDITIONS, PUMP_INITIAL_CONDITIONS, VALVE_INITIAL_CONDITIONS
 
 def get_initial_conditions(inpfile, period = 0):
@@ -29,7 +29,7 @@ def get_initial_conditions(inpfile, period = 0):
     valves = Table(VALVE_INITIAL_CONDITIONS, wn.num_valves)
     pumps = Table(PUMP_INITIAL_CONDITIONS, wn.num_pumps)
 
-    initial_conditions = {
+    ic = {
         'nodes' : nodes,
         'pipes' : pipes,
         'valves' : valves,
@@ -54,10 +54,10 @@ def get_initial_conditions(inpfile, period = 0):
 
     # Retrieve node conditions
     for i in range(1, wn.num_nodes+1):
-        initial_conditions['nodes'].ID[i-1] = EPANET.ENgetnodeid(i)
-        initial_conditions['nodes'].emitter_coefficient[i-1] = EPANET.ENgetnodevalue(i, EN.EMITTER)
-        initial_conditions['nodes'].demand[i-1] = EPANET.ENgetnodevalue(i, EN.DEMAND)
-        initial_conditions['nodes'].head[i-1] = EPANET.ENgetnodevalue(i, EN.HEAD)
+        ic['nodes'].ID[i-1] = EPANET.ENgetnodeid(i)
+        ic['nodes'].emitter_coefficient[i-1] = EPANET.ENgetnodevalue(i, EN.EMITTER)
+        ic['nodes'].demand[i-1] = EPANET.ENgetnodevalue(i, EN.DEMAND)
+        ic['nodes'].head[i-1] = EPANET.ENgetnodevalue(i, EN.HEAD)
 
     # Retrieve link conditions
     head_loss = np.zeros(wn.num_links, dtype = np.float)
@@ -70,7 +70,8 @@ def get_initial_conditions(inpfile, period = 0):
         if link.link_type == 'Pipe':
             k = p
             p += 1
-            initial_conditions[ltype].length[k] = link.length
+            ic[ltype].length[k] = link.length
+            ic[ltype].head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
         elif link.link_type == 'Pump':
             k = pp
             pp += 1
@@ -79,40 +80,48 @@ def get_initial_conditions(inpfile, period = 0):
             v += 1
 
         if link.link_type in ('Pipe', 'Valve'):
-            initial_conditions[ltype].diameter[k] = link.diameter
-            initial_conditions[ltype].area[k] = np.pi * link.diameter ** 2 / 4
+            ic[ltype].diameter[k] = link.diameter
+            ic[ltype].area[k] = np.pi * link.diameter ** 2 / 4
 
-        initial_conditions[ltype].ID[k] = link.name
-        initial_conditions[ltype].start_node[k], initial_conditions[ltype].end_node[k] = EPANET.ENgetlinknodes(i)
-        initial_conditions[ltype].flowrate[k] = EPANET.ENgetlinkvalue(i, EN.FLOW)
+        ic[ltype].ID[k] = link.name
+        ic[ltype].start_node[k], ic[ltype].end_node[k] = EPANET.ENgetlinknodes(i)
+        ic[ltype].flowrate[k] = EPANET.ENgetlinkvalue(i, EN.FLOW)
+        ic[ltype].velocity[k] = EPANET.ENgetlinkvalue(i, EN.VELOCITY)
 
-        if initial_conditions[ltype].flowrate[k] > TOL:
-            initial_conditions[ltype].direction[k] = 1
-        elif -TOL < initial_conditions[ltype].flowrate[k] < TOL:
-            initial_conditions[ltype].direction[k] = 0
-            initial_conditions[ltype].flowrate[k] = 0
+        if -TOL < ic[ltype].flowrate[k] < TOL:
+            ic[ltype].direction[k] = 0
+            ic[ltype].flowrate[k] = 0
+            if link.link_type == 'Pipe':
+                ic[ltype].ffactor[k] = DEFAULT_FFACTOR
+        elif ic[ltype].flowrate[k] > TOL:
+            ic[ltype].direction[k] = 1
         else:
-            initial_conditions[ltype].direction[k] = -1
-
-        head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
+            ic[ltype].direction[k] = -1
 
     EPANET.ENcloseH()
     EPANET.ENclose()
 
     # Unit conversion
-    to_si(flow_units, initial_conditions['nodes'].emitter_coefficient, HydParam.EmitterCoeff)
-    to_si(flow_units, initial_conditions['nodes'].demand, HydParam.Flow)
-    to_si(flow_units, initial_conditions['nodes'].head, HydParam.HydraulicHead)
-    to_si(flow_units, initial_conditions['pipes'].flowrate, HydParam.Flow)
-    to_si(flow_units, initial_conditions['pumps'].flowrate, HydParam.Flow)
-    to_si(flow_units, initial_conditions['valves'].flowrate, HydParam.Flow)
-    to_si(flow_units, head_loss, HydParam.HeadLoss)
+    to_si(flow_units, ic['nodes'].emitter_coefficient, HydParam.EmitterCoeff)
+    to_si(flow_units, ic['nodes'].demand, HydParam.Flow)
+    to_si(flow_units, ic['nodes'].head, HydParam.HydraulicHead)
+    to_si(flow_units, ic['pipes'].head_loss, HydParam.HeadLoss)
+    to_si(flow_units, ic['pipes'].flowrate, HydParam.Flow)
+    to_si(flow_units, ic['pumps'].flowrate, HydParam.Flow)
+    to_si(flow_units, ic['valves'].flowrate, HydParam.Flow)
+    to_si(flow_units, ic['pipes'].velocity, HydParam.Velocity)
+    to_si(flow_units, ic['pumps'].velocity, HydParam.Velocity)
+    to_si(flow_units, ic['valves'].velocity, HydParam.Velocity)
 
-    # den = (conditions['links'].length*(conditions['links'].flowrate/conditions['links'].area)**2)
-    # conditions['links'].ffactor = min(DEFAULT_FFACTOR, 2*G*conditions['links'].diameter[i-1]*hl / den )
+    idx = ic['pipes'].ffactor == 0
+    ic['pipes'].ffactor[idx] = \
+        (2*G*ic['pipes'].diameter[idx] * ic['pipes'].head_loss[idx]) \
+            / (ic['pipes'].length[idx] * ic['pipes'].velocity[idx]**2)
 
-    # conditions['links'].R[:] =
-    return initial_conditions, wn
+    ic['pipes'].ffactor[ic['pipes'].ffactor >= CEIL_FFACTOR] = DEFAULT_FFACTOR
+    ic['pipes'].ffactor[ic['pipes'].ffactor <= FLOOR_FFACTOR] = DEFAULT_FFACTOR
+
+    return ic
 
 def get_network_graph():
     pass

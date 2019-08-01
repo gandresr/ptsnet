@@ -2,14 +2,14 @@ import matplotlib.pyplot as plt
 from phammer.simulation.steady_sim import get_initial_conditions
 from time import time
 
-inpfile = '/home/watsup/Documents/Github/hammer-net/example_files/LoopedNet_leak.inp'
+inpfile = '/home/watsup/Documents/Github/hammer-net/example_files/PHFC_SIM_17_4_13.inp'
 
 t = time()
-conditions, wn = get_initial_conditions(inpfile)
+conditions = get_initial_conditions(inpfile)
 print(time() - t)
 Ke = conditions['nodes'].emitter_coefficient
 d = conditions['nodes'].demand
-h = conditions['nodes'].head
+print(conditions['pipes'].ffactor)
 
-plt.plot(conditions['valves'].direction, 'o')
+plt.plot(conditions['pipes'].ffactor, 'o')
 plt.show()

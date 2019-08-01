@@ -6,6 +6,8 @@ WARNINGS = True
 TIMEIT = True
 PARALLEL = False
 DEFAULT_FLUID_DENSITY = 997 # kg/m^3
+CEIL_FFACTOR = 0.035
+FLOOR_FFACTOR = 1E-4
 DEFAULT_FFACTOR = 0.035
 G = 9.807 # SI gravity
 TOL = 1E-6
@@ -20,14 +22,16 @@ NODE_INITIAL_CONDITIONS = {
 }
 
 PIPE_INITIAL_CONDITIONS = {
-    'ID' : '<U50',
-    'start_node' : np.int,
-    'end_node' : np.int,
-    'length' : np.float,
-    'diameter' : np.float,
-    'area' : np.float,
+    'ID' : '<U50', #
+    'start_node' : np.int, #
+    'end_node' : np.int, #
+    'length' : np.float, #
+    'diameter' : np.float, #
+    'area' : np.float, #
     'wave_speed' : np.float,
     'flowrate' : np.float,
+    'velocity' : np.float,
+    'head_loss' : np.float,
     'direction' : np.int,
     'ffactor' : np.float,
     'B' : np.float,
@@ -39,6 +43,7 @@ PUMP_INITIAL_CONDITIONS = {
     'start_node' : np.int,
     'end_node' : np.int,
     'flowrate' : np.float,
+    'velocity' : np.float,
     'direction' : np.int,
     'initial_status' : np.bool,
     'A' : np.float,
@@ -53,6 +58,7 @@ VALVE_INITIAL_CONDITIONS = {
     'diameter' : np.float,
     'area' : np.float,
     'flowrate' : np.float,
+    'velocity' : np.float,
     'direction' : np.int,
     'initial_setting' : np.float,
 }
