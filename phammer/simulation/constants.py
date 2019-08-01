@@ -13,14 +13,14 @@ TOL = 1E-6
 # ----- Initial Conditions -----
 
 NODE_INITIAL_CONDITIONS = {
-    'ID' : '<U3',
+    'ID' : '<U50',
     'emitter_coefficient' : np.float,
     'demand' : np.float,
     'head' : np.float,
 }
 
-LINK_INITIAL_CONDITIONS = {
-    'ID' : '<U3',
+PIPE_INITIAL_CONDITIONS = {
+    'ID' : '<U50',
     'start_node' : np.int,
     'end_node' : np.int,
     'length' : np.float,
@@ -32,4 +32,27 @@ LINK_INITIAL_CONDITIONS = {
     'ffactor' : np.float,
     'B' : np.float,
     'R' : np.float,
+}
+
+PUMP_INITIAL_CONDITIONS = {
+    'ID' : '<U50',
+    'start_node' : np.int,
+    'end_node' : np.int,
+    'flowrate' : np.float,
+    'direction' : np.int,
+    'initial_status' : np.bool,
+    'A' : np.float,
+    'B' : np.float,
+    'C' : np.float,
+}
+
+VALVE_INITIAL_CONDITIONS = {
+    'ID' : '<U50',
+    'start_node' : np.int,
+    'end_node' : np.int,
+    'diameter' : np.float,
+    'area' : np.float,
+    'flowrate' : np.float,
+    'direction' : np.int,
+    'initial_setting' : np.float,
 }

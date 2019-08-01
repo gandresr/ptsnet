@@ -508,7 +508,7 @@ class HydParam(enum.Enum):
             data *= flow_units.factor
             if self is HydParam.EmitterCoeff:
                 if flow_units.is_traditional:
-                    data /= 0.7032  # flowunit/psi0.5 to flowunit/m0.5
+                    data *= 1.42197020632 ** 0.5 # flowunit/psi0.5 to flowunit/m0.5
 
         elif self in [HydParam.PipeDiameter]:
             if flow_units.is_traditional:
@@ -595,7 +595,7 @@ class HydParam(enum.Enum):
             data /= flow_units.factor
             if self is HydParam.EmitterCoeff:
                 if flow_units.is_traditional:
-                    data /= 0.7032  # flowunit/psi0.5 from flowunit/m0.5
+                    data /= 1.42197020632 ** 0.5  # flowunit/psi0.5 from flowunit/m0.5
 
         elif self in [HydParam.PipeDiameter]:
             if flow_units.is_traditional:

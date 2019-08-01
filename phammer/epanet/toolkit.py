@@ -432,7 +432,7 @@ class ENepanet():
             iIndex {[type]} -- [description]
         """
 
-        fValue = ctypes.create_string_buffer(b'', 100)
+        fValue = ctypes.create_string_buffer(b'', 50)
         self.errcode = self.ENlib.ENgetnodeid(iIndex, fValue)
         self._error()
         return fValue.value.decode()
@@ -446,7 +446,7 @@ class ENepanet():
             iIndex {[type]} -- [description]
         """
 
-        fValue = ctypes.create_string_buffer(b'', 100)
+        fValue = ctypes.create_string_buffer(b'', 50)
         self.errcode = self.ENlib.ENgetlinkid(iIndex, fValue)
         self._error()
         return fValue.value.decode()
