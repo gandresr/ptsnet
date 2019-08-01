@@ -8,7 +8,11 @@ from phammer.epanet.util import EN, FlowUnits, HydParam, to_si
 from phammer.simulation.constants import G, TOL, FLOOR_FFACTOR, CEIL_FFACTOR, DEFAULT_FFACTOR
 from phammer.simulation.constants import NODE_INITIAL_CONDITIONS, PIPE_INITIAL_CONDITIONS, PUMP_INITIAL_CONDITIONS, VALVE_INITIAL_CONDITIONS
 
-def get_initial_conditions(inpfile, period = 0):
+def get_water_network(inpfile):
+    ENFile = InpFile()
+    return ENFile.read(inpfile)
+
+def get_initial_conditions(inpfile, period = 0, wn = None):
 
     # EPANET initialization
 
@@ -16,8 +20,9 @@ def get_initial_conditions(inpfile, period = 0):
     rptfile = file_prefix + '.rpt'
     outfile = file_prefix + '.bin'
 
-    ENFile = InpFile()
-    wn = ENFile.read(inpfile)
+    if wn is None:
+        wn = get_water_network(inpfile)
+
     EPANET = ENepanet()
     EPANET.ENopen(inpfile, rptfile, outfile)
     EPANET.ENopenH()
