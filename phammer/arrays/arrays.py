@@ -35,35 +35,60 @@ class Row:
     def __repr__(self):
         return self._value.__repr__()
 
-    def __iadd__(self, value):
-        return self._value.__iadd__(value)
+    def __add__(self, value):
+        if type(value) == Row:
+            return self._value.__add__(value._value)
+        return self._value.__add__(value)
 
-    def __isub__(self, value):
-        return self._value.__isub__(value)
+    def __sub__(self, value):
+        if type(value) == Row:
+            return self._value.__sub__(value._value)
+        return self._value.__sub__(value)
 
-    def __imul__(self, value):
-        return self._value.__imul__(value)
+    def __mul__(self, value):
+        if type(value) == Row:
+            return self._value.__mul__(value._value)
+        return self._value.__mul__(value)
 
-    def __ifloordiv__(self, value):
-        return self._value.__ifloordiv__(value)
+    def __truediv__(self, value):
+        if type(value) == Row:
+            return self._value.__truediv__(value._value)
+        return self._value.__truediv__(value)
 
-    def __imod__(self, value):
-        return self._value.__imod__(value)
+    def __floordiv__(self, value):
+        if type(value) == Row:
+            return self._value.__floordiv__(value._value)
+        return self._value.__floordiv__(value)
 
-    def __ipow__(self, value):
-        return self._value.__ipow__(value)
+    def __mod__(self, value):
+        if type(value) == Row:
+            return self._value.__mod__(value._value)
+        return self._value.__mod__(value)
 
-    def __irshift__(self, value):
-        return self._value.__irshift__(value)
+    def __pow__(self, value):
+        if type(value) == Row:
+            return self._value.__pow__(value._value)
+        return self._value.__pow__(value)
 
-    def __iand__(self, value):
-        return self._value.__iand__(value)
+    def __rshift__(self, value):
+        if type(value) == Row:
+            return self._value.__rshift__(value._value)
+        return self._value.__rshift__(value)
 
-    def __ixor__(self, value):
-        return self._value.__ixor__(value)
+    def __and__(self, value):
+        if type(value) == Row:
+            return self._value.__and__(value._value)
+        return self._value.__and__(value)
 
-    def __ior__(self, value):
-        return self._value.__ior__(value)
+    def __xor__(self, value):
+        if type(value) == Row:
+            return self._value.__xor__(value._value)
+        return self._value.__xor__(value)
+
+    def __or__(self, value):
+        if type(value) == Row:
+            return self._value.__or__(value._value)
+        return self._value.__or__(value)
 
     def __lt__(self, other):
         return self._value.__lt__(other)
