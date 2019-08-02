@@ -142,9 +142,3 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     pumps.setindex(pump_ids)
 
     return ic
-
-def get_network_graph(inpfile = None, wn = None):
-    if inpfile is None and wn is None:
-        raise ValueError("'inpfile' or 'wn' has to be defined")
-    wn = get_network_graph(inpfile)
-    return wn.get_graph()
