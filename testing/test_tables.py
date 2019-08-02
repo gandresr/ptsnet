@@ -1,6 +1,6 @@
 import numpy as np
 
-from phammer.arrays.tables import Table2D
+from phammer.arrays.tables import Table
 
 time_steps = 20
 num_points = 10
@@ -11,5 +11,5 @@ properties = {
 }
 
 index = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
-results = Table2D(properties, num_points, time_steps, index)
-results.flow[0:1]
+results = Table(properties, num_points, index)
+results.flow['a']

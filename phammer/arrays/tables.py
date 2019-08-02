@@ -13,7 +13,6 @@ class Row:
             return self._value[index]
         else:
             if type(index) in (int, tuple, list, slice, np.int):
-                print(index)
                 return self._value[index]
             else:
                 return self._value[self._index[index]]
@@ -46,10 +45,10 @@ class Table:
 
     def __init__(self, properties, size, index = None):
         self.__dict__['shape'] = (len(properties), size,)
-        self.setindex(index, self.shape[0])
+        self.setindex(index, self.shape[1])
 
         for p, dtype in properties.items():
-            self.__dict__[p] = Row(np.zeros(size, dtype=dtype), self.__dict__['index'])
+            self.__dict__[p] = Row(np.zeros(size, dtype=dtype), self.__dict__['_index'])
 
     def __setattr__(self, name, value):
         if name not in self.__dict__:
