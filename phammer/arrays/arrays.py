@@ -32,145 +32,6 @@ class Row:
     def _index(self):
         return self._super._index
 
-    @property
-    def ndim(self):
-        return self._value.ndim
-
-    def __repr__(self):
-        return self._value.__repr__()
-
-    def __add__(self, value):
-        if type(value) == Row:
-            return self._value.__add__(value._value)
-        return self._value.__add__(value)
-
-    def __sub__(self, value):
-        if type(value) == Row:
-            return self._value.__sub__(value._value)
-        return self._value.__sub__(value)
-
-    def __mul__(self, value):
-        if type(value) == Row:
-            return self._value.__mul__(value._value)
-        return self._value.__mul__(value)
-
-    def __truediv__(self, value):
-        if type(value) == Row:
-            return self._value.__truediv__(value._value)
-        return self._value.__truediv__(value)
-
-    def __floordiv__(self, value):
-        if type(value) == Row:
-            return self._value.__floordiv__(value._value)
-        return self._value.__floordiv__(value)
-
-    def __mod__(self, value):
-        if type(value) == Row:
-            return self._value.__mod__(value._value)
-        return self._value.__mod__(value)
-
-    def __pow__(self, value):
-        if type(value) == Row:
-            return self._value.__pow__(value._value)
-        return self._value.__pow__(value)
-
-    def __rshift__(self, value):
-        if type(value) == Row:
-            return self._value.__rshift__(value._value)
-        return self._value.__rshift__(value)
-
-    def __and__(self, value):
-        if type(value) == Row:
-            return self._value.__and__(value._value)
-        return self._value.__and__(value)
-
-    def __xor__(self, value):
-        if type(value) == Row:
-            return self._value.__xor__(value._value)
-        return self._value.__xor__(value)
-
-    def __or__(self, value):
-        if type(value) == Row:
-            return self._value.__or__(value._value)
-        return self._value.__or__(value)
-
-    def __iadd__(self, value):
-        if type(value) == Row:
-            return self._value.__iadd__(value._value)
-        return self._value.__iadd__(value)
-
-    def __isub__(self, value):
-        if type(value) == Row:
-            return self._value.__isub__(value._value)
-        return self._value.__isub__(value)
-
-    def __imul__(self, value):
-        if type(value) == Row:
-            return self._value.__imul__(value._value)
-        return self._value.__imul__(value)
-
-    def __itruediv__(self, value):
-        if type(value) == Row:
-            return self._value.__itruediv__(value._value)
-        return self._value.__itruediv__(value)
-
-    def __ifloordiv__(self, value):
-        if type(value) == Row:
-            return self._value.__ifloordiv__(value._value)
-        return self._value.__ifloordiv__(value)
-
-    def __imod__(self, value):
-        if type(value) == Row:
-            return self._value.__imod__(value._value)
-        return self._value.__imod__(value)
-
-    def __ipow__(self, value):
-        if type(value) == Row:
-            return self._value.__ipow__(value._value)
-        return self._value.__ipow__(value)
-
-    def __irshift__(self, value):
-        if type(value) == Row:
-            return self._value.__irshift__(value._value)
-        return self._value.__irshift__(value)
-
-    def __iand__(self, value):
-        if type(value) == Row:
-            return self._value.__iand__(value._value)
-        return self._value.__iand__(value)
-
-    def __ixor__(self, value):
-        if type(value) == Row:
-            return self._value.__ixor__(value._value)
-        return self._value.__ixor__(value)
-
-    def __ior__(self, value):
-        if type(value) == Row:
-            return self._value.__ior__(value._value)
-        return self._value.__ior__(value)
-
-    def __lt__(self, other):
-        return self._value.__lt__(other)
-
-    def __le__(self, other):
-        return self._value.__le__(other)
-
-    def __eq__(self, other):
-        return self._value.__eq__(other)
-
-    def __ne__(self, other):
-        return self._value.__ne__(other)
-
-    def __gt__(self, other):
-        return self._value.__gt__(other)
-
-    def __ge__(self, other):
-        return self._value.__ge__(other)
-
-    @property
-    def shape(self):
-        return self._value.shape
-
 class Table:
     Selector = namedtuple('Selector', ['value', 'context'])
 
@@ -181,11 +42,21 @@ class Table:
         for p, dtype in properties.items():
             self.__dict__[p] = Row(np.zeros(size, dtype=dtype), self)
 
+    def __getattribute__(self, name):
+        if name == '__dict__':
+            return object.__getattribute__(self, name)
+        else:
+            if name in self.__dict__:
+                if type(self.__dict__[name]) == Row:
+                    return self.__dict__[name]._value
+                return self.__dict__[name]
+            return object.__getattribute__(self, name)
+
     def __setattr__(self, name, value):
         if name not in self.__dict__:
-            raise TypeError("'Table' object does not support attribute assignment")
+            raise TypeError("'Table' does not support attribute assignment")
         else:
-            old_val = self.__dict__[name]._value
+            old_val = self[name]
             new_val = value
 
             if type(new_val) == Row:
