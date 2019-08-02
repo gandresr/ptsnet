@@ -10,5 +10,6 @@ properties = {
     'head' : np.float
 }
 
-results = Table2D(properties, time_steps, num_points)
-
+index = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
+results = Table2D(properties, num_points, time_steps, index)
+results.flow[0:1]
