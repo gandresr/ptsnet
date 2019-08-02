@@ -185,14 +185,20 @@ class Table:
         if name not in self.__dict__:
             raise TypeError("'Table' object does not support attribute assignment")
         else:
-            if type(value) != type(self.__dict__[name].value):
+            old_val = self.__dict__[name]._value
+            new_val = value
+
+            if type(new_val) == Row:
+                new_val = new_val._value
+
+            if type(old_val) != type(new_val):
                 raise ValueError("Property '%s' can only be updated not replaced" % name)
-            elif value.shape != self.__dict__[name].value.shape:
+            elif old_val.shape != new_val.shape:
                 raise ValueError("Property '%s' can only be updated not replaced by new size array" % name)
-            elif value.dtype != self.__dict__[name].value.dtype:
+            elif old_val.dtype != new_val.dtype:
                 raise ValueError("Property '%s' can only be updated not replaced by ndarray of different type" % name)
             else:
-                self.__dict__[name].value = value
+                old_val[:] = new_val
 
     @property
     def shape(self):
