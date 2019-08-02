@@ -1,0 +1,5 @@
+check_size of flowdirections vector
+check size of arrays consistent with assumptions
+check size of network graph, compate number of nodes and number of edges
+check wave_speed values imply N >= 2 for any dt, L, a
+check that all initial flows are positive after defining convention
