@@ -23,34 +23,14 @@ class Table:
             else:
                 object.__setattr__(self, name, value)
 
-    def __getitem__(self, selector):
-        if type(selector) is tuple:
-            try:
-                return self.selectors[selector[0]].context
-            except:
-                raise KeyError("%s is not a selector in the Table" % selector)
-        try:
-            return self.selectors[selector].value
-        except:
-            raise KeyError("%s is not a selector in the Table" % selector)
-
-    def __setitem__(self, index, value):
-        if type(index) is tuple:
-            if type(value) is np.ndarray:
-                if not (value.dtype == np.int):
-                    raise TypeError('Only numpy arrays with dtype = np.int are valid as context')
-                self.selectors[index[0]].context = value
-            else:
-                raise TypeError('Only numpy arrays with dtype = np.int are valid as context')
-        else:
-            if type(value) is np.ndarray:
-                if not (value.dtype == np.int):
-                    raise TypeError('Only numpy arrays with dtype = np.int are valid as context')
-                self.selectors[index] = self.Selector(value, None)
-            else:
-                raise TypeError('Only numpy arrays with dtype = np.int are valid as context')
+    def __repr__(self):
+        return "Table <properties: %d, rows: %d>" % self.__dict__['shape']
 
 class Table2D(Table):
     def __init__(self, properties, num_rows, num_cols):
         for property, dtype in properties.items():
             self.__dict__[property] = np.zeros((num_rows, num_cols), dtype = dtype)
+        self.__dict__['shape'] = (len(properties), num_rows, num_cols,)
+
+    def __repr__(self):
+        return "Table2D <properties: %d, rows: %d, cols: %d>" % self.__dict__['shape']
