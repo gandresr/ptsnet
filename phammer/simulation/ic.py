@@ -16,7 +16,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
 
     # EPANET initialization
 
-    file_prefix, file_ext = os.path.splitext(inpfile)
+    file_prefix, _ = os.path.splitext(inpfile)
     rptfile = file_prefix + '.rpt'
     outfile = file_prefix + '.bin'
 
@@ -67,9 +67,6 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
         ic['nodes'].emitter_coefficient[i-1] = EPANET.ENgetnodevalue(i, EN.EMITTER)
         ic['nodes'].demand[i-1] = EPANET.ENgetnodevalue(i, EN.DEMAND)
         ic['nodes'].head[i-1] = EPANET.ENgetnodevalue(i, EN.HEAD)
-
-    # Retrieve link conditions
-    head_loss = np.zeros(wn.num_links, dtype = np.float)
 
     p, pp, v = 0, 0, 0 # pipes, pumps, valves
     for i in range(1, wn.num_links+1):

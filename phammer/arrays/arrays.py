@@ -112,11 +112,6 @@ class Row:
     def shape(self):
         return self._value.shape
 
-    def iloc(self, index):
-        if self._index is None:
-            raise ValueError("'index' has not been defined for the table")
-        return self._index[index]
-
 class Table:
     Selector = namedtuple('Selector', ['value', 'context'])
 
@@ -150,6 +145,18 @@ class Table:
     def setindex(self, index, size=None):
         self._setindex(index, size, '_index')
 
+    def iloc(self, index):
+        if self._index is None:
+            raise ValueError("'index' has not been defined for the table")
+        return self._index[index]
+
+    def ival(self, index):
+        if self._index is None:
+            raise ValueError("'index' has not been defined for the table")
+        if type(index) != int:
+            raise ValueError("'%s' has to be a integer" % str(index))
+        return self._index_keys[index]
+
     def _setindex(self, index, size, _index_name):
         if size == None:
             if _index_name == 'index':
@@ -160,6 +167,7 @@ class Table:
             if len(index) != size:
                 raise ValueError("could not assing index of len (%d) to entry of size (%d)" % (len(index), size))
             self.__dict__[_index_name] = {}
+            self.__dict__[_index_name + '_keys'] = index
             for i in range(size):
                 if not index[i] in self.__dict__[_index_name]:
                     self.__dict__[_index_name][index[i]] = i
