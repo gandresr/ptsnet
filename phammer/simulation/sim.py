@@ -40,6 +40,7 @@ class HammerSimulation:
         self.wn = get_water_network(inpfile)
         self.ic = get_initial_conditions(inpfile, wn = self.wn)
         self.ng = self.wn.get_graph()
+        self.num_segments = 0
 
     def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
 
@@ -67,3 +68,20 @@ class HammerSimulation:
             excep = "The file does not specify wave speed values for all the pipes,\n"
             excep += "it is necessary to define a default wave speed value"
             raise ValueError(excep)
+
+    def set_segments(self):
+        self.ic['pipes'].segments = self.ic['pipes'].length
+        self.ic['pipes'].segments /= self.ic['pipes'].wave_speed
+
+        # Maximum time_step in the system to capture waves in all pipes
+        max_dt = min(self.ic['pipes'].segments) / 2 # at least 2 segments in critical pipe
+
+        self.settings.time_step = min(self.settings.time_step, max_dt)
+
+        # The number of segments is defined
+        self.ic['pipes'].segments /= self.settings.time_step
+        int_segments = np.round(self.ic['pipes'].segments)
+        # The wave_speed is adjusted to compensate the truncation error
+        self.ic['pipes'].wave_speed = self.ic['pipes'].wave_speed*self.ic['pipes'].segments/int_segments
+        self.ic['pipes'].segments = int_segments
+        self.num_segments = sum(self.ic['pipes'].segments)

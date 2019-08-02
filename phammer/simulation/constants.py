@@ -27,6 +27,7 @@ PIPE_INITIAL_CONDITIONS = {
     'diameter' : np.float, #
     'area' : np.float, #
     'wave_speed' : np.float,
+    'segments' : np.float,
     'flowrate' : np.float, #
     'velocity' : np.float, #
     'head_loss' : np.float, #
