@@ -2,7 +2,7 @@ import os
 import numpy as np
 
 from wntr.epanet.io import InpFile
-from phammer.arrays.table import Table
+from phammer.arrays.arrays import Table
 from phammer.epanet.toolkit import ENepanet
 from phammer.epanet.util import EN, FlowUnits, HydParam, to_si
 from phammer.simulation.constants import G, TOL, FLOOR_FFACTOR, CEIL_FFACTOR, DEFAULT_FFACTOR
@@ -30,9 +30,13 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
 
     # Data structures for node and link initial conditions
     nodes = Table(NODE_INITIAL_CONDITIONS, wn.num_nodes)
+    node_ids = []
     pipes = Table(PIPE_INITIAL_CONDITIONS, wn.num_pipes)
+    pipe_ids = []
     valves = Table(VALVE_INITIAL_CONDITIONS, wn.num_valves)
+    valve_ids = []
     pumps = Table(PUMP_INITIAL_CONDITIONS, wn.num_pumps)
+    pump_ids = []
 
     ic = {
         'nodes' : nodes,
@@ -59,7 +63,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
 
     # Retrieve node conditions
     for i in range(1, wn.num_nodes+1):
-        ic['nodes'].ID[i-1] = EPANET.ENgetnodeid(i)
+        node_ids.append(EPANET.ENgetnodeid(i))
         ic['nodes'].emitter_coefficient[i-1] = EPANET.ENgetnodevalue(i, EN.EMITTER)
         ic['nodes'].demand[i-1] = EPANET.ENgetnodevalue(i, EN.DEMAND)
         ic['nodes'].head[i-1] = EPANET.ENgetnodevalue(i, EN.HEAD)
@@ -74,21 +78,23 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
         ltype = link.link_type.lower() + 's'
         if link.link_type == 'Pipe':
             k = p; p += 1
+            pipe_ids.append(link.name)
             ic[ltype].length[k] = link.length
             ic[ltype].head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
         elif link.link_type == 'Pump':
             k = pp; pp += 1
+            pump_ids.append(link.name)
             ic[ltype].initial_status[k] = link.initial_status
             ic[ltype].A[k], ic[ltype].B[k], ic[ltype].C[k] = link.get_head_curve_coefficients()
         elif link.link_type == 'Valve':
             k = v; v += 1
+            valve_ids.append(link.name)
             ic[ltype].initial_status[k] = EPANET.ENgetlinkvalue(i, EN.INITSTATUS)
 
         if link.link_type in ('Pipe', 'Valve'):
             ic[ltype].diameter[k] = link.diameter
             ic[ltype].area[k] = np.pi * link.diameter ** 2 / 4
 
-        ic[ltype].ID[k] = link.name
         ic[ltype].start_node[k], ic[ltype].end_node[k] = EPANET.ENgetlinknodes(i)
         ic[ltype].flowrate[k] = EPANET.ENgetlinkvalue(i, EN.FLOW)
         ic[ltype].velocity[k] = EPANET.ENgetlinkvalue(i, EN.VELOCITY)
@@ -129,6 +135,11 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
 
     ic['pipes'].ffactor[ic['pipes'].ffactor >= CEIL_FFACTOR] = DEFAULT_FFACTOR
     ic['pipes'].ffactor[ic['pipes'].ffactor <= FLOOR_FFACTOR] = DEFAULT_FFACTOR
+
+    nodes.setindex(node_ids)
+    pipes.setindex(pipe_ids)
+    valves.setindex(valve_ids)
+    pumps.setindex(pump_ids)
 
     return ic
 

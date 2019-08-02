@@ -1,7 +1,6 @@
 import numpy as np
-from phammer.simulation.ic import get_initial_conditions
-from phammer.arrays.table import Table2D
-from phammer.simulation.constants import RESULTS
+from phammer.simulation.ic import get_initial_conditions, get_water_network
+from phammer.arrays.arrays import Table2D
 
 class Settings:
     def __init__(self,
@@ -38,9 +37,9 @@ class HammerSimulation:
         if type(settings) != dict:
             raise TypeError("'settings' are not properly defined, use dict object")
         self.settings = Settings(**settings)
-        self.ic = get_initial_conditions(inpfile)
+        self.wn = get_water_network(inpfile)
+        self.ic = get_initial_conditions(inpfile, wn = wn)
         self.num_points = 0
-        self.results = Table(RESULTS, self.num_points)
 
     def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
         # wave_speeds = np.

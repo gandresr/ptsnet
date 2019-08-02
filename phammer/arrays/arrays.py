@@ -2,34 +2,86 @@ import numpy as np
 from collections import namedtuple
 
 class Row:
-    def __init__(self, value, index = None):
+    def __init__(self, value, _super = None):
         self._value = value
-        self._index = index
+        self._super = _super
 
     def __getitem__(self, index):
         if self._index is None:
-            if not type(index) in (int, slice):
+            if not type(index) in (int, tuple, list, slice, np.ndarray):
                 raise ValueError("not valid index")
             return self._value[index]
         else:
-            if type(index) in (int, tuple, list, slice, np.int):
+            if type(index) in (int, tuple, list, slice, np.ndarray):
                 return self._value[index]
             else:
                 return self._value[self._index[index]]
 
     def __setitem__(self, index, value):
         if self._index is None:
-            if type(index) != int:
+            if not type(index) in (int, tuple, list, slice, np.ndarray):
                 raise ValueError("not valid index")
-            return self._value[index]
+            self._value[index] = value
         else:
-            if type(index) == int:
+            if type(index) in (int, tuple, list, slice, np.ndarray):
                 self._value[index] = value
             else:
                 self._value[self._index[index]] = value
 
+    @property
+    def _index(self):
+        return self._super._index
+
     def __repr__(self):
         return self._value.__repr__()
+
+    def __iadd__(self, value):
+        return self._value.__iadd__(value)
+
+    def __isub__(self, value):
+        return self._value.__isub__(value)
+
+    def __imul__(self, value):
+        return self._value.__imul__(value)
+
+    def __ifloordiv__(self, value):
+        return self._value.__ifloordiv__(value)
+
+    def __imod__(self, value):
+        return self._value.__imod__(value)
+
+    def __ipow__(self, value):
+        return self._value.__ipow__(value)
+
+    def __irshift__(self, value):
+        return self._value.__irshift__(value)
+
+    def __iand__(self, value):
+        return self._value.__iand__(value)
+
+    def __ixor__(self, value):
+        return self._value.__ixor__(value)
+
+    def __ior__(self, value):
+        return self._value.__ior__(value)
+
+    def __lt__(self, other):
+        return self._value.__lt__(other)
+
+    def __le__(self, other):
+        return self._value.__le__(other)
+
+    def __eq__(self, other):
+        return self._value.__eq__(other)
+
+    def __ne__(self, other):
+        return self._value.__ne__(other)
+
+    def __gt__(self, other):
+        return self._value.__gt__(other)
+
+    def __ge__(self, other):
+        return self._value.__ge__(other)
 
     @property
     def shape(self):
@@ -48,7 +100,7 @@ class Table:
         self.setindex(index, self.shape[1])
 
         for p, dtype in properties.items():
-            self.__dict__[p] = Row(np.zeros(size, dtype=dtype), self.__dict__['_index'])
+            self.__dict__[p] = Row(np.zeros(size, dtype=dtype), self)
 
     def __setattr__(self, name, value):
         if name not in self.__dict__:
@@ -97,7 +149,7 @@ class Table2D(Table):
         self.setindex(index, self.shape[0])
 
         for p, dtype in properties.items():
-            self.__dict__[p] = Row(np.zeros((num_rows, num_cols), dtype=dtype), self.__dict__['_index'])
+            self.__dict__[p] = Row(np.zeros((num_rows, num_cols), dtype=dtype), self)
 
     def __repr__(self):
         return "Table2D <rows: %d, cols: %d, properties: %d>" % self.shape
