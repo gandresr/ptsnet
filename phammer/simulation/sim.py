@@ -39,27 +39,31 @@ class HammerSimulation:
         self.settings = HammerSettings(**settings)
         self.wn = get_water_network(inpfile)
         self.ic = get_initial_conditions(inpfile, wn = self.wn)
-        self.num_points = 0
+        self.ng = self.wn.get_graph()
 
     def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
 
         if default_wave_speed is None and wave_speed_file is None:
-            raise Exception("Wave speed values not specified")
+            raise ValueError("wave_speed was not specified")
 
-        if default_wave_speed is not None:
-            wave_speeds = dict.fromkeys(self.ss.pipes, default_wave_speed)
+        if not default_wave_speed is None:
+            self.ic['pipes'].wave_speed[:] = default_wave_speed
 
-        if wave_speed_file:
+        modified_lines = 0
+        if not wave_speed_file is None:
             with open(wave_speed_file, 'r') as f:
                 for line in f:
                     line = line.strip()
+                    if len(line) <= 1:
+                        raise ValueError("The wave_speed file has to have to entries per line 'pipe,wave_speed'")
                     pipe, wave_speed = line.split(delimiter)
-                    wave_speeds[pipe] = float(wave_speed)
+                    self.ic['pipes'].wave_speed[pipe] = float(wave_speed)
+                    modified_lines += 1
+        else:
+            return
 
-        if len(wave_speeds) != self.ss.num_pipes:
-            wave_speeds = {}
-            raise Exception("""
-            The file does not specify wave speed values for all the pipes,
-            it is necessary to define a default wave speed value""")
-
-        return wave_speeds
+        if modified_lines != self.wn.num_pipes:
+            self.ic['pipes'].wave_speed[:] = 0
+            excep = "The file does not specify wave speed values for all the pipes,\n"
+            excep += "it is necessary to define a default wave speed value"
+            raise ValueError(excep)
