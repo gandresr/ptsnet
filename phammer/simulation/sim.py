@@ -1,6 +1,11 @@
 import numpy as np
+
 from phammer.simulation.ic import get_initial_conditions, get_water_network
 from phammer.arrays.arrays import Table2D
+from phammer.simulation.constants import MEM_POOL_POINTS, LINK_RESULTS, NODE_RESULTS, G
+from phammer.arrays.selectors import SelectorSet
+from phammer.epanet.util import EN
+from phammer.simulation.util import imerge
 
 class HammerSettings:
     def __init__(self,
@@ -81,7 +86,33 @@ class HammerSimulation:
         # The number of segments is defined
         self.ic['pipes'].segments /= self.settings.time_step
         int_segments = np.round(self.ic['pipes'].segments)
-        # The wave_speed is adjusted to compensate the truncation error
-        self.ic['pipes'].wave_speed = self.ic['pipes'].wave_speed*self.ic['pipes'].segments/int_segments
+
+        # The wave_speed values are adjusted to compensate the truncation error
+        self.ic['pipes'].wave_speed = self.ic['pipes'].wave_speed * self.ic['pipes'].segments/int_segments
         self.ic['pipes'].segments = int_segments
-        self.num_segments = sum(self.ic['pipes'].segments)
+        self.num_segments = int(sum(self.ic['pipes'].segments))
+        self.num_points = self.num_segments + self.wn.num_pipes
+        # self._update_moc_constants()
+
+    def initialize(self):
+        self.mem_pool = Table2D(MEM_POOL_POINTS, self.num_points, 2)
+        self.link_results = Table2D(LINK_RESULTS, self.wn.num_links, self.settings.time_steps)
+        self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.settings.time_steps)
+
+    def _create_selectors(self):
+        self.where = SelectorSet(['points'])
+        self.where.points['are_uboundaries'] = np.cumsum(self.ic['pipes'].segments.astype(np.int)+1) - 1
+        self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ic['pipes'].segments.astype(np.int)
+        bnodes = imerge(self.ic['pipes'].start_node, self.ic['pipes'].end_node)
+        bpoints_types = self.ic['nodes'].type[bnodes]
+        bpoints = imerge(self.where.points['are_dboundaries'], self.where.points['are_uboundaries'])
+        self.where.points['are_reservoirs'] = bpoints[bpoints_types == EN.RESERVOIR]
+        self.where.points['are_tanks'] = bpoints[bpoints_types == EN.TANK]
+        self.where.points['are_junctions'] = bpoints[bpoints_types == EN.JUNCTION]
+        self.where.points['to_junctions'] = bnodes[bpoints_types == EN.JUNCTION]
+        order = np.argsort(self.where.points['to_junctions'])
+        self.where.points['are_junctions'] = self.where.points['are_junctions'][order]
+        self.where.points['to_junctions'] = self.where.points['to_junctions'][order]
+        bindices = np.cumsum(np.bincount(self.where.points['to_junctions']))
+        self.where.points['are_junctions',] = np.zeros(len(bindices))
+        self.where.points['are_junctions',][1:] = bindices[:-1]
