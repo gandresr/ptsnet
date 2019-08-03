@@ -4,7 +4,7 @@ import phammer.epanet.toolkit as EPANET
 from phammer.epanet.util import EN, FlowUnits
 import matplotlib.pyplot as plt
 
-inpfile = '/home/watsup/Documents/Github/hammer-net/example_files/PHFC_SIM_17_4_13.inp'
+inpfile = '/home/watsup/Documents/Github/phammer/example_files/PHFC_SIM_17_4_13.inp'
 file_prefix, file_ext = os.path.splitext(inpfile)
 rptfile = file_prefix + '.rpt'
 outfile = file_prefix + '.bin'
@@ -27,9 +27,9 @@ link_name_list = []
 node_name_list = []
 
 for i in range(1, num_nodes+1):
-    node_name_list.append(EPANET_.ENgetnodeid(i))
+    node_name_list.append(EPANET_.ENgetnodetype(i))
 for i in range(1, num_links+1):
-    link_name_list.append(EPANET_.ENgetlinkid(i))
+    link_name_list.append(EPANET_.ENgetlinktype(i))
 
 flowrate = []
 head = []

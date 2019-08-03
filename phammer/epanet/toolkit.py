@@ -437,34 +437,6 @@ class ENepanet():
         self._error()
         return fValue.value.decode()
 
-    def ENgetlinkid(self, iIndex):
-        """[summary]
-
-        TODO DOCS
-
-        Arguments:
-            iIndex {[type]} -- [description]
-        """
-
-        fValue = ctypes.create_string_buffer(b'', 50)
-        self.errcode = self.ENlib.ENgetlinkid(iIndex, fValue)
-        self._error()
-        return fValue.value.decode()
-
-    def ENgetlinknodes(self, iIndex):
-        """[summary]
-
-        TODO DOCS
-
-        Arguments:
-            iIndex {[type]} -- [description]
-        """
-        n1 = ctypes.c_int()
-        n2 = ctypes.c_int()
-        self.errcode = self.ENlib.ENgetlinknodes(iIndex, byref(n1), byref(n2))
-        self._error()
-        return n1.value, n2.value
-
     def ENgetnodevalue(self, iIndex, iCode):
         """Retrieves parameter value for a node
 
@@ -482,6 +454,14 @@ class ENepanet():
         """
         fValue = ctypes.c_float()
         self.errcode = self.ENlib.ENgetnodevalue(iIndex, iCode, byref(fValue))
+        self._error()
+        return fValue.value
+
+    def ENgetnodetype(self, iIndex):
+        """TODO DOCS
+        """
+        fValue = ctypes.c_int()
+        self.errcode = self.ENlib.ENgetnodetype(iIndex, byref(fValue))
         self._error()
         return fValue.value
 
@@ -520,6 +500,42 @@ class ENepanet():
         """
         fValue = ctypes.c_float()
         self.errcode = self.ENlib.ENgetlinkvalue(iIndex, iCode, byref(fValue))
+        self._error()
+        return fValue.value
+
+    def ENgetlinkid(self, iIndex):
+        """[summary]
+
+        TODO DOCS
+
+        Arguments:
+            iIndex {[type]} -- [description]
+        """
+
+        fValue = ctypes.create_string_buffer(b'', 50)
+        self.errcode = self.ENlib.ENgetlinkid(iIndex, fValue)
+        self._error()
+        return fValue.value.decode()
+
+    def ENgetlinknodes(self, iIndex):
+        """[summary]
+
+        TODO DOCS
+
+        Arguments:
+            iIndex {[type]} -- [description]
+        """
+        n1 = ctypes.c_int()
+        n2 = ctypes.c_int()
+        self.errcode = self.ENlib.ENgetlinknodes(iIndex, byref(n1), byref(n2))
+        self._error()
+        return n1.value, n2.value
+
+    def ENgetlinktype(self, iIndex):
+        """TODO DOCS
+        """
+        fValue = ctypes.c_int()
+        self.errcode = self.ENlib.ENgetlinktype(iIndex, byref(fValue))
         self._error()
         return fValue.value
 
