@@ -107,6 +107,8 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
             ic[ltype].direction[k] = 1
         else:
             ic[ltype].direction[k] = -1
+            ic[ltype].flowrate[k] *= -1
+            ic[ltype].start_node[k], ic[ltype].end_node[k] = ic[ltype].end_node[k], ic[ltype].start_node[k]
 
     EPANET.ENcloseH()
     EPANET.ENclose()
