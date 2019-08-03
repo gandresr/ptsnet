@@ -13,19 +13,26 @@ class HammerSettings:
         duration: float = 20,
         warnings_on: bool = True,
         parallel : bool = False,
-        gpu : bool = False):
+        gpu : bool = False,
+        _super = None):
 
+        self.settingsOK = False
         self.time_step = time_step
         self.duration = duration
         self.time_steps = int(duration/time_step)
         self.warnings_on = warnings_on
         self.parallel = parallel
         self.gpu = gpu
+        self.defined_wave_speeds = False
+        self._super = _super
+        self.settingsOK = True
 
     def __repr__(self):
         rep = "\nSimulation settings:\n\n"
 
         for setting, val in self.__dict__.items():
+            if setting == '_super':
+                continue
             rep += '%s: %s\n' % (setting, str(val))
         return rep
 
@@ -36,43 +43,53 @@ class HammerSettings:
         except:
             pass
         object.__setattr__(self, name, value)
+        if (name == 'duration' or name == 'time_step') and self.settingsOK:
+            self.time_steps = int(self.duration/self.time_step)
 
 class HammerSimulation:
     def __init__(self, inpfile, settings):
         if type(settings) != dict:
             raise TypeError("'settings' are not properly defined, use dict object")
-        self.settings = HammerSettings(**settings)
+        self.settings = HammerSettings(**settings, _super = self)
         self.wn = get_water_network(inpfile)
         self.ic = get_initial_conditions(inpfile, wn = self.wn)
         self.ng = self.wn.get_graph()
         self.num_segments = 0
+        self.num_points = 0
 
-    def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
+    def __repr__(self):
+        return "HammerSimulation <duration = %d [s] | time_steps = %d | num_points = %s>" % \
+            (self.settings.duration, self.settings.time_steps, format(self.num_points, ',d'))
 
-        if default_wave_speed is None and wave_speed_file is None:
-            raise ValueError("wave_speed was not specified")
+    def _update_moc_constants(self):
+        self.ic['pipes'].dx[:] = self.ic['pipes'].length / self.ic['pipes'].segments
+        self.ic['pipes'].B[:] = self.ic['pipes'].wave_speed / (G * self.ic['pipes'].area)
+        self.ic['pipes'].R[:] = (self.ic['pipes'].ffactor * self.ic['pipes'].dx) / \
+            (2 * G * self.ic['pipes'].diameter * self.ic['pipes'].area ** 2)
 
-        if not default_wave_speed is None:
-            self.ic['pipes'].wave_speed[:] = default_wave_speed
+    def _allocate_memory(self):
+        self.mem_pool = Table2D(MEM_POOL_POINTS, self.num_points, 2)
+        self.link_results = Table2D(LINK_RESULTS, self.wn.num_links, self.settings.time_steps)
+        self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.settings.time_steps)
 
-        modified_lines = 0
-        if not wave_speed_file is None:
-            with open(wave_speed_file, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if len(line) <= 1:
-                        raise ValueError("The wave_speed file has to have to entries per line 'pipe,wave_speed'")
-                    pipe, wave_speed = line.split(delimiter)
-                    self.ic['pipes'].wave_speed[pipe] = float(wave_speed)
-                    modified_lines += 1
-        else:
-            return
-
-        if modified_lines != self.wn.num_pipes:
-            self.ic['pipes'].wave_speed[:] = 0
-            excep = "The file does not specify wave speed values for all the pipes,\n"
-            excep += "it is necessary to define a default wave speed value"
-            raise ValueError(excep)
+    def _create_selectors(self):
+        self.where = SelectorSet(['points', 'pipes'])
+        self.where.points['are_uboundaries'] = np.cumsum(self.ic['pipes'].segments.astype(np.int)+1) - 1
+        self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ic['pipes'].segments.astype(np.int)
+        bnodes = imerge(self.ic['pipes'].start_node, self.ic['pipes'].end_node)
+        bpoints_types = self.ic['nodes'].type[bnodes]
+        bpoints = imerge(self.where.points['are_dboundaries'], self.where.points['are_uboundaries'])
+        self.where.points['are_reservoirs'] = bpoints[bpoints_types == EN.RESERVOIR]
+        self.where.points['are_tanks'] = bpoints[bpoints_types == EN.TANK]
+        self.where.points['are_junctions'] = bpoints[bpoints_types == EN.JUNCTION]
+        self.where.points['to_junctions'] = bnodes[bpoints_types == EN.JUNCTION]
+        order = np.argsort(self.where.points['to_junctions'])
+        self.where.points['are_junctions'] = self.where.points['are_junctions'][order]
+        self.where.points['to_junctions'] = self.where.points['to_junctions'][order]
+        bindices = np.cumsum(np.bincount(self.where.points['to_junctions']))
+        self.where.points['are_junctions',] = np.zeros(len(bindices))
+        self.where.points['are_junctions',][1:] = bindices[:-1]
+        # self.where.pipes['to_points'] =
 
     def set_segments(self):
         self.ic['pipes'].segments = self.ic['pipes'].length
@@ -94,25 +111,38 @@ class HammerSimulation:
         self.num_points = self.num_segments + self.wn.num_pipes
         # self._update_moc_constants()
 
-    def initialize(self):
-        self.mem_pool = Table2D(MEM_POOL_POINTS, self.num_points, 2)
-        self.link_results = Table2D(LINK_RESULTS, self.wn.num_links, self.settings.time_steps)
-        self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.settings.time_steps)
+    def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
 
-    def _create_selectors(self):
-        self.where = SelectorSet(['points'])
-        self.where.points['are_uboundaries'] = np.cumsum(self.ic['pipes'].segments.astype(np.int)+1) - 1
-        self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ic['pipes'].segments.astype(np.int)
-        bnodes = imerge(self.ic['pipes'].start_node, self.ic['pipes'].end_node)
-        bpoints_types = self.ic['nodes'].type[bnodes]
-        bpoints = imerge(self.where.points['are_dboundaries'], self.where.points['are_uboundaries'])
-        self.where.points['are_reservoirs'] = bpoints[bpoints_types == EN.RESERVOIR]
-        self.where.points['are_tanks'] = bpoints[bpoints_types == EN.TANK]
-        self.where.points['are_junctions'] = bpoints[bpoints_types == EN.JUNCTION]
-        self.where.points['to_junctions'] = bnodes[bpoints_types == EN.JUNCTION]
-        order = np.argsort(self.where.points['to_junctions'])
-        self.where.points['are_junctions'] = self.where.points['are_junctions'][order]
-        self.where.points['to_junctions'] = self.where.points['to_junctions'][order]
-        bindices = np.cumsum(np.bincount(self.where.points['to_junctions']))
-        self.where.points['are_junctions',] = np.zeros(len(bindices))
-        self.where.points['are_junctions',][1:] = bindices[:-1]
+        if default_wave_speed is None and wave_speed_file is None:
+            raise ValueError("wave_speed was not specified")
+
+        if not default_wave_speed is None:
+            self.ic['pipes'].wave_speed[:] = default_wave_speed
+
+        modified_lines = 0
+        if not wave_speed_file is None:
+            with open(wave_speed_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if len(line) <= 1:
+                        raise ValueError("The wave_speed file has to have to entries per line 'pipe,wave_speed'")
+                    pipe, wave_speed = line.split(delimiter)
+                    self.ic['pipes'].wave_speed[pipe] = float(wave_speed)
+                    modified_lines += 1
+        else:
+            self.settings.defined_wave_speeds = True
+            self.set_segments()
+            return
+
+        if modified_lines != self.wn.num_pipes:
+            self.ic['pipes'].wave_speed[:] = 0
+            excep = "The file does not specify wave speed values for all the pipes,\n"
+            excep += "it is necessary to define a default wave speed value"
+            raise ValueError(excep)
+
+        self.settings.defined_wave_speeds = True
+        self.set_segments()
+
+    def initialize(self):
+        self._create_selectors()
+        self._allocate_memory()
