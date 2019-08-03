@@ -55,7 +55,6 @@ class SelectorSet:
         raise TypeError("Attribute assignment is not suported for SelectorSet")
 
     def __iadd__(self, category):
-        print(category)
         self.append(category)
         return self
 

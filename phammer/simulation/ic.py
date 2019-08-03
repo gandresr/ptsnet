@@ -67,6 +67,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
         ic['nodes'].emitter_coefficient[i-1] = EPANET.ENgetnodevalue(i, EN.EMITTER)
         ic['nodes'].demand[i-1] = EPANET.ENgetnodevalue(i, EN.DEMAND)
         ic['nodes'].head[i-1] = EPANET.ENgetnodevalue(i, EN.HEAD)
+        ic['nodes'].type[i-1] = EPANET.ENgetnodetype(i)
 
     p, pp, v = 0, 0, 0 # pipes, pumps, valves
     for i in range(1, wn.num_links+1):
@@ -91,6 +92,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
         if link.link_type in ('Pipe', 'Valve'):
             ic[ltype].diameter[k] = link.diameter
             ic[ltype].area[k] = np.pi * link.diameter ** 2 / 4
+            ic[ltype].type[k] = EPANET.ENgetlinktype(i)
 
         ic[ltype].start_node[k], ic[ltype].end_node[k] = EPANET.ENgetlinknodes(i)
         ic[ltype].flowrate[k] = EPANET.ENgetlinkvalue(i, EN.FLOW)
