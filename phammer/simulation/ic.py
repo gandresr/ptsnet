@@ -126,8 +126,12 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     to_si(flow_units, ic['valves'].velocity, HydParam.Velocity)
 
     # Indexes are adjusted to fit the new Table / Indexing in C code starts in 1
-    ic[ltype].start_node[k] -= 1
-    ic[ltype].end_node[k] -= 1
+    ic['pipes'].start_node -= 1
+    ic['pipes'].end_node -= 1
+    ic['pumps'].start_node -= 1
+    ic['pumps'].end_node -= 1
+    ic['valves'].start_node -= 1
+    ic['valves'].end_node -= 1
 
     idx = ic['pipes'].ffactor == 0
     ic['pipes'].ffactor[idx] = \
