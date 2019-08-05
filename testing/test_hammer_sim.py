@@ -15,5 +15,8 @@ sim = HammerSimulation(inpfile, {
 
 sim.set_wave_speeds(1300)
 
-sim.settings.duration = 8
+sim.settings.duration = 8.31
 sim.initialize()
+
+plt.plot(sim.mem_pool_points.flowrate[0:238,0])
+plt.show()

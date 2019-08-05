@@ -68,7 +68,7 @@ class HammerSimulation:
             (2 * G * self.ic['pipes'].diameter * self.ic['pipes'].area ** 2)
 
     def _allocate_memory(self):
-        self.mem_pool = Table2D(MEM_POOL_POINTS, self.num_points, 2)
+        self.mem_pool_points = Table2D(MEM_POOL_POINTS, self.num_points, 2)
         self.link_results = Table2D(LINK_RESULTS, self.wn.num_links, self.settings.time_steps)
         self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.settings.time_steps)
 
@@ -76,20 +76,29 @@ class HammerSimulation:
         self.where = SelectorSet(['points', 'pipes'])
         self.where.points['are_uboundaries'] = np.cumsum(self.ic['pipes'].segments.astype(np.int)+1) - 1
         self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ic['pipes'].segments.astype(np.int)
-        bnodes = imerge(self.ic['pipes'].start_node, self.ic['pipes'].end_node)
-        bpoints_types = self.ic['nodes'].type[bnodes]
-        bpoints = imerge(self.where.points['are_dboundaries'], self.where.points['are_uboundaries'])
-        self.where.points['are_reservoirs'] = bpoints[bpoints_types == EN.RESERVOIR]
-        self.where.points['are_tanks'] = bpoints[bpoints_types == EN.TANK]
-        self.where.points['are_junctions'] = bpoints[bpoints_types == EN.JUNCTION]
-        self.where.points['to_junctions'] = bnodes[bpoints_types == EN.JUNCTION]
+        self.where.pipes['to_nodes'] = imerge(self.ic['pipes'].start_node, self.ic['pipes'].end_node)
+        bpoints_types = self.ic['nodes'].type[self.where.pipes['to_nodes']]
+        self.where.points['are_boundaries'] = imerge(self.where.points['are_dboundaries'], self.where.points['are_uboundaries'])
+        self.where.points['are_inner'] = np.setdiff1d(np.arange(self.num_points, dtype=np.int), self.where.points['are_boundaries'])
+        self.where.points['are_reservoirs'] = self.where.points['are_boundaries'][bpoints_types == EN.RESERVOIR]
+        self.where.points['are_tanks'] = self.where.points['are_boundaries'][bpoints_types == EN.TANK]
+        self.where.points['are_junctions'] = self.where.points['are_boundaries'][bpoints_types == EN.JUNCTION]
+        self.where.points['to_junctions'] = self.where.pipes['to_nodes'][bpoints_types == EN.JUNCTION]
         order = np.argsort(self.where.points['to_junctions'])
         self.where.points['are_junctions'] = self.where.points['are_junctions'][order]
         self.where.points['to_junctions'] = self.where.points['to_junctions'][order]
         bindices = np.cumsum(np.bincount(self.where.points['to_junctions']))
         self.where.points['are_junctions',] = np.zeros(len(bindices))
         self.where.points['are_junctions',][1:] = bindices[:-1]
-        # self.where.pipes['to_points'] =
+
+    def _load_initial_conditions(self):
+        self.mem_pool_points.head[self.where.points['are_boundaries'], 0] = self.ic['nodes'].head[self.where.pipes['to_nodes']]
+        per_unit_hl = self.ic['pipes'].head_loss / self.ic['pipes'].segments
+        for i in range(self.wn.num_pipes):
+            k = self.where.points['are_dboundaries'][i]
+            s = int(self.ic['pipes'].segments[i])
+            self.mem_pool_points.head[k:k+s+1, 0] = self.mem_pool_points.head[k,0] - (per_unit_hl[i] * np.arange(s+1))
+            self.mem_pool_points.flowrate[k:k+s+1, 0] = self.ic['pipes'].flowrate[i]
 
     def set_segments(self):
         self.ic['pipes'].segments = self.ic['pipes'].length
@@ -146,3 +155,4 @@ class HammerSimulation:
     def initialize(self):
         self._create_selectors()
         self._allocate_memory()
+        self._load_initial_conditions()
