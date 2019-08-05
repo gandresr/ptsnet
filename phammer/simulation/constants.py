@@ -66,6 +66,9 @@ VALVE_INITIAL_CONDITIONS = {
 MEM_POOL_POINTS = {
     'flowrate' : np.float,
     'head' : np.float,
+}
+
+POINT_PROPERTIES = {
     'B' : np.float,
     'R' : np.float,
     'Bm' : np.float,
@@ -78,9 +81,11 @@ MEM_POOL_POINTS = {
 
 NODE_RESULTS = {
     'head' : np.float,
+    'emitter_flow' : np.float,
+    'demand_flow' : np.float,
 }
 
-LINK_RESULTS = {
+PIPE_RESULTS = {
     'inflow' : np.float,
     'outflow' : np.float,
 }

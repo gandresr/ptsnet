@@ -1,11 +1,12 @@
 import numpy as np
 
 from phammer.simulation.ic import get_initial_conditions, get_water_network
-from phammer.arrays.arrays import Table2D
-from phammer.simulation.constants import MEM_POOL_POINTS, LINK_RESULTS, NODE_RESULTS, G
+from phammer.arrays.arrays import Table2D, Table
+from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G
 from phammer.arrays.selectors import SelectorSet
 from phammer.epanet.util import EN
 from phammer.simulation.util import imerge
+from phammer.simulation.funcs import run_interior_step, run_boundary_step
 
 class HammerSettings:
     def __init__(self,
@@ -39,6 +40,8 @@ class HammerSettings:
     def __setattr__(self, name, value):
         try:
             if self.__getattribute__(name) != value:
+                if name == 'settingsOK':
+                    return
                 print("Warning: '%s' value has been changed to %s" % (name, str(value)))
         except:
             pass
@@ -56,20 +59,16 @@ class HammerSimulation:
         self.ng = self.wn.get_graph()
         self.num_segments = 0
         self.num_points = 0
+        self.t = 0
 
     def __repr__(self):
         return "HammerSimulation <duration = %d [s] | time_steps = %d | num_points = %s>" % \
             (self.settings.duration, self.settings.time_steps, format(self.num_points, ',d'))
 
-    def _update_moc_constants(self):
-        self.ic['pipes'].dx[:] = self.ic['pipes'].length / self.ic['pipes'].segments
-        self.ic['pipes'].B[:] = self.ic['pipes'].wave_speed / (G * self.ic['pipes'].area)
-        self.ic['pipes'].R[:] = (self.ic['pipes'].ffactor * self.ic['pipes'].dx) / \
-            (2 * G * self.ic['pipes'].diameter * self.ic['pipes'].area ** 2)
-
     def _allocate_memory(self):
         self.mem_pool_points = Table2D(MEM_POOL_POINTS, self.num_points, 2)
-        self.link_results = Table2D(LINK_RESULTS, self.wn.num_links, self.settings.time_steps)
+        self.point_properties = Table(POINT_PROPERTIES, self.num_points)
+        self.pipe_results = Table2D(PIPE_RESULTS, self.wn.num_pipes, self.settings.time_steps)
         self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.settings.time_steps)
 
     def _create_selectors(self):
