@@ -19,6 +19,8 @@ NODE_INITIAL_CONDITIONS = {
     'demand_coefficient' : np.float, #
     'demand' : np.float, #
     'head' : np.float, #
+    'pressure' : np.float,
+    'elevation' : np.float,
     'type' : np.int, #
 }
 
