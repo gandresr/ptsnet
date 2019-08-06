@@ -40,14 +40,19 @@ class HammerSettings:
     def __setattr__(self, name, value):
         try:
             if self.__getattribute__(name) != value:
-                if name == 'settingsOK':
-                    return
-                print("Warning: '%s' value has been changed to %s" % (name, str(value)))
+                if name != 'settingsOK':
+                    print("Warning: '%s' value has been changed to %s" % (name, str(value)))
         except:
             pass
+
+        if 'settingsOK' in self.__dict__:
+            if self.settingsOK:
+                if name == 'duration':
+                    self.time_steps = int(value/self.time_step)
+                elif name == 'time_step':
+                    self.time_steps = int(self.duration/value)
+
         object.__setattr__(self, name, value)
-        if (name == 'duration' or name == 'time_step') and self.settingsOK:
-            self.time_steps = int(self.duration/self.time_step)
 
 class HammerSimulation:
     def __init__(self, inpfile, settings):
@@ -68,36 +73,60 @@ class HammerSimulation:
     def _allocate_memory(self):
         self.mem_pool_points = Table2D(MEM_POOL_POINTS, self.num_points, 2)
         self.point_properties = Table(POINT_PROPERTIES, self.num_points)
-        self.pipe_results = Table2D(PIPE_RESULTS, self.wn.num_pipes, self.settings.time_steps)
-        self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.settings.time_steps)
+        self.pipe_results = Table2D(PIPE_RESULTS, self.wn.num_pipes, self.settings.time_steps, index = self.ic['pipes']._index_keys)
+        self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.settings.time_steps, index = self.ic['nodes']._index_keys)
 
     def _create_selectors(self):
-        self.where = SelectorSet(['points', 'pipes'])
+        self.where = SelectorSet(['points', 'pipes', 'nodes'])
+
+        # Point, None and pipe selectors
+        self.where.pipes['to_nodes'] = imerge(self.ic['pipes'].start_node, self.ic['pipes'].end_node)
+        self.where.nodes['njust_in_pipes'] = np.unique(np.concatenate((
+            self.ic['valves'].start_node, self.ic['valves'].end_node,
+            self.ic['pumps'].start_node, self.ic['pumps'].end_node)))
+        nodes = np.arange(self.wn.num_nodes)
         self.where.points['are_uboundaries'] = np.cumsum(self.ic['pipes'].segments.astype(np.int)+1) - 1
         self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ic['pipes'].segments.astype(np.int)
-        self.where.pipes['to_nodes'] = imerge(self.ic['pipes'].start_node, self.ic['pipes'].end_node)
-        bpoints_types = self.ic['nodes'].type[self.where.pipes['to_nodes']]
         self.where.points['are_boundaries'] = imerge(self.where.points['are_dboundaries'], self.where.points['are_uboundaries'])
         self.where.points['are_inner'] = np.setdiff1d(np.arange(self.num_points, dtype=np.int), self.where.points['are_boundaries'])
+        x = ~np.isin(self.where.pipes['to_nodes'], self.where.nodes['njust_in_pipes'])
+        self.where.points['just_in_pipes'] = self.where.points['are_boundaries'][x]
+        self.where.points['just_in_pipes',] = self.where.pipes['to_nodes'][x]
+        order = np.argsort(self.where.points['just_in_pipes',])
+        self.where.points['just_in_pipes'] = self.where.points['just_in_pipes'][order]
+        self.where.points['just_in_pipes',] = self.where.points['just_in_pipes',][order]
+        self.where.points['rjust_in_pipes'] = self.where.points['just_in_pipes']
+        self.where.points['rjust_in_pipes',] = np.copy(self.where.points['just_in_pipes',])
+        y = self.where.points['rjust_in_pipes',]
+        y = (y[1:] - y[:-1]) - 1; y[y < 0] = 0; y = np.cumsum(y)
+        self.where.points['rjust_in_pipes',][1:] -= y
+        self.where.nodes['just_in_pipes'] = np.unique(self.where.points['just_in_pipes',])
+        self.where.nodes['rjust_in_pipes'] = np.unique(self.where.points['rjust_in_pipes',])
+        self.where.points['jip_dboundaries'] = self.where.points['are_dboundaries'][x[0::2]]
+        self.where.points['jip_uboundaries'] = self.where.points['are_uboundaries'][x[1::2]]
+        bpoints_types = self.ic['nodes'].type[self.where.pipes['to_nodes']]
         self.where.points['are_reservoirs'] = self.where.points['are_boundaries'][bpoints_types == EN.RESERVOIR]
         self.where.points['are_tanks'] = self.where.points['are_boundaries'][bpoints_types == EN.TANK]
-        self.where.points['are_junctions'] = self.where.points['are_boundaries'][bpoints_types == EN.JUNCTION]
-        self.where.points['to_junctions'] = self.where.pipes['to_nodes'][bpoints_types == EN.JUNCTION]
-        order = np.argsort(self.where.points['to_junctions'])
-        self.where.points['are_junctions'] = self.where.points['are_junctions'][order]
-        self.where.points['to_junctions'] = self.where.points['to_junctions'][order]
-        bindices = np.cumsum(np.bincount(self.where.points['to_junctions']))
-        self.where.points['are_junctions',] = np.zeros(len(bindices))
-        self.where.points['are_junctions',][1:] = bindices[:-1]
+        bcount = np.bincount(self.where.points['just_in_pipes',])
+        bcount = np.cumsum(bcount[bcount != 0]); bcount[1:] = bcount[:-1]; bcount[0] = 0
+        self.where.nodes['just_in_pipes',] = bcount
 
     def _load_initial_conditions(self):
         self.mem_pool_points.head[self.where.points['are_boundaries'], 0] = self.ic['nodes'].head[self.where.pipes['to_nodes']]
+        self.ic['pipes'].dx = self.ic['pipes'].length / self.ic['pipes'].segments
         per_unit_hl = self.ic['pipes'].head_loss / self.ic['pipes'].segments
+        self.point_properties.has_plus[self.where.points['are_uboundaries']] = 1
+        self.point_properties.has_plus[self.where.points['are_inner']] = 1
+        self.point_properties.has_minus[self.where.points['are_dboundaries']] = 1
+        self.point_properties.has_minus[self.where.points['are_inner']] = 1
         for i in range(self.wn.num_pipes):
             k = self.where.points['are_dboundaries'][i]
             s = int(self.ic['pipes'].segments[i])
             self.mem_pool_points.head[k:k+s+1, 0] = self.mem_pool_points.head[k,0] - (per_unit_hl[i] * np.arange(s+1))
             self.mem_pool_points.flowrate[k:k+s+1, 0] = self.ic['pipes'].flowrate[i]
+            self.point_properties.B[k:k+s+1] = self.ic['pipes'].wave_speed[i] / (G * self.ic['pipes'].area[i])
+            self.point_properties.R[k:k+s+1] = self.ic['pipes'].ffactor[i] * self.ic['pipes'].dx[i] / \
+                (2 * G * self.ic['pipes'].diameter[i] * self.ic['pipes'].area[i] ** 2)
 
     def set_segments(self):
         self.ic['pipes'].segments = self.ic['pipes'].length
@@ -120,7 +149,6 @@ class HammerSimulation:
         # self._update_moc_constants()
 
     def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
-
         if default_wave_speed is None and wave_speed_file is None:
             raise ValueError("wave_speed was not specified")
 
@@ -155,3 +183,38 @@ class HammerSimulation:
         self._create_selectors()
         self._allocate_memory()
         self._load_initial_conditions()
+
+    def run_step(self):
+        t0 = self.t % 2
+        t1 = 1 - t0
+        run_interior_step(
+            self.mem_pool_points.flowrate[:,t0],
+            self.mem_pool_points.head[:,t0],
+            self.mem_pool_points.flowrate[:,t1],
+            self.mem_pool_points.head[:,t1],
+            self.point_properties.B,
+            self.point_properties.R,
+            self.point_properties.Cp,
+            self.point_properties.Bp,
+            self.point_properties.Cm,
+            self.point_properties.Bm,
+            self.point_properties.has_plus,
+            self.point_properties.has_minus)
+        run_boundary_step(
+            self.mem_pool_points.head[:,t0],
+            self.mem_pool_points.flowrate[:,t1],
+            self.mem_pool_points.head[:,t1],
+            self.node_results.emitter_flow[:,self.t],
+            self.node_results.demand_flow[:,self.t],
+            self.point_properties.Cp,
+            self.point_properties.Bp,
+            self.point_properties.Cm,
+            self.point_properties.Bm,
+            self.ic['nodes'].emitter_coefficient,
+            self.ic['nodes'].demand_coefficient,
+            self.ic['nodes'].elevation,
+            self.where)
+
+        self.t += 1
+        self.pipe_results.inflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_dboundaries'],t1]
+        self.pipe_results.outflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_uboundaries'],t1]
