@@ -55,19 +55,20 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
 
     flow_units = FlowUnits(EPANET.ENgetflowunits())
 
-    # Selectors
-
-    # 'are_junction'
-    # 'are_tank'
-    # 'are_reservoir'
-
     # Retrieve node conditions
     for i in range(1, wn.num_nodes+1):
         node_ids.append(EPANET.ENgetnodeid(i))
         ic['nodes'].emitter_coefficient[i-1] = EPANET.ENgetnodevalue(i, EN.EMITTER)
         ic['nodes'].demand[i-1] = EPANET.ENgetnodevalue(i, EN.DEMAND)
         ic['nodes'].head[i-1] = EPANET.ENgetnodevalue(i, EN.HEAD)
+        ic['nodes'].pressure[i-1] = EPANET.ENgetnodevalue(i, EN.PRESSURE)
         ic['nodes'].type[i-1] = EPANET.ENgetnodetype(i)
+        z = EPANET.ENgetnodevalue(i, EN.ELEVATION)
+        if ic['nodes'].type[i-1] == EN.RESERVOIR:
+            z = 0
+        elif ic['nodes'].type[i-1] == EN.TANK:
+            z = ic['nodes'].head[i-1] - ic['nodes'].pressure[i-1]
+        ic['nodes'].elevation[i-1] = z
 
     p, pp, v = 0, 0, 0 # pipes, pumps, valves
     for i in range(1, wn.num_links+1):
