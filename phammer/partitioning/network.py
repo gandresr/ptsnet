@@ -1,5 +1,5 @@
 import networkx as nx
-from phammer.partitioning.constants import SUPPORTED_NETWORK_FORMATS
+import numpy as np
 
 def get_dense_graph(G, weights = None):
     # If graph is a MultiGraph, then, the keys for weights should be given by the name of the
@@ -26,3 +26,14 @@ def get_dense_graph(G, weights = None):
         add_dense_edge(weights[edge_name], edge[0], edge[1], G, D)
 
     return D
+
+def export_graph(G, filename, index = None):
+    if index is None:
+        index = {node : i+1 for i, node in enumerate(G.nodes)}
+    with open(filename + '.graph', 'w') as f:
+        f.write("%d %d\n" % (len(G), len(G.edges)))
+        for node in index:
+            fline = ''
+            for neighbor in G[node]:
+                fline += "%d " % index[neighbor]
+            f.write(fline.rstrip() + '\n')

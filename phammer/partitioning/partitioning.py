@@ -1,41 +1,40 @@
-    def define_partitions(self, k):
-        """Defines network partitioning using parHIP (external lib)
+import subprocess
+import numpy as np
 
-        Arguments:
-            k {integer} -- desired number of partitions
-        """
+from os import sep
+from os.path import isdir
+from pkg_resources import resource_filename
 
-        if not isdir(MOC_PATH + 'partitionings'):
-            subprocess.call(['mkdir', MOC_PATH + 'partitionings'])
+def define_partitions(graph_file, k):
+    """Defines network partitioning using parHIP (external lib)
 
-        self._write_mesh()
-        script = MOC_PATH + 'parHIP/kaffpa'
-        subprocess.call([
-            script, self.fname + '.graph',
-            '--k=' + str(k),
-            '--preconfiguration=strong',
-            '--output_filename=' + MOC_PATH + 'partitionings/p%d.graph' % k],
-            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    Arguments:
+        k {integer} -- desired number of partitions
+    """
 
-        script = MOC_PATH + 'parHIP/partition_to_vertex_separator'
+    RESOURCE_PATH = resource_filename(__name__, 'resources')
 
-        subprocess.call([
-            script, self.fname + '.graph',
-            '--k=' + str(k),
-            '--input_partition=' + MOC_PATH + 'partitionings/p%d.graph' % k,
-            '--output_filename=' + MOC_PATH + 'partitionings/s%d.graph' % k],
-            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    if not isdir(RESOURCE_PATH + sep + 'partitions'):
+        subprocess.call(['mkdir', RESOURCE_PATH + sep + 'partitions'])
 
-        self.num_processors = k
-        pp = zip(
-            np.loadtxt(MOC_PATH + 'partitionings/p%d.graph' % k, dtype=int),
-            np.loadtxt(MOC_PATH + 'partitionings/s%d.graph' % k, dtype=int))
+    script = RESOURCE_PATH + sep + 'kaffpa'
+    subprocess.call([
+        script, graph_file + '.graph',
+        '--k=' + str(k),
+        '--preconfiguration=strong',
+        '--output_filename=' + RESOURCE_PATH + sep + sep.join(('partitions', 'p%d.graph' % k))],
+        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
-        # Stored in the same order of mesh_graph:
-        names = list(self.mesh_graph)
-        self.partitioning = dict(zip(names, pp))
+    script = RESOURCE_PATH + sep + 'partition_to_vertex_separator'
+    subprocess.call([
+        script, graph_file + '.graph',
+        '--k=' + str(k),
+        '--input_partition=' + RESOURCE_PATH + sep + sep.join(('partitions', 'p%d.graph' % k)),
+        '--output_filename=' + RESOURCE_PATH + sep + sep.join(('partitions', 's%d.graph' % k))],
+        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
-        for i, node in enumerate(self.node_name_list):
-            self.nodes_int[NODE_INT['processor'], i] = self.partitioning[node][0] # processor
-            # is separator? ... more details in parHIP user manual
-            self.nodes_int[NODE_INT['is_ghost'], i] = self.partitioning[node][1] == self.num_processors
+    partitions = np.loadtxt(RESOURCE_PATH + sep + sep.join(('partitions', 'p%d.graph' % k)), dtype=np.int)
+    is_ghost = np.loadtxt(RESOURCE_PATH + sep + sep.join(('partitions', 's%d.graph' % k)), dtype=np.int)
+    is_ghost = is_ghost == k
+
+    return partitions, is_ghost
