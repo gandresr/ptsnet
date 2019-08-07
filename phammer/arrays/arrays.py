@@ -32,9 +32,10 @@ class Row(np.ndarray):
 class Table:
     def __init__(self, properties, size, index = None):
         self.__dict__['shape'] = (len(properties), size,)
+        self.__dict__['properties'] = properties
         self.setindex(index, self.shape[1])
 
-        for p, dtype in properties.items():
+        for p, dtype in self.properties.items():
             self.__dict__[p] = Row(size, dtype=dtype, _super=self)
 
     def __setattr__(self, name, value):
@@ -52,16 +53,16 @@ class Table:
                 old_val[:] = new_val
 
     def __getitem__(self, index):
+        if not ((is_iterable(index) and type(index) != str) or type(index) == slice):
+            raise ValueError("index is not valid, only numpy valid iterable indices")
         idx = index
-        if type(index) == int:
-            idx = [index]
-        elif type(index) == slice:
-            idx =  range(*index.indices(self.shape[1]))
-        elif not is_iterable(index):
-            raise ValueError("index is not valid")
-
-        sliced_table = Table(self.__dict__['_properties'], len(idx))
-        for p in self.__dict__['_properties']:
+        if type(index) == slice:
+            idx = range(*index.indices(self.shape[1]))
+        new_index = None
+        if hasattr(self, '_index_keys'):
+            new_index = self._index_keys[idx]
+        sliced_table = Table(self.properties, len(idx), new_index)
+        for p in self.properties:
             sliced_table.__dict__[p][:] = self.__dict__[p][idx]
 
         return sliced_table
@@ -94,11 +95,11 @@ class Table:
                 size = self.shape[0]
             else:
                 size = self.shape[1]
-        if index:
+        if not index is None:
             if len(index) != size:
                 raise ValueError("could not assing index of len (%d) to entry of size (%d)" % (len(index), size))
             self.__dict__[_index_name] = {}
-            self.__dict__[_index_name + '_keys'] = index
+            self.__dict__[_index_name + '_keys'] = np.array(index)
             for i in range(size):
                 if not index[i] in self.__dict__[_index_name]:
                     self.__dict__[_index_name][index[i]] = i
@@ -110,10 +111,26 @@ class Table:
 class Table2D(Table):
     def __init__(self, properties, num_rows, num_cols, index = None):
         self.__dict__['shape'] = (num_rows, num_cols, len(properties))
+        self.__dict__['properties'] = properties
         self.setindex(index, self.shape[0])
 
-        for p, dtype in properties.items():
+        for p, dtype in self.properties.items():
             self.__dict__[p] = Row((num_rows, num_cols), dtype=dtype, _super=self)
 
     def __repr__(self):
         return "<Table2D rows: %d, cols: %d, properties: %d>" % self.shape
+
+    def __getitem__(self, index):
+        if not ((is_iterable(index) and type(index) != str) or type(index) == slice):
+            raise ValueError("index is not valid, only numpy valid iterable indices")
+        idx = index
+        if type(index) == slice:
+            idx = range(*index.indices(self.shape[1]))
+        new_index = None
+        if hasattr(self, '_index_keys'):
+            new_index = self._index_keys[idx]
+        sliced_table = Table2D(self.properties, len(idx), self.shape[1], new_index)
+        for p in self.properties:
+            sliced_table.__dict__[p][:] = self.__dict__[p][idx]
+
+            return sliced_table
