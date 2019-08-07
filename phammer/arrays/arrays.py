@@ -1,62 +1,47 @@
 import numpy as np
 from collections import namedtuple
+from phammer.simulation.util import is_iterable
 
-class Row:
-    def __init__(self, value, _super = None):
-        self._value = value
-        self._super = _super
+class Row(np.ndarray):
+    def __new__(subtype, shape, dtype=float, _super=None):
+        obj = super(Row, subtype).__new__(subtype, shape, dtype)
+        obj._super = _super
+        obj.fill(0)
+        return obj
+
+    def __array_finalize__(self, obj):
+        if obj is None: return
+        self._super = getattr(obj, '_super', None)
 
     def __getitem__(self, index):
-        if self._index is None:
-            if not type(index) in (int, tuple, list, slice, np.ndarray):
-                raise ValueError("not valid index")
-            return self._value[index]
+        if type(index) == str:
+            return super().__getitem__(self.index[index])
         else:
-            if type(index) in (int, tuple, list, slice, np.ndarray):
-                return self._value[index]
-            else:
-                return self._value[self._index[index]]
+            return super().__getitem__(index)
 
     def __setitem__(self, index, value):
-        if self._index is None:
-            if not type(index) in (int, tuple, list, slice, np.ndarray):
-                raise ValueError("not valid index")
-            self._value[index] = value
+        if type(index) == str:
+            super().__setitem__(self.index[index], value)
         else:
-            if type(index) in (int, tuple, list, slice, np.ndarray):
-                self._value[index] = value
-            else:
-                self._value[self._index[index]] = value
+            super().__setitem__(index, value)
 
     @property
-    def _index(self):
+    def index(self):
         return self._super._index
 
 class Table:
-    Selector = namedtuple('Selector', ['value', 'context'])
-
     def __init__(self, properties, size, index = None):
         self.__dict__['shape'] = (len(properties), size,)
         self.setindex(index, self.shape[1])
 
         for p, dtype in properties.items():
-            self.__dict__[p] = Row(np.zeros(size, dtype=dtype), self)
-
-    def __getattribute__(self, name):
-        if name == '__dict__':
-            return object.__getattribute__(self, name)
-        else:
-            if name in self.__dict__:
-                if type(self.__dict__[name]) == Row:
-                    return self.__dict__[name]._value
-                return self.__dict__[name]
-            return object.__getattribute__(self, name)
+            self.__dict__[p] = Row(size, dtype=dtype, _super=self)
 
     def __setattr__(self, name, value):
         if name not in self.__dict__:
             raise TypeError("'Table' does not support attribute assignment")
         else:
-            old_val = self.__dict__[name]._value
+            old_val = self.__dict__[name]
             new_val = value
 
             if type(old_val) != type(new_val):
@@ -66,12 +51,27 @@ class Table:
             else:
                 old_val[:] = new_val
 
+    def __getitem__(self, index):
+        idx = index
+        if type(index) == int:
+            idx = [index]
+        elif type(index) == slice:
+            idx =  range(*index.indices(self.shape[1]))
+        elif not is_iterable(index):
+            raise ValueError("index is not valid")
+
+        sliced_table = Table(self.__dict__['_properties'], len(idx))
+        for p in self.__dict__['_properties']:
+            sliced_table.__dict__[p][:] = self.__dict__[p][idx]
+
+        return sliced_table
+
     @property
     def shape(self):
         return self.__dict__['shape']
 
     def __repr__(self):
-        return "Table <properties: %d, size: %d>" % self.shape
+        return "<Table properties: %d, size: %d>" % self.shape
 
     def setindex(self, index, size=None):
         self._setindex(index, size, '_index')
@@ -113,7 +113,7 @@ class Table2D(Table):
         self.setindex(index, self.shape[0])
 
         for p, dtype in properties.items():
-            self.__dict__[p] = Row(np.zeros((num_rows, num_cols), dtype=dtype), self)
+            self.__dict__[p] = Row((num_rows, num_cols), dtype=dtype, _super=self)
 
     def __repr__(self):
-        return "Table2D <rows: %d, cols: %d, properties: %d>" % self.shape
+        return "<Table2D rows: %d, cols: %d, properties: %d>" % self.shape
