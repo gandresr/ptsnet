@@ -1,6 +1,6 @@
 import numpy as np
 
-from collections import defaultdict as dd
+from phammer.arrays.arrays import Row
 
 class SelectorList:
     def __init__(self):
@@ -34,7 +34,7 @@ class SelectorList:
                 self._contexts[index[0]] = value
         else:
             if (type(value) == np.ndarray and value.dtype != np.int) or \
-                type(value) != np.ndarray:
+                (not type(value) in (Row, np.ndarray)) or (type(value) == Row and value.dtype != np.int):
                     raise ValueError("'selector' is not valid: Only numpy arrays of dtype = int")
             self._selectors[index] = value
 

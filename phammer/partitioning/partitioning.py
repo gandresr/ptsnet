@@ -4,6 +4,7 @@ import numpy as np
 from os import sep
 from os.path import isdir
 from pkg_resources import resource_filename
+from phammer.partitioning.util import clean_resources
 
 def define_partitions(graph_file, k):
     """Defines network partitioning using parHIP (external lib)
@@ -36,5 +37,7 @@ def define_partitions(graph_file, k):
     partitions = np.loadtxt(RESOURCE_PATH + sep + sep.join(('partitions', 'p%d.graph' % k)), dtype=np.int)
     is_ghost = np.loadtxt(RESOURCE_PATH + sep + sep.join(('partitions', 's%d.graph' % k)), dtype=np.int)
     is_ghost = is_ghost == k
+
+    clean_resources()
 
     return partitions, is_ghost
