@@ -84,7 +84,6 @@ class HammerSimulation:
         self.where.nodes['njust_in_pipes'] = np.unique(np.concatenate((
             self.ic['valves'].start_node, self.ic['valves'].end_node,
             self.ic['pumps'].start_node, self.ic['pumps'].end_node)))
-        nodes = np.arange(self.wn.num_nodes)
         self.where.points['are_uboundaries'] = np.cumsum(self.ic['pipes'].segments.astype(np.int)+1) - 1
         self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ic['pipes'].segments.astype(np.int)
         self.where.points['are_boundaries'] = imerge(self.where.points['are_dboundaries'], self.where.points['are_uboundaries'])
@@ -110,6 +109,14 @@ class HammerSimulation:
         bcount = np.bincount(self.where.points['just_in_pipes',])
         bcount = np.cumsum(bcount[bcount != 0]); bcount[1:] = bcount[:-1]; bcount[0] = 0
         self.where.nodes['just_in_pipes',] = bcount
+        x = np.isin(self.where.pipes['to_nodes'], self.ic['valves'].start_node[self.ic['valves'].is_inline])
+        self.where.points['in_valves'] = self.where.points['are_boundaries'][x]
+        x = np.isin(self.where.pipes['to_nodes'], self.ic['valves'].end_node[self.ic['valves'].is_inline])
+        self.where.points['out_valves'] = self.where.points['are_boundaries'][x]
+        x = np.isin(self.where.pipes['to_nodes'], self.ic['pumps'].start_node[self.ic['pumps'].is_inline])
+        self.where.points['in_pumps'] = self.where.points['are_boundaries'][x]
+        x = np.isin(self.where.pipes['to_nodes'], self.ic['pumps'].end_node[self.ic['pumps'].is_inline])
+        self.where.points['out_pumps'] = self.where.points['are_boundaries'][x]
 
     def _load_initial_conditions(self):
         self.mem_pool_points.head[self.where.points['are_boundaries'], 0] = self.ic['nodes'].head[self.where.pipes['to_nodes']]
@@ -128,7 +135,7 @@ class HammerSimulation:
             self.point_properties.R[k:k+s+1] = self.ic['pipes'].ffactor[i] * self.ic['pipes'].dx[i] / \
                 (2 * G * self.ic['pipes'].diameter[i] * self.ic['pipes'].area[i] ** 2)
 
-    def set_segments(self):
+    def _set_segments(self):
         self.ic['pipes'].segments = self.ic['pipes'].length
         self.ic['pipes'].segments /= self.ic['pipes'].wave_speed
 
@@ -146,7 +153,6 @@ class HammerSimulation:
         self.ic['pipes'].segments = int_segments
         self.num_segments = int(sum(self.ic['pipes'].segments))
         self.num_points = self.num_segments + self.wn.num_pipes
-        # self._update_moc_constants()
 
     def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
         if default_wave_speed is None and wave_speed_file is None:
@@ -167,7 +173,7 @@ class HammerSimulation:
                     modified_lines += 1
         else:
             self.settings.defined_wave_speeds = True
-            self.set_segments()
+            self._set_segments()
             return
 
         if modified_lines != self.wn.num_pipes:
@@ -177,7 +183,7 @@ class HammerSimulation:
             raise ValueError(excep)
 
         self.settings.defined_wave_speeds = True
-        self.set_segments()
+        self._set_segments()
 
     def initialize(self):
         self._create_selectors()

@@ -23,6 +23,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     if wn is None:
         wn = get_water_network(inpfile)
 
+    network_graph = wn.get_graph()
     EPANET = ENepanet()
     EPANET.ENopen(inpfile, rptfile, outfile)
     EPANET.ENopenH()
@@ -57,7 +58,8 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
 
     # Retrieve node conditions
     for i in range(1, wn.num_nodes+1):
-        node_ids.append(EPANET.ENgetnodeid(i))
+        node_id = EPANET.ENgetnodeid(i)
+        node_ids.append(node_id)
         ic['nodes'].emitter_coefficient[i-1] = EPANET.ENgetnodevalue(i, EN.EMITTER)
         ic['nodes'].demand[i-1] = EPANET.ENgetnodevalue(i, EN.DEMAND)
         ic['nodes'].head[i-1] = EPANET.ENgetnodevalue(i, EN.HEAD)
@@ -69,6 +71,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
         elif ic['nodes'].type[i-1] == EN.TANK:
             z = ic['nodes'].head[i-1] - ic['nodes'].pressure[i-1]
         ic['nodes'].elevation[i-1] = z
+        ic['nodes'].degree[i-1] = network_graph.degree(node_id)
 
     p, pp, v = 0, 0, 0 # pipes, pumps, valves
     for i in range(1, wn.num_links+1):
@@ -98,6 +101,10 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
         ic[ltype].start_node[k], ic[ltype].end_node[k] = EPANET.ENgetlinknodes(i)
         ic[ltype].flowrate[k] = EPANET.ENgetlinkvalue(i, EN.FLOW)
         ic[ltype].velocity[k] = EPANET.ENgetlinkvalue(i, EN.VELOCITY)
+
+        if ic['nodes'].degree[ic[ltype].start_node[k]-1] >= 2 and \
+            ic['nodes'].degree[ic[ltype].end_node[k]-1] >= 2:
+            ic[ltype].is_inline[k] = True
 
         if -TOL < ic[ltype].flowrate[k] < TOL:
             ic[ltype].direction[k] = 0

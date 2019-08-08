@@ -19,9 +19,10 @@ NODE_INITIAL_CONDITIONS = {
     'demand_coefficient' : np.float, #
     'demand' : np.float, #
     'head' : np.float, #
-    'pressure' : np.float,
-    'elevation' : np.float,
+    'pressure' : np.float, #
+    'elevation' : np.float, #
     'type' : np.int, #
+    'degree' : np.int, #
 }
 
 PIPE_INITIAL_CONDITIONS = {
@@ -39,6 +40,7 @@ PIPE_INITIAL_CONDITIONS = {
     'ffactor' : np.float, #
     'dx' : np.float, #
     'type' : np.int, #
+    'is_inline' : np.bool,
 }
 
 PUMP_INITIAL_CONDITIONS = {
@@ -51,6 +53,7 @@ PUMP_INITIAL_CONDITIONS = {
     'A' : np.float, #
     'B' : np.float, #
     'C' : np.float, #
+    'is_inline' : np.bool,
 }
 
 VALVE_INITIAL_CONDITIONS = {
@@ -63,6 +66,7 @@ VALVE_INITIAL_CONDITIONS = {
     'direction' : np.int, #
     'initial_status' : np.int, #
     'type' : np.int, #
+    'is_inline' : np.bool,
 }
 
 MEM_POOL_POINTS = {
