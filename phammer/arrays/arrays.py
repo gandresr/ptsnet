@@ -134,3 +134,40 @@ class Table2D(Table):
             sliced_table.__dict__[p][:] = self.__dict__[p][idx]
 
             return sliced_table
+
+class ObjArray:
+    def __init__(self):
+        self.index = {}
+        self.name_list = []
+        self.values = []
+
+    def __setitem__(self, name, value):
+        if name in self.index:
+            self.values[self.index[name]] = value
+        else:
+            self.index[name] = len(self)
+            self.values.append(value)
+            self.name_list.append(name)
+
+    def __getitem__(self, index):
+        return self.values[self.index[index]]
+
+    def __len__(self):
+        return len(self.values)
+
+    def __iter__(self):
+        self.i = 0
+        return self
+
+    def __next__(self):
+        self.i += 1
+        if (self.i - 1) < len(self):
+            return self.values[self.i - 1]
+        else:
+            raise StopIteration
+
+    def __repr__(self):
+        return "<ObjArray " + str(self.index) + " >"
+
+    def iloc(self, index):
+        return self.index[index]
