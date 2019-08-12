@@ -15,14 +15,8 @@ sim = HammerSimulation(inpfile, {
     'duration' : duration # TODO change only data structures affected by the change
 })
 
-sim.set_wave_speeds(1200)
-sim.initialize()
+sim.add_curve('V_BUTTERFLY', 'valve_curve',
+    [1, 0.8, 0.6, 0.4, 0.2, 0],
+    [1.4, 1, 0.55, 0.25, 0.1, 0])
 
-t = time()
-for i in range(1, sim.settings.time_steps):
-    sim.run_step()
-print(time()-t)
-
-plt.plot(sim.pipe_results.inflow[2])
-plt.plot(sim.pipe_results.outflow[2])
-plt.show()
+sim.assign_curve_to('V_BUTTERFLY', '9')

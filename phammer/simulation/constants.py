@@ -40,7 +40,7 @@ PIPE_INITIAL_CONDITIONS = {
     'ffactor' : np.float, #
     'dx' : np.float, #
     'type' : np.int, #
-    'is_inline' : np.bool,
+    'is_inline' : np.bool, #
 }
 
 PUMP_INITIAL_CONDITIONS = {
@@ -53,7 +53,9 @@ PUMP_INITIAL_CONDITIONS = {
     'A' : np.float, #
     'B' : np.float, #
     'C' : np.float, #
-    'is_inline' : np.bool,
+    'is_inline' : np.bool, #
+    'curve_index' : np.int,
+    'setting_curve_index' : np.int,
 }
 
 VALVE_INITIAL_CONDITIONS = {
@@ -66,11 +68,18 @@ VALVE_INITIAL_CONDITIONS = {
     'direction' : np.int, #
     'initial_status' : np.int, #
     'type' : np.int, #
-    'is_inline' : np.bool,
+    'is_inline' : np.bool, #
+    'curve_index' : np.int,
+    'setting_curve_index' : np.int,
 }
 
 MEM_POOL_POINTS = {
     'flowrate' : np.float,
+    'head' : np.float,
+}
+
+MEM_POOL_VALVES = {
+    'setting' : np.float,
     'head' : np.float,
 }
 

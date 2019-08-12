@@ -1,11 +1,11 @@
 import numpy as np
 
 from phammer.simulation.ic import get_initial_conditions, get_water_network
-from phammer.arrays.arrays import Table2D, Table
+from phammer.arrays.arrays import Table2D, Table, ObjArray
 from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G
 from phammer.arrays.selectors import SelectorSet
 from phammer.epanet.util import EN
-from phammer.simulation.util import imerge
+from phammer.simulation.util import imerge, define_curve, is_iterable
 from phammer.simulation.funcs import run_interior_step, run_boundary_step
 
 class HammerSettings:
@@ -54,6 +54,39 @@ class HammerSettings:
 
         object.__setattr__(self, name, value)
 
+class HammerCurve:
+    types = [
+        'valve_curve',
+        'valve_setting',
+        'pump_curve',
+        'pump_setting',
+        'emitter_curve',
+        'emitter_setting',
+        'demand',
+        'demand_setting']
+
+    def __init__(self, X, Y, type_):
+        self.elements = []
+        if type_ not in self.types:
+            raise ValueError("type is not valid, use ('" + "', '".join(self.types) + "')")
+        self.type = type_
+        self.X = np.array(X)
+        self.Y = np.array(Y)
+        order = np.argsort(self.X)
+        self.X = self.X[order]
+        self.Y = self.Y[order]
+        if self.type in ('valve_curve', 'pump_curve', 'emitter_curve'):
+            self.fun = define_curve(self.X, self.Y)
+        else:
+            self.fun = None
+
+    def add_element(self, element):
+        if not element in self.elements:
+            self.elements.append(element)
+
+    def __iadd__(self, element):
+        self.add_element(element)
+
 class HammerSimulation:
     def __init__(self, inpfile, settings):
         if type(settings) != dict:
@@ -62,6 +95,7 @@ class HammerSimulation:
         self.wn = get_water_network(inpfile)
         self.ic = get_initial_conditions(inpfile, wn = self.wn)
         self.ng = self.wn.get_graph()
+        self.curves = ObjArray()
         self.num_segments = 0
         self.num_points = 0
         self.t = 0
@@ -184,6 +218,26 @@ class HammerSimulation:
 
         self.settings.defined_wave_speeds = True
         self._set_segments()
+
+    def add_curve(self, curve_name, type_, X, Y):
+        self.curves[curve_name] = HammerCurve(X, Y, type_)
+
+    def assign_curve_to(self, curve_name, elements):
+        if type(elements) == str:
+            elements = [elements]
+        for element in elements:
+            if element in self.wn.valve_name_list:
+                if self.curves[curve_name].type != 'valve_curve':
+                    raise ValueError("only curves of type 'valve_curve' can be defined for valve %s" % element)
+            elif (element in self.wn.pump_name_list):
+                if self.curves[curve_name].type != 'pump_curve':
+                    raise ValueError("only curves of type 'pump_curve' can be defined for pump %s" % element)
+            elif element in self.wn.node_name_list:
+                if not self.curves[curve_name].type in ('emitter_curve', 'emitter_setting', 'demand', 'demand_setting'):
+                    raise ValueError("only emitter and demand curves can be defined for node %s" % element)
+            else:
+                raise ValueError("element is not valid")
+            self.curves[curve_name].add_element(element)
 
     def initialize(self):
         self._create_selectors()

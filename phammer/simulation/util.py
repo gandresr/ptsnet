@@ -8,7 +8,7 @@ def define_curve(X, Y):
 def is_iterable(x):
     try:
         iter(x)
-        return True
+        return type(x) != str
     except:
         return False
 
