@@ -127,6 +127,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     to_si(flow_units, ic['nodes'].demand, HydParam.Flow)
     to_si(flow_units, ic['nodes'].head, HydParam.HydraulicHead)
     to_si(flow_units, ic['nodes'].pressure, HydParam.Pressure)
+    to_si(flow_units, ic['nodes'].elevation, HydParam.Elevation)
     to_si(flow_units, ic['pipes'].head_loss, HydParam.HeadLoss)
     to_si(flow_units, ic['pipes'].flowrate, HydParam.Flow)
     to_si(flow_units, ic['pumps'].flowrate, HydParam.Flow)
