@@ -1,17 +1,48 @@
 import wntr
+from wntr.epanet.toolkit import ENepanet
+from wntr.epanet.util import EN, FlowUnits, HydParam, to_si
+
 from phammer.simulation.ic import get_initial_conditions
+
 inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet_leak_us.inp'
+rptfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet_leak_us.rpt'
+outfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet_leak_us.out'
+
 
 wn = wntr.network.WaterNetworkModel(inpfile)
+
+# Getting results from EPANET using WNTR
+
 sim = wntr.sim.EpanetSimulator(wn)
 results = sim.run_sim()
-wntr_result = float(results.node['demand']['5'])
-node = wn.get_node('5')
+epa_result = float(results.node['demand']['5'])
+
+# Extracting results with WNTR
+
+EPANET = ENepanet()
+EPANET.ENopen(inpfile, rptfile, outfile)
+EPANET.ENopenH()
+EPANET.ENinitH(0)
+EPANET.ENrunH()
+
+emitter_coeff = to_si(flow_units, EPANET.ENgetnodevalue(5, EN.EMITTER), HydParam.EmitterCoeff)
+pressure = to_si(flow_units, EPANET.ENgetnodevalue(5, EN.PRESSURE), HydParam.Pressure)
+flow_units = FlowUnits(EPANET.ENgetflowunits())
+wntr_result = emitter_coeff * pressure ** 0.5
+
+EPANET.ENcloseH()
+EPANET.ENclose()
+
+# Extracting results with phammer
 
 ic = get_initial_conditions(inpfile)
 K = ic['nodes'].emitter_coefficient['5']
 P = ic['nodes'].pressure['5']
 H = ic['nodes'].head['5']
 F = ic['nodes'].demand['5']
-epa_result = K*P**0.5
-print(wntr_result, epa_result)
+phammer_result = K*P**0.5
+
+# Results Comparison
+print("EPA", epa_result)
+print("PHAMMER", phammer_result)
+print("WNTR", wntr_result)
