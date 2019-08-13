@@ -92,6 +92,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
             k = v; v += 1
             valve_ids.append(link.name)
             ic[ltype].initial_status[k] = EPANET.ENgetlinkvalue(i, EN.INITSTATUS)
+            ic[ltype].setting[k] = ic[ltype].initial_status[k]
 
         if link.link_type in ('Pipe', 'Valve'):
             ic[ltype].diameter[k] = link.diameter
@@ -125,6 +126,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     to_si(flow_units, ic['nodes'].emitter_coefficient, HydParam.EmitterCoeff)
     to_si(flow_units, ic['nodes'].demand, HydParam.Flow)
     to_si(flow_units, ic['nodes'].head, HydParam.HydraulicHead)
+    to_si(flow_units, ic['nodes'].pressure, HydParam.Pressure)
     to_si(flow_units, ic['pipes'].head_loss, HydParam.HeadLoss)
     to_si(flow_units, ic['pipes'].flowrate, HydParam.Flow)
     to_si(flow_units, ic['pumps'].flowrate, HydParam.Flow)
