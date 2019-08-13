@@ -11,7 +11,6 @@ FLOOR_FFACTOR = 1E-4
 DEFAULT_FFACTOR = 0.035
 G = 9.807 # SI gravity
 TOL = 1E-6
-SETTING_TYPES = ('valve', 'pump', 'emitter', 'demand',)
 
 # ----- Initial Conditions -----
 
@@ -78,10 +77,10 @@ VALVE_PROPERTIES = {
     'type' : np.int, #
     'is_inline' : np.bool, #
     # ----------------------------------------
-    'curve_index' : np.int,
-    'setting_curve_index' : np.int,
     'K' : np.float,
     'setting' : np.float,
+    'curve_index' : np.int,
+    'setting_curve_index' : np.int,
 }
 
 POINT_PROPERTIES = {
