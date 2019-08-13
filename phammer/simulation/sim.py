@@ -2,7 +2,7 @@ import numpy as np
 
 from phammer.simulation.ic import get_initial_conditions, get_water_network
 from phammer.arrays.arrays import Table2D, Table, ObjArray
-from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G
+from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G, SETTING_TYPES
 from phammer.arrays.selectors import SelectorSet
 from phammer.epanet.util import EN
 from phammer.simulation.util import imerge, define_curve, is_iterable
@@ -20,7 +20,7 @@ class HammerSettings:
         self.settingsOK = False
         self.time_step = time_step
         self.duration = duration
-        self.time_steps = int(duration/time_step)
+        self.time_steps = int(round(duration/time_step))
         self.warnings_on = warnings_on
         self.parallel = parallel
         self.gpu = gpu
@@ -48,9 +48,9 @@ class HammerSettings:
         if 'settingsOK' in self.__dict__:
             if self.settingsOK:
                 if name == 'duration':
-                    self.time_steps = int(value/self.time_step)
+                    self.time_steps = int(round(value/self.time_step))
                 elif name == 'time_step':
-                    self.time_steps = int(self.duration/value)
+                    self.time_steps = int(round(self.duration/value))
 
         object.__setattr__(self, name, value)
 
@@ -60,9 +60,7 @@ class HammerCurve:
         'valve_setting',
         'pump_curve',
         'pump_setting',
-        'emitter_curve',
         'emitter_setting',
-        'demand',
         'demand_setting']
 
     def __init__(self, X, Y, type_):
@@ -121,6 +119,10 @@ class HammerSimulation:
         self.where.points['are_uboundaries'] = np.cumsum(self.ic['pipes'].segments.astype(np.int)+1) - 1
         self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ic['pipes'].segments.astype(np.int)
         self.where.points['are_boundaries'] = imerge(self.where.points['are_dboundaries'], self.where.points['are_uboundaries'])
+        order = np.argsort(self.where.pipes['to_nodes'])
+        nodes, indices = np.unique(self.where.pipes['to_nodes'][order], True)
+        self.where.nodes['to_points'] = self.where.points['are_boundaries'][order][indices]
+        self.where.nodes['to_points',] = nodes
         self.where.points['are_inner'] = np.setdiff1d(np.arange(self.num_points, dtype=np.int), self.where.points['are_boundaries'])
         x = ~np.isin(self.where.pipes['to_nodes'], self.where.nodes['njust_in_pipes'])
         self.where.points['just_in_pipes'] = self.where.points['are_boundaries'][x]
@@ -168,6 +170,13 @@ class HammerSimulation:
             self.point_properties.B[k:k+s+1] = self.ic['pipes'].wave_speed[i] / (G * self.ic['pipes'].area[i])
             self.point_properties.R[k:k+s+1] = self.ic['pipes'].ffactor[i] * self.ic['pipes'].dx[i] / \
                 (2 * G * self.ic['pipes'].diameter[i] * self.ic['pipes'].area[i] ** 2)
+        self.pipe_results.inflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_dboundaries'], 0]
+        self.pipe_results.outflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_uboundaries'], 0]
+        self.node_results.head[self.where.nodes['to_points',], self.t] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
+        self.node_results.head[self.where.nodes['to_points',], self.t] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
+        self.node_results.emitter_flow[:, self.t] = self.ic['nodes'].emitter_coefficient * np.sqrt(self.ic['nodes'].pressure)
+        self.node_results.demand_flow[:, self.t] = self.ic['nodes'].demand_coefficient * np.sqrt(self.ic['nodes'].pressure)
+        self.t += 1
 
     def _set_segments(self):
         self.ic['pipes'].segments = self.ic['pipes'].length
@@ -240,13 +249,15 @@ class HammerSimulation:
             self.curves[curve_name].add_element(element)
 
     def initialize(self):
+        if not self.settings.defined_wave_speeds:
+            raise NotImplementedError("wave speed values have not been defined for the pipes")
         self._create_selectors()
         self._allocate_memory()
         self._load_initial_conditions()
 
     def run_step(self):
-        t0 = self.t % 2
-        t1 = 1 - t0
+        t1 = self.t % 2
+        t0 = 1 - t1
         run_interior_step(
             self.mem_pool_points.flowrate[:,t0],
             self.mem_pool_points.head[:,t0],
@@ -274,7 +285,7 @@ class HammerSimulation:
             self.ic['nodes'].demand_coefficient,
             self.ic['nodes'].elevation,
             self.where)
-
+        self.pipe_results.inflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_dboundaries'], t1]
+        self.pipe_results.outflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_uboundaries'], t1]
+        self.node_results.head[self.where.nodes['to_points',], self.t] = self.mem_pool_points.head[self.where.nodes['to_points'], t1]
         self.t += 1
-        self.pipe_results.inflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_dboundaries'],t1]
-        self.pipe_results.outflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_uboundaries'],t1]
