@@ -6,7 +6,7 @@ from phammer.arrays.arrays import Table
 from phammer.epanet.toolkit import ENepanet
 from phammer.epanet.util import EN, FlowUnits, HydParam, to_si
 from phammer.simulation.constants import G, TOL, FLOOR_FFACTOR, CEIL_FFACTOR, DEFAULT_FFACTOR
-from phammer.simulation.constants import NODE_INITIAL_CONDITIONS, PIPE_INITIAL_CONDITIONS, PUMP_INITIAL_CONDITIONS, VALVE_INITIAL_CONDITIONS
+from phammer.simulation.constants import NODE_PROPERTIES, PIPE_PROPERTIES, PUMP_PROPERTIES, VALVE_PROPERTIES
 
 def get_water_network(inpfile):
     ENFile = InpFile()
@@ -30,13 +30,13 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     EPANET.ENinitH(0)
 
     # Data structures for node and link initial conditions
-    nodes = Table(NODE_INITIAL_CONDITIONS, wn.num_nodes)
+    nodes = Table(NODE_PROPERTIES, wn.num_nodes)
     node_ids = []
-    pipes = Table(PIPE_INITIAL_CONDITIONS, wn.num_pipes)
+    pipes = Table(PIPE_PROPERTIES, wn.num_pipes)
     pipe_ids = []
-    valves = Table(VALVE_INITIAL_CONDITIONS, wn.num_valves)
+    valves = Table(VALVE_PROPERTIES, wn.num_valves)
     valve_ids = []
-    pumps = Table(PUMP_INITIAL_CONDITIONS, wn.num_pumps)
+    pumps = Table(PUMP_PROPERTIES, wn.num_pumps)
     pump_ids = []
 
     ic = {
@@ -148,6 +148,13 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
 
     ic['pipes'].ffactor[ic['pipes'].ffactor >= CEIL_FFACTOR] = DEFAULT_FFACTOR
     ic['pipes'].ffactor[ic['pipes'].ffactor <= FLOOR_FFACTOR] = DEFAULT_FFACTOR
+
+    ic['valves'].curve_index.fill(np.nan)
+    ic['valves'].setting_curve_index.fill(np.nan)
+    ic['pumps'].curve_index.fill(np.nan)
+    ic['pumps'].setting_curve_index.fill(np.nan)
+    ic['nodes'].e_setting_curve_index.fill(np.nan)
+    ic['nodes'].d_setting_curve_index.fill(np.nan)
 
     nodes.setindex(node_ids)
     pipes.setindex(pipe_ids)

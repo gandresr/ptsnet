@@ -11,21 +11,27 @@ FLOOR_FFACTOR = 1E-4
 DEFAULT_FFACTOR = 0.035
 G = 9.807 # SI gravity
 TOL = 1E-6
+SETTING_TYPES = ('valve', 'pump', 'emitter', 'demand',)
 
 # ----- Initial Conditions -----
 
-NODE_INITIAL_CONDITIONS = {
-    'emitter_coefficient' : np.float, #
-    'demand_coefficient' : np.float, #
+NODE_PROPERTIES = {
     'demand' : np.float, #
     'head' : np.float, #
     'pressure' : np.float, #
     'elevation' : np.float, #
     'type' : np.int, #
     'degree' : np.int, #
+    'emitter_coefficient' : np.float, #
+    'demand_coefficient' : np.float, #
+    # ----------------------------------------
+    'e_setting_curve_index' : np.int, #
+    'd_setting_curve_index' : np.int, #
+    'demand_setting' : np.float,
+    'emitter_setting' : np.float,
 }
 
-PIPE_INITIAL_CONDITIONS = {
+PIPE_PROPERTIES = {
     'start_node' : np.int, #
     'end_node' : np.int, #
     'length' : np.float, #
@@ -43,22 +49,24 @@ PIPE_INITIAL_CONDITIONS = {
     'is_inline' : np.bool, #
 }
 
-PUMP_INITIAL_CONDITIONS = {
+PUMP_PROPERTIES = {
     'start_node' : np.int, #
     'end_node' : np.int, #
     'flowrate' : np.float, #
     'velocity' : np.float, #
     'direction' : np.int, #
     'initial_status' : np.int, #
+    'is_inline' : np.bool, #
+    # ----------------------------------------
     'A' : np.float, #
     'B' : np.float, #
     'C' : np.float, #
-    'is_inline' : np.bool, #
     'curve_index' : np.int,
     'setting_curve_index' : np.int,
+    'setting' : np.float,
 }
 
-VALVE_INITIAL_CONDITIONS = {
+VALVE_PROPERTIES = {
     'start_node' : np.int, #
     'end_node' : np.int, #
     'diameter' : np.float, #
@@ -69,18 +77,11 @@ VALVE_INITIAL_CONDITIONS = {
     'initial_status' : np.int, #
     'type' : np.int, #
     'is_inline' : np.bool, #
+    # ----------------------------------------
     'curve_index' : np.int,
     'setting_curve_index' : np.int,
-}
-
-MEM_POOL_POINTS = {
-    'flowrate' : np.float,
-    'head' : np.float,
-}
-
-MEM_POOL_VALVES = {
+    'K' : np.float,
     'setting' : np.float,
-    'head' : np.float,
 }
 
 POINT_PROPERTIES = {
@@ -92,6 +93,11 @@ POINT_PROPERTIES = {
     'Cp' : np.float,
     'has_plus' : np.int,
     'has_minus' : np.int,
+}
+
+MEM_POOL_POINTS = {
+    'flowrate' : np.float,
+    'head' : np.float,
 }
 
 NODE_RESULTS = {
