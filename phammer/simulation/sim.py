@@ -274,6 +274,37 @@ class HammerSimulation:
                 raise ValueError("element is not valid")
             self.curves[curve_name].add_element(element)
 
+    def can_be_operated(self, step, check_warning = False):
+        check_time = self.t * self.settings.time_step
+        if check_time % step >= self.settings.time_step:
+            return False
+        else:
+            if check_warning:
+                print("Warning: operating at time time %f" % check_time)
+            return True
+
+    def set_setting(self, type_, element_name, value, step = None, check_warning = False):
+        if not is_iterable(element_name):
+            if type(element_name) is str:
+                element_name = [element_name]
+                value = [value]
+            else:
+                raise ValueError("'element_name' should be iterable or str")
+        if not type_ in self.SETTING_TYPES:
+            raise ValueError("type_ should be in ('" + "', '".join(self.SETTING_TYPES) + "')")
+        if not step is None:
+            if not self.can_be_operated(step, check_warning):
+                return
+        for i, element in enumerate(element_name):
+            if type_ == 'valve':
+                self.ic['valves'].setting[element] = value[i]
+            elif type_ == 'pump':
+                self.ic['pumps'].setting[element] = value[i]
+            elif type_ == 'emitter':
+                self.ic['nodes'].emitter_setting[element] = value[i]
+            elif type == 'demand':
+                self.ic['nodes'].demand_setting[element] = value[i]
+
     def initialize(self):
         if not self.settings.defined_wave_speeds:
             raise NotImplementedError("wave speed values have not been defined for the pipes")
