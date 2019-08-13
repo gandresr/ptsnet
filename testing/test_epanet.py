@@ -39,9 +39,9 @@ while EPANET_.ENnextH() > 0 and t <= period:
     tx = EPANET_.ENrunH()
     if t == period:
         for i in range(1, num_links+1):
-            flowrate.append(FLOW_TO_SI * EPANET_.ENgetlinkvalue(i, EN.FLOW))
+            flowrate.append(EPANET_.ENgetlinkvalue(i, EN.FLOW))
         for i in range(1, num_nodes+1):
-            head.append(HEAD_TO_SI * EPANET_.ENgetnodevalue(i, EN.HEAD))
+            head.append(EPANET_.ENgetnodevalue(i, EN.HEAD))
     t += 1
 
 EPANET_.ENcloseH()

@@ -66,9 +66,9 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
     Q1[where.points['jip_uboundaries']] = Cp[where.points['jip_uboundaries']] \
         - H1[where.points['jip_uboundaries']] * Bp[where.points['jip_uboundaries']]
 
-    # Get demand and emitter flows
+    # Get demand and leak flows
     HH -= Z[where.nodes['just_in_pipes']]
-    HH[HH < 0] = 0 # No demand/emitter flow with negative pressure
+    HH[HH < 0] = 0 # No demand/leak flow with negative pressure
     E1[where.nodes['just_in_pipes']] = Ke[where.nodes['just_in_pipes']] * np.sqrt(2*G*HH)
     D1[where.nodes['just_in_pipes']] = Kd[where.nodes['just_in_pipes']] * np.sqrt(2*G*HH)
 

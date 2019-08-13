@@ -61,7 +61,7 @@ class HammerCurve:
         'valve_setting',
         'pump_curve',
         'pump_setting',
-        'emitter_setting',
+        'burst_setting',
         'demand_setting',)
 
     def __init__(self, X, Y, type_):
@@ -74,7 +74,7 @@ class HammerCurve:
         order = np.argsort(self.X)
         self.X = self.X[order]
         self.Y = self.Y[order]
-        if self.type in ('valve_curve', 'pump_curve', 'emitter_curve'):
+        if 'curve' in self.type:
             self.fun = define_curve(self.X, self.Y)
         else:
             self.fun = None
@@ -92,7 +92,7 @@ class HammerCurve:
         raise TypeError("settings curve is not callable")
 
 class HammerSimulation:
-    SETTING_TYPES = ('valve', 'pump', 'emitter', 'demand',)
+    SETTING_TYPES = ('valve', 'pump', 'burst', 'demand',)
     def __init__(self, inpfile, settings):
         if type(settings) != dict:
             raise TypeError("'settings' are not properly defined, use dict object")
@@ -185,7 +185,7 @@ class HammerSimulation:
         self.pipe_results.outflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_uboundaries'], 0]
         self.node_results.head[self.where.nodes['to_points',], self.t] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
         self.node_results.head[self.where.nodes['to_points',], self.t] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
-        self.node_results.emitter_flow[:, self.t] = self.ic['nodes'].emitter_coefficient * np.sqrt(self.ic['nodes'].pressure)
+        self.node_results.leak_flow[:, self.t] = self.ic['nodes'].leak_coefficient * np.sqrt(self.ic['nodes'].pressure)
         self.node_results.demand_flow[:, self.t] = self.ic['nodes'].demand_coefficient * np.sqrt(self.ic['nodes'].pressure)
         self.t += 1
 
@@ -264,12 +264,12 @@ class HammerSimulation:
                 else:
                     self.ic['pumps'].curve_index[element] = len(self.curves[curve_name].elements)
             elif element in self.wn.node_name_list:
-                if not self.curves[curve_name].type in ('emitter_curve', 'emitter_setting', 'demand', 'demand_setting'):
-                    raise ValueError("only emitter and demand curves can be defined for node %s" % element)
-                if self.curves[curve_name].type == 'emitter_setting':
-                    self.ic['nodes'].e_setting_curve_index[element] = len(self.curves[curve_name].elements)
+                if not self.curves[curve_name].type in ('burst_setting', 'demand_setting'):
+                    raise ValueError("only burst and demand settings can be defined for node %s" % element)
+                if self.curves[curve_name].type == 'burst_setting':
+                    self.ic['nodes'].leak_curve_index[element] = len(self.curves[curve_name].elements)
                 elif self.curves[curve_name].type == 'demand_setting':
-                    self.ic['nodes'].d_setting_curve_index[element] = len(self.curves[curve_name].elements)
+                    self.ic['nodes'].demand_curve_index[element] = len(self.curves[curve_name].elements)
             else:
                 raise ValueError("element is not valid")
             self.curves[curve_name].add_element(element)
@@ -300,8 +300,8 @@ class HammerSimulation:
                 self.ic['valves'].setting[element] = value[i]
             elif type_ == 'pump':
                 self.ic['pumps'].setting[element] = value[i]
-            elif type_ == 'emitter':
-                self.ic['nodes'].emitter_setting[element] = value[i]
+            elif type_ == 'burst':
+                self.ic['nodes'].burst_setting[element] = value[i]
             elif type == 'demand':
                 self.ic['nodes'].demand_setting[element] = value[i]
 
@@ -335,13 +335,13 @@ class HammerSimulation:
             self.mem_pool_points.head[:,t0],
             self.mem_pool_points.flowrate[:,t1],
             self.mem_pool_points.head[:,t1],
-            self.node_results.emitter_flow[:,self.t],
+            self.node_results.leak_flow[:,self.t],
             self.node_results.demand_flow[:,self.t],
             self.point_properties.Cp,
             self.point_properties.Bp,
             self.point_properties.Cm,
             self.point_properties.Bm,
-            self.ic['nodes'].emitter_coefficient,
+            self.ic['nodes'].leak_coefficient,
             self.ic['nodes'].demand_coefficient,
             self.ic['nodes'].elevation,
             self.where)

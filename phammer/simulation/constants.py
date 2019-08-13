@@ -21,13 +21,11 @@ NODE_PROPERTIES = {
     'elevation' : np.float, #
     'type' : np.int, #
     'degree' : np.int, #
-    'emitter_coefficient' : np.float, #
-    'demand_coefficient' : np.float, #
     # ----------------------------------------
-    'e_setting_curve_index' : np.int, #
-    'd_setting_curve_index' : np.int, #
-    'demand_setting' : np.float,
-    'emitter_setting' : np.float,
+    'leak_coefficient' : np.float, #
+    'leak_curve_index' : np.int, #
+    'demand_coefficient' : np.float, #
+    'demand_curve_index' : np.int, #
 }
 
 PIPE_PROPERTIES = {
@@ -101,7 +99,7 @@ MEM_POOL_POINTS = {
 
 NODE_RESULTS = {
     'head' : np.float,
-    'emitter_flow' : np.float,
+    'leak_flow' : np.float,
     'demand_flow' : np.float,
 }
 

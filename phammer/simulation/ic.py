@@ -60,7 +60,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     for i in range(1, wn.num_nodes+1):
         node_id = EPANET.ENgetnodeid(i)
         node_ids.append(node_id)
-        ic['nodes'].emitter_coefficient[i-1] = EPANET.ENgetnodevalue(i, EN.EMITTER)
+        ic['nodes'].leak_coefficient[i-1] = EPANET.ENgetnodevalue(i, EN.EMITTER)
         ic['nodes'].demand[i-1] = EPANET.ENgetnodevalue(i, EN.DEMAND)
         ic['nodes'].head[i-1] = EPANET.ENgetnodevalue(i, EN.HEAD)
         ic['nodes'].pressure[i-1] = EPANET.ENgetnodevalue(i, EN.PRESSURE)
@@ -123,7 +123,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     EPANET.ENclose()
 
     # Unit conversion
-    to_si(flow_units, ic['nodes'].emitter_coefficient, HydParam.EmitterCoeff)
+    to_si(flow_units, ic['nodes'].leak_coefficient, HydParam.EmitterCoeff)
     to_si(flow_units, ic['nodes'].demand, HydParam.Flow)
     to_si(flow_units, ic['nodes'].head, HydParam.HydraulicHead)
     to_si(flow_units, ic['nodes'].pressure, HydParam.Pressure)
@@ -156,8 +156,8 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     ic['valves'].setting_curve_index.fill(np.nan)
     ic['pumps'].curve_index.fill(np.nan)
     ic['pumps'].setting_curve_index.fill(np.nan)
-    ic['nodes'].e_setting_curve_index.fill(np.nan)
-    ic['nodes'].d_setting_curve_index.fill(np.nan)
+    ic['nodes'].leak_curve_index.fill(np.nan)
+    ic['nodes'].demand_curve_index.fill(np.nan)
 
     nodes.setindex(node_ids)
     pipes.setindex(pipe_ids)
