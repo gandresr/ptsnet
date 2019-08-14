@@ -132,7 +132,7 @@ class HammerSimulation:
         self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.settings.time_steps, index = self.ic['node']._index_keys)
 
     def _create_selectors(self):
-        self.where = SelectorSet(['points', 'pipe', 'node'])
+        self.where = SelectorSet(['points', 'pipes', 'nodes'])
         # Point, None and pipe selectors
         self.where.pipes['to_nodes'] = imerge(self.ic['pipe'].start_node, self.ic['pipe'].end_node)
         self.where.nodes['njust_in_pipes'] = np.unique(np.concatenate((
