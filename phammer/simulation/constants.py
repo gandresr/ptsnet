@@ -23,9 +23,7 @@ NODE_PROPERTIES = {
     'degree' : np.int, #
     # ----------------------------------------
     'leak_coefficient' : np.float, #
-    'leak_curve_index' : np.int, #
     'demand_coefficient' : np.float, #
-    'demand_curve_index' : np.int, #
 }
 
 PIPE_PROPERTIES = {
@@ -59,7 +57,6 @@ PUMP_PROPERTIES = {
     'B' : np.float, #
     'C' : np.float, #
     'curve_index' : np.int,
-    'setting_curve_index' : np.int,
     'setting' : np.float,
 }
 
@@ -78,7 +75,6 @@ VALVE_PROPERTIES = {
     'K' : np.float,
     'setting' : np.float,
     'curve_index' : np.int,
-    'setting_curve_index' : np.int,
 }
 
 POINT_PROPERTIES = {

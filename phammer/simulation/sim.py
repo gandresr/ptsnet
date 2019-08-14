@@ -56,40 +56,51 @@ class HammerSettings:
         object.__setattr__(self, name, value)
 
 class HammerCurve:
-    CURVE_TYPES = (
-        'valve_curve',
-        'valve_setting',
-        'pump_curve',
-        'pump_setting',
-        'burst_setting',
-        'demand_setting',)
-
+    CURVE_TYPES = ('valve', 'pump',)
     def __init__(self, X, Y, type_):
         self.elements = []
         if type_ not in self.CURVE_TYPES:
-            raise ValueError("type is not valid, use ('" + "', '".join(self.types) + "')")
+            raise ValueError("type '%s' is not valid, use ('" % type_ + "', '".join(self.CURVE_TYPES) + "')")
         self.type = type_
         self.X = np.array(X)
         self.Y = np.array(Y)
         order = np.argsort(self.X)
         self.X = self.X[order]
         self.Y = self.Y[order]
-        if 'curve' in self.type:
             self.fun = define_curve(self.X, self.Y)
-        else:
-            self.fun = None
 
     def add_element(self, element):
+        if is_iterable(element):
+            for e in element:
         if not element in self.elements:
+                    self.elements.append(e)
+        else:
+            if not element in self.elements:
             self.elements.append(element)
 
-    def __iadd__(self, element):
-        self.add_element(element)
-
     def __call__(self, value):
-        if not self.fun is None:
             return self.fun(value)
-        raise TypeError("settings curve is not callable")
+
+    def __len__(self):
+        return len(self.elements)
+
+class ElementSettings:
+    def __init__(self):
+        self.entries = []
+
+    def dump_settings(self, X, Y, element_index):
+        if type(element_index) != int:
+            raise ValueError("'element_index' is not int")
+        if X.shape != Y.shape:
+            raise ValueError("X and Y have different shapes")
+        if len(X.shape) > 1:
+            raise ValueError("X should be a 1D numpy array")
+        eidx = element_index * np.ones_like(X, dtype = np.int)
+
+        self.entries += list(zip(X, Y, eidx))
+
+    def sort(self):
+        self.entries.sort(key = lambda x : x[0])
 
 class HammerSimulation:
     SETTING_TYPES = ('valve', 'pump', 'burst', 'demand',)
@@ -101,6 +112,7 @@ class HammerSimulation:
         self.ic = get_initial_conditions(inpfile, wn = self.wn)
         self.ng = self.wn.get_graph()
         self.curves = ObjArray()
+        self.element_settings = {type_ : ElementSettings() for type_ in self.SETTING_TYPES}
         self.num_segments = 0
         self.num_points = 0
         self.t = 0
@@ -239,39 +251,20 @@ class HammerSimulation:
         self.settings.defined_wave_speeds = True
         self._set_segments()
 
+    def define_element_setting(self, element, type_, X, Y):
+        self.element_settings[type_].dump_settings(X, Y, element)
+
     def add_curve(self, curve_name, type_, X, Y):
-        if 'setting' in type_:
-            if X[0] != 0:
-                raise ValueError("setting at t=0 is not defined")
         self.curves[curve_name] = HammerCurve(X, Y, type_)
 
     def assign_curve_to(self, curve_name, elements):
         if type(elements) == str:
             elements = [elements]
+        type_ = self.curves[curve_name].type
         for element in elements:
-            if element in self.wn.valve_name_list:
-                if not self.curves[curve_name].type in ('valve_curve', 'valve_setting'):
-                    raise ValueError("only curves of type 'valve_curve' can be defined for valve %s" % element)
-                if self.curves[curve_name].type == 'valve_setting':
-                    self.ic['valves'].setting_curve_index[element] = len(self.curves[curve_name].elements)
-                else:
-                    self.ic['valves'].curve_index[element] = len(self.curves[curve_name].elements)
-            elif (element in self.wn.pump_name_list):
-                if self.curves[curve_name].type != 'pump_curve':
-                    raise ValueError("only curves of type 'pump_curve' can be defined for pump %s" % element)
-                if self.curves[curve_name].type == 'pump_setting':
-                    self.ic['pumps'].setting_curve_index[element] = len(self.curves[curve_name].elements)
-                else:
-                    self.ic['pumps'].curve_index[element] = len(self.curves[curve_name].elements)
-            elif element in self.wn.node_name_list:
-                if not self.curves[curve_name].type in ('burst_setting', 'demand_setting'):
-                    raise ValueError("only burst and demand settings can be defined for node %s" % element)
-                if self.curves[curve_name].type == 'burst_setting':
-                    self.ic['nodes'].leak_curve_index[element] = len(self.curves[curve_name].elements)
-                elif self.curves[curve_name].type == 'demand_setting':
-                    self.ic['nodes'].demand_curve_index[element] = len(self.curves[curve_name].elements)
-            else:
-                raise ValueError("element is not valid")
+            if self.ic[type_].curve_index[element] == -1:
+                N = len(self.curves[curve_name])
+                self.ic[type_].curve_index[element] = N
             self.curves[curve_name].add_element(element)
 
     def can_be_operated(self, step, check_warning = False):
