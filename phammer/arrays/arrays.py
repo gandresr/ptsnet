@@ -1,6 +1,8 @@
 import numpy as np
+
 from collections import namedtuple
 from phammer.simulation.util import is_iterable
+from functools import lru_cache
 
 class Row(np.ndarray):
     def __new__(subtype, shape, dtype=float, _super=None):
@@ -77,6 +79,7 @@ class Table:
     def setindex(self, index, size=None):
         self._setindex(index, size, '_index')
 
+    @lru_cache(maxsize=None)
     def iloc(self, index):
         if self._index is None:
             raise ValueError("'index' has not been defined for the table")
@@ -84,6 +87,7 @@ class Table:
             return [self._index[i] for i in index]
         return self._index[index]
 
+    @lru_cache(maxsize=None)
     def ival(self, index):
         if self._index is None:
             raise ValueError("'index' has not been defined for the table")
