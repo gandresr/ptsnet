@@ -36,10 +36,10 @@ EPANET.ENclose()
 # Extracting results with phammer
 
 ic = get_initial_conditions(inpfile)
-K = ic['nodes'].emitter_coefficient['5']
-P = ic['nodes'].pressure['5']
-H = ic['nodes'].head['5']
-F = ic['nodes'].demand['5']
+K = ic['node'].emitter_coefficient['5']
+P = ic['node'].pressure['5']
+H = ic['node'].head['5']
+F = ic['node'].demand['5']
 phammer_result = K*P**0.5
 
 # Results Comparison

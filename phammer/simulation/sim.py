@@ -67,19 +67,19 @@ class HammerCurve:
         order = np.argsort(self.X)
         self.X = self.X[order]
         self.Y = self.Y[order]
-            self.fun = define_curve(self.X, self.Y)
+        self.fun = define_curve(self.X, self.Y)
 
     def add_element(self, element):
         if is_iterable(element):
             for e in element:
-        if not element in self.elements:
+                if not element in self.elements:
                     self.elements.append(e)
         else:
             if not element in self.elements:
-            self.elements.append(element)
+                self.elements.append(element)
 
     def __call__(self, value):
-            return self.fun(value)
+        return self.fun(value)
 
     def __len__(self):
         return len(self.elements)
@@ -128,19 +128,18 @@ class HammerSimulation:
     def _allocate_memory(self):
         self.mem_pool_points = Table2D(MEM_POOL_POINTS, self.num_points, 2)
         self.point_properties = Table(POINT_PROPERTIES, self.num_points)
-        self.pipe_results = Table2D(PIPE_RESULTS, self.wn.num_pipes, self.settings.time_steps, index = self.ic['pipes']._index_keys)
-        self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.settings.time_steps, index = self.ic['nodes']._index_keys)
+        self.pipe_results = Table2D(PIPE_RESULTS, self.wn.num_pipes, self.settings.time_steps, index = self.ic['pipe']._index_keys)
+        self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.settings.time_steps, index = self.ic['node']._index_keys)
 
     def _create_selectors(self):
-        self.where = SelectorSet(['points', 'pipes', 'nodes'])
-
+        self.where = SelectorSet(['points', 'pipe', 'node'])
         # Point, None and pipe selectors
-        self.where.pipes['to_nodes'] = imerge(self.ic['pipes'].start_node, self.ic['pipes'].end_node)
+        self.where.pipes['to_nodes'] = imerge(self.ic['pipe'].start_node, self.ic['pipe'].end_node)
         self.where.nodes['njust_in_pipes'] = np.unique(np.concatenate((
-            self.ic['valves'].start_node, self.ic['valves'].end_node,
-            self.ic['pumps'].start_node, self.ic['pumps'].end_node)))
-        self.where.points['are_uboundaries'] = np.cumsum(self.ic['pipes'].segments.astype(np.int)+1) - 1
-        self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ic['pipes'].segments.astype(np.int)
+            self.ic['valve'].start_node, self.ic['valve'].end_node,
+            self.ic['pump'].start_node, self.ic['pump'].end_node)))
+        self.where.points['are_uboundaries'] = np.cumsum(self.ic['pipe'].segments.astype(np.int)+1) - 1
+        self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ic['pipe'].segments.astype(np.int)
         self.where.points['are_boundaries'] = imerge(self.where.points['are_dboundaries'], self.where.points['are_uboundaries'])
         order = np.argsort(self.where.pipes['to_nodes'])
         nodes, indices = np.unique(self.where.pipes['to_nodes'][order], True)
@@ -162,62 +161,62 @@ class HammerSimulation:
         self.where.nodes['rjust_in_pipes'] = np.unique(self.where.points['rjust_in_pipes',])
         self.where.points['jip_dboundaries'] = self.where.points['are_dboundaries'][x[0::2]]
         self.where.points['jip_uboundaries'] = self.where.points['are_uboundaries'][x[1::2]]
-        bpoints_types = self.ic['nodes'].type[self.where.pipes['to_nodes']]
+        bpoints_types = self.ic['node'].type[self.where.pipes['to_nodes']]
         self.where.points['are_reservoirs'] = self.where.points['are_boundaries'][bpoints_types == EN.RESERVOIR]
         self.where.points['are_tanks'] = self.where.points['are_boundaries'][bpoints_types == EN.TANK]
         bcount = np.bincount(self.where.points['just_in_pipes',])
         bcount = np.cumsum(bcount[bcount != 0]); bcount[1:] = bcount[:-1]; bcount[0] = 0
         self.where.nodes['just_in_pipes',] = bcount
-        x = np.isin(self.where.pipes['to_nodes'], self.ic['valves'].start_node[self.ic['valves'].is_inline])
+        x = np.isin(self.where.pipes['to_nodes'], self.ic['valve'].start_node[self.ic['valve'].is_inline])
         self.where.points['in_valves'] = self.where.points['are_boundaries'][x]
-        x = np.isin(self.where.pipes['to_nodes'], self.ic['valves'].end_node[self.ic['valves'].is_inline])
+        x = np.isin(self.where.pipes['to_nodes'], self.ic['valve'].end_node[self.ic['valve'].is_inline])
         self.where.points['out_valves'] = self.where.points['are_boundaries'][x]
-        x = np.isin(self.where.pipes['to_nodes'], self.ic['pumps'].start_node[self.ic['pumps'].is_inline])
+        x = np.isin(self.where.pipes['to_nodes'], self.ic['pump'].start_node[self.ic['pump'].is_inline])
         self.where.points['in_pumps'] = self.where.points['are_boundaries'][x]
-        x = np.isin(self.where.pipes['to_nodes'], self.ic['pumps'].end_node[self.ic['pumps'].is_inline])
+        x = np.isin(self.where.pipes['to_nodes'], self.ic['pump'].end_node[self.ic['pump'].is_inline])
         self.where.points['out_pumps'] = self.where.points['are_boundaries'][x]
 
     def _load_initial_conditions(self):
-        self.mem_pool_points.head[self.where.points['are_boundaries'], 0] = self.ic['nodes'].head[self.where.pipes['to_nodes']]
-        self.ic['pipes'].dx = self.ic['pipes'].length / self.ic['pipes'].segments
-        per_unit_hl = self.ic['pipes'].head_loss / self.ic['pipes'].segments
+        self.mem_pool_points.head[self.where.points['are_boundaries'], 0] = self.ic['node'].head[self.where.pipes['to_nodes']]
+        self.ic['pipe'].dx = self.ic['pipe'].length / self.ic['pipe'].segments
+        per_unit_hl = self.ic['pipe'].head_loss / self.ic['pipe'].segments
         self.point_properties.has_plus[self.where.points['are_uboundaries']] = 1
         self.point_properties.has_plus[self.where.points['are_inner']] = 1
         self.point_properties.has_minus[self.where.points['are_dboundaries']] = 1
         self.point_properties.has_minus[self.where.points['are_inner']] = 1
         for i in range(self.wn.num_pipes):
             k = self.where.points['are_dboundaries'][i]
-            s = int(self.ic['pipes'].segments[i])
+            s = int(self.ic['pipe'].segments[i])
             self.mem_pool_points.head[k:k+s+1, 0] = self.mem_pool_points.head[k,0] - (per_unit_hl[i] * np.arange(s+1))
-            self.mem_pool_points.flowrate[k:k+s+1, 0] = self.ic['pipes'].flowrate[i]
-            self.point_properties.B[k:k+s+1] = self.ic['pipes'].wave_speed[i] / (G * self.ic['pipes'].area[i])
-            self.point_properties.R[k:k+s+1] = self.ic['pipes'].ffactor[i] * self.ic['pipes'].dx[i] / \
-                (2 * G * self.ic['pipes'].diameter[i] * self.ic['pipes'].area[i] ** 2)
+            self.mem_pool_points.flowrate[k:k+s+1, 0] = self.ic['pipe'].flowrate[i]
+            self.point_properties.B[k:k+s+1] = self.ic['pipe'].wave_speed[i] / (G * self.ic['pipe'].area[i])
+            self.point_properties.R[k:k+s+1] = self.ic['pipe'].ffactor[i] * self.ic['pipe'].dx[i] / \
+                (2 * G * self.ic['pipe'].diameter[i] * self.ic['pipe'].area[i] ** 2)
         self.pipe_results.inflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_dboundaries'], 0]
         self.pipe_results.outflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_uboundaries'], 0]
         self.node_results.head[self.where.nodes['to_points',], self.t] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
         self.node_results.head[self.where.nodes['to_points',], self.t] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
-        self.node_results.leak_flow[:, self.t] = self.ic['nodes'].leak_coefficient * np.sqrt(self.ic['nodes'].pressure)
-        self.node_results.demand_flow[:, self.t] = self.ic['nodes'].demand_coefficient * np.sqrt(self.ic['nodes'].pressure)
+        self.node_results.leak_flow[:, self.t] = self.ic['node'].leak_coefficient * np.sqrt(self.ic['node'].pressure)
+        self.node_results.demand_flow[:, self.t] = self.ic['node'].demand_coefficient * np.sqrt(self.ic['node'].pressure)
         self.t += 1
 
     def _set_segments(self):
-        self.ic['pipes'].segments = self.ic['pipes'].length
-        self.ic['pipes'].segments /= self.ic['pipes'].wave_speed
+        self.ic['pipe'].segments = self.ic['pipe'].length
+        self.ic['pipe'].segments /= self.ic['pipe'].wave_speed
 
         # Maximum time_step in the system to capture waves in all pipes
-        max_dt = min(self.ic['pipes'].segments) / 2 # at least 2 segments in critical pipe
+        max_dt = min(self.ic['pipe'].segments) / 2 # at least 2 segments in critical pipe
 
         self.settings.time_step = min(self.settings.time_step, max_dt)
 
         # The number of segments is defined
-        self.ic['pipes'].segments /= self.settings.time_step
-        int_segments = np.round(self.ic['pipes'].segments)
+        self.ic['pipe'].segments /= self.settings.time_step
+        int_segments = np.round(self.ic['pipe'].segments)
 
         # The wave_speed values are adjusted to compensate the truncation error
-        self.ic['pipes'].wave_speed = self.ic['pipes'].wave_speed * self.ic['pipes'].segments/int_segments
-        self.ic['pipes'].segments = int_segments
-        self.num_segments = int(sum(self.ic['pipes'].segments))
+        self.ic['pipe'].wave_speed = self.ic['pipe'].wave_speed * self.ic['pipe'].segments/int_segments
+        self.ic['pipe'].segments = int_segments
+        self.num_segments = int(sum(self.ic['pipe'].segments))
         self.num_points = self.num_segments + self.wn.num_pipes
 
     def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
@@ -225,7 +224,7 @@ class HammerSimulation:
             raise ValueError("wave_speed was not specified")
 
         if not default_wave_speed is None:
-            self.ic['pipes'].wave_speed[:] = default_wave_speed
+            self.ic['pipe'].wave_speed[:] = default_wave_speed
 
         modified_lines = 0
         if not wave_speed_file is None:
@@ -235,7 +234,7 @@ class HammerSimulation:
                     if len(line) <= 1:
                         raise ValueError("The wave_speed file has to have to entries per line 'pipe,wave_speed'")
                     pipe, wave_speed = line.split(delimiter)
-                    self.ic['pipes'].wave_speed[pipe] = float(wave_speed)
+                    self.ic['pipe'].wave_speed[pipe] = float(wave_speed)
                     modified_lines += 1
         else:
             self.settings.defined_wave_speeds = True
@@ -243,7 +242,7 @@ class HammerSimulation:
             return
 
         if modified_lines != self.wn.num_pipes:
-            self.ic['pipes'].wave_speed[:] = 0
+            self.ic['pipe'].wave_speed[:] = 0
             excep = "The file does not specify wave speed values for all the pipes,\n"
             excep += "it is necessary to define a default wave speed value"
             raise ValueError(excep)
@@ -265,7 +264,7 @@ class HammerSimulation:
             if self.ic[type_].curve_index[element] == -1:
                 N = len(self.curves[curve_name])
                 self.ic[type_].curve_index[element] = N
-            self.curves[curve_name].add_element(element)
+                self.curves[curve_name].add_element(element)
 
     def can_be_operated(self, step, check_warning = False):
         check_time = self.t * self.settings.time_step
@@ -290,13 +289,21 @@ class HammerSimulation:
                 return
         for i, element in enumerate(element_name):
             if type_ == 'valve':
-                self.ic['valves'].setting[element] = value[i]
+                if not (0 <= value[i] <= 1):
+                    raise ValueError("setting for valve '%s' not in [0, 1]" % element)
+                self.ic['valve'].setting[element] = value[i]
             elif type_ == 'pump':
-                self.ic['pumps'].setting[element] = value[i]
+                if value[i] not in (0, 1):
+                    raise ValueError("setting for pump '%s' can only be 0 (OFF) or 1 (ON)" % element)
+                self.ic['pump'].setting[element] = value[i]
             elif type_ == 'burst':
-                self.ic['nodes'].burst_setting[element] = value[i]
+                if value[i] < 0:
+                    raise ValueError("burst coefficient for node '%s' has to be >= 0" % element)
+                self.ic['node'].leak_coefficient[element] = value[i]
             elif type == 'demand':
-                self.ic['nodes'].demand_setting[element] = value[i]
+                if value[i] < 0:
+                    raise ValueError("demand coefficient for node '%s' has to be >= 0" % element)
+                self.ic['node'].demand_coefficient[element] = value[i]
 
     def initialize(self):
         if not self.settings.defined_wave_speeds:
@@ -334,9 +341,9 @@ class HammerSimulation:
             self.point_properties.Bp,
             self.point_properties.Cm,
             self.point_properties.Bm,
-            self.ic['nodes'].leak_coefficient,
-            self.ic['nodes'].demand_coefficient,
-            self.ic['nodes'].elevation,
+            self.ic['node'].leak_coefficient,
+            self.ic['node'].demand_coefficient,
+            self.ic['node'].elevation,
             self.where)
         self.pipe_results.inflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_dboundaries'], t1]
         self.pipe_results.outflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_uboundaries'], t1]

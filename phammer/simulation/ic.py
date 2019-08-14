@@ -40,10 +40,10 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     pump_ids = []
 
     ic = {
-        'nodes' : nodes,
-        'pipes' : pipes,
-        'valves' : valves,
-        'pumps' : pumps,
+        'node' : nodes,
+        'pipe' : pipes,
+        'valve' : valves,
+        'pump' : pumps,
     }
 
     # Run EPANET simulation
@@ -60,24 +60,24 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     for i in range(1, wn.num_nodes+1):
         node_id = EPANET.ENgetnodeid(i)
         node_ids.append(node_id)
-        ic['nodes'].leak_coefficient[i-1] = EPANET.ENgetnodevalue(i, EN.EMITTER)
-        ic['nodes'].demand[i-1] = EPANET.ENgetnodevalue(i, EN.DEMAND)
-        ic['nodes'].head[i-1] = EPANET.ENgetnodevalue(i, EN.HEAD)
-        ic['nodes'].pressure[i-1] = EPANET.ENgetnodevalue(i, EN.PRESSURE)
-        ic['nodes'].type[i-1] = EPANET.ENgetnodetype(i)
+        ic['node'].leak_coefficient[i-1] = EPANET.ENgetnodevalue(i, EN.EMITTER)
+        ic['node'].demand[i-1] = EPANET.ENgetnodevalue(i, EN.DEMAND)
+        ic['node'].head[i-1] = EPANET.ENgetnodevalue(i, EN.HEAD)
+        ic['node'].pressure[i-1] = EPANET.ENgetnodevalue(i, EN.PRESSURE)
+        ic['node'].type[i-1] = EPANET.ENgetnodetype(i)
         z = EPANET.ENgetnodevalue(i, EN.ELEVATION)
-        if ic['nodes'].type[i-1] == EN.RESERVOIR:
+        if ic['node'].type[i-1] == EN.RESERVOIR:
             z = 0
-        elif ic['nodes'].type[i-1] == EN.TANK:
-            z = ic['nodes'].head[i-1] - ic['nodes'].pressure[i-1]
-        ic['nodes'].elevation[i-1] = z
-        ic['nodes'].degree[i-1] = network_graph.degree(node_id)
+        elif ic['node'].type[i-1] == EN.TANK:
+            z = ic['node'].head[i-1] - ic['node'].pressure[i-1]
+        ic['node'].elevation[i-1] = z
+        ic['node'].degree[i-1] = network_graph.degree(node_id)
 
     p, pp, v = 0, 0, 0 # pipes, pumps, valves
     for i in range(1, wn.num_links+1):
 
         link = wn.get_link(EPANET.ENgetlinkid(i))
-        ltype = link.link_type.lower() + 's'
+        ltype = link.link_type.lower()
         if link.link_type == 'Pipe':
             k = p; p += 1
             pipe_ids.append(link.name)
@@ -103,8 +103,8 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
         ic[ltype].flowrate[k] = EPANET.ENgetlinkvalue(i, EN.FLOW)
         ic[ltype].velocity[k] = EPANET.ENgetlinkvalue(i, EN.VELOCITY)
 
-        if ic['nodes'].degree[ic[ltype].start_node[k]-1] >= 2 and \
-            ic['nodes'].degree[ic[ltype].end_node[k]-1] >= 2:
+        if ic['node'].degree[ic[ltype].start_node[k]-1] >= 2 and \
+            ic['node'].degree[ic[ltype].end_node[k]-1] >= 2:
             ic[ltype].is_inline[k] = True
 
         if -TOL < ic[ltype].flowrate[k] < TOL:
@@ -123,41 +123,37 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     EPANET.ENclose()
 
     # Unit conversion
-    to_si(flow_units, ic['nodes'].leak_coefficient, HydParam.EmitterCoeff)
-    to_si(flow_units, ic['nodes'].demand, HydParam.Flow)
-    to_si(flow_units, ic['nodes'].head, HydParam.HydraulicHead)
-    to_si(flow_units, ic['nodes'].pressure, HydParam.Pressure)
-    to_si(flow_units, ic['nodes'].elevation, HydParam.Elevation)
-    to_si(flow_units, ic['pipes'].head_loss, HydParam.HeadLoss)
-    to_si(flow_units, ic['pipes'].flowrate, HydParam.Flow)
-    to_si(flow_units, ic['pumps'].flowrate, HydParam.Flow)
-    to_si(flow_units, ic['valves'].flowrate, HydParam.Flow)
-    to_si(flow_units, ic['pipes'].velocity, HydParam.Velocity)
-    to_si(flow_units, ic['pumps'].velocity, HydParam.Velocity)
-    to_si(flow_units, ic['valves'].velocity, HydParam.Velocity)
+    to_si(flow_units, ic['node'].leak_coefficient, HydParam.EmitterCoeff)
+    to_si(flow_units, ic['node'].demand, HydParam.Flow)
+    to_si(flow_units, ic['node'].head, HydParam.HydraulicHead)
+    to_si(flow_units, ic['node'].pressure, HydParam.Pressure)
+    to_si(flow_units, ic['node'].elevation, HydParam.Elevation)
+    to_si(flow_units, ic['pipe'].head_loss, HydParam.HeadLoss)
+    to_si(flow_units, ic['pipe'].flowrate, HydParam.Flow)
+    to_si(flow_units, ic['pump'].flowrate, HydParam.Flow)
+    to_si(flow_units, ic['valve'].flowrate, HydParam.Flow)
+    to_si(flow_units, ic['pipe'].velocity, HydParam.Velocity)
+    to_si(flow_units, ic['pump'].velocity, HydParam.Velocity)
+    to_si(flow_units, ic['valve'].velocity, HydParam.Velocity)
 
     # Indexes are adjusted to fit the new Table / Indexing in C code starts in 1
-    ic['pipes'].start_node -= 1
-    ic['pipes'].end_node -= 1
-    ic['pumps'].start_node -= 1
-    ic['pumps'].end_node -= 1
-    ic['valves'].start_node -= 1
-    ic['valves'].end_node -= 1
+    ic['pipe'].start_node -= 1
+    ic['pipe'].end_node -= 1
+    ic['pump'].start_node -= 1
+    ic['pump'].end_node -= 1
+    ic['valve'].start_node -= 1
+    ic['valve'].end_node -= 1
 
-    idx = ic['pipes'].ffactor == 0
-    ic['pipes'].ffactor[idx] = \
-        (2*G*ic['pipes'].diameter[idx] * ic['pipes'].head_loss[idx]) \
-            / (ic['pipes'].length[idx] * ic['pipes'].velocity[idx]**2)
+    idx = ic['pipe'].ffactor == 0
+    ic['pipe'].ffactor[idx] = \
+        (2*G*ic['pipe'].diameter[idx] * ic['pipe'].head_loss[idx]) \
+            / (ic['pipe'].length[idx] * ic['pipe'].velocity[idx]**2)
 
-    ic['pipes'].ffactor[ic['pipes'].ffactor >= CEIL_FFACTOR] = DEFAULT_FFACTOR
-    ic['pipes'].ffactor[ic['pipes'].ffactor <= FLOOR_FFACTOR] = DEFAULT_FFACTOR
+    ic['pipe'].ffactor[ic['pipe'].ffactor >= CEIL_FFACTOR] = DEFAULT_FFACTOR
+    ic['pipe'].ffactor[ic['pipe'].ffactor <= FLOOR_FFACTOR] = DEFAULT_FFACTOR
 
-    ic['valves'].curve_index.fill(np.nan)
-    ic['valves'].setting_curve_index.fill(np.nan)
-    ic['pumps'].curve_index.fill(np.nan)
-    ic['pumps'].setting_curve_index.fill(np.nan)
-    ic['nodes'].leak_curve_index.fill(np.nan)
-    ic['nodes'].demand_curve_index.fill(np.nan)
+    ic['valve'].curve_index.fill(-1)
+    ic['pump'].curve_index.fill(-1)
 
     nodes.setindex(node_ids)
     pipes.setindex(pipe_ids)
