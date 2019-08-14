@@ -80,13 +80,13 @@ class Table:
     def iloc(self, index):
         if self._index is None:
             raise ValueError("'index' has not been defined for the table")
+        if is_iterable(index):
+            return [self._index[i] for i in index]
         return self._index[index]
 
     def ival(self, index):
         if self._index is None:
             raise ValueError("'index' has not been defined for the table")
-        if type(index) != int:
-            raise ValueError("'%s' has to be a integer" % str(index))
         return self._index_keys[index]
 
     def _setindex(self, index, size, _index_name):
