@@ -79,7 +79,7 @@ class Table:
     def setindex(self, index, size=None):
         self._setindex(index, size, '_index')
 
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=64)
     def iloc(self, index):
         if self._index is None:
             raise ValueError("'index' has not been defined for the table")
@@ -87,7 +87,7 @@ class Table:
             return [self._index[i] for i in index]
         return self._index[index]
 
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=64)
     def ival(self, index):
         if self._index is None:
             raise ValueError("'index' has not been defined for the table")

@@ -105,11 +105,12 @@ class ElementSettings:
         self.entries += list(zip(elist, X, Y))
 
     def _sort(self):
-        self.entries.sort(key = lambda x : x[1])
-        np_entries = np.array(self.entries)
-        x = np_entries[:,1] // self._super.time_step
-        self.activation_times, self.activation_indices = np.unique(x, True)
-        self.activation_times = dq(self.activation_times)
+        if self.entries:
+            self.entries.sort(key = lambda x : x[1])
+            np_entries = np.array(self.entries)
+            x = np_entries[:,1] // self._super.time_step
+            self.activation_times, self.activation_indices = np.unique(x, True)
+            self.activation_times = dq(self.activation_times)
 
 class HammerSimulation:
     SETTING_TYPES = ('valve', 'pump', 'burst', 'demand',)
@@ -231,6 +232,50 @@ class HammerSimulation:
     def _define_element_setting(self, element, type_, X, Y):
         self.element_settings[type_].dump_settings(X, Y, element)
 
+    def _set_element_setting(self, type_, element_name, value, step = None, check_warning = False):
+        if self.t == 0:
+            raise NotImplementedError("simulation has not been initialized")
+        if not step is None:
+            if not self.can_be_operated(step, check_warning):
+                return
+        if not is_iterable(element_name):
+            if type(element_name) is str:
+                element_name = [element_name]
+                value = [value]
+            else:
+                raise ValueError("'element_name' should be iterable or str")
+        else:
+            if not is_iterable(value):
+                value = np.ones(len(element_name)) * value
+            elif len(element_name) != len(value):
+                raise ValueError("len of 'element_name' array does not match len of 'value' array")
+
+        if type(value) != np.ndarray:
+            value = np.array(value)
+        if type(element_name) != tuple:
+            element_name = tuple(element_name)
+
+        ic_type = None
+
+        if type_ == 'valve':
+            if (value > 1).any() or (value < 0).any():
+                raise ValueError("valve setting not in [0, 1]" % element)
+            ic_type = 'valve'
+        elif type_ == 'pump':
+            if (not np.isin(value, (0,1,))).any():
+                raise ValueError("pump setting can only be 0 (OFF) or 1 (ON)")
+            ic_type = 'pump'
+        elif type_ == 'burst':
+            if (value < 0).any():
+                raise ValueError("burst coefficient has to be >= 0")
+            ic_type = 'node'
+        elif type_ == 'demand':
+            if (value < 0).any():
+                raise ValueError("demand coefficient has to be >= 0")
+            ic_type = 'node'
+
+        self.ic[ic_type].setting[self.ic[ic_type].iloc(element_name)] = value
+
     def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
         if default_wave_speed is None and wave_speed_file is None:
             raise ValueError("wave_speed was not specified")
@@ -268,6 +313,12 @@ class HammerSimulation:
     def define_pump_settings(self, pump_name, X, Y):
         self._define_element_setting(pump_name, 'pump', X, Y)
 
+    def set_valve_setting(self, element_name, value, step = None, check_warning = False):
+        self._set_element_setting('valve', element_name, value, step, check_warning)
+
+    def set_pump_setting(self, element_name, value, step = None, check_warning = False):
+        self._set_element_setting('pump', element_name, value, step, check_warning)
+
     def add_curve(self, curve_name, type_, X, Y):
         self.curves[curve_name] = HammerCurve(X, Y, type_)
 
@@ -290,36 +341,6 @@ class HammerSimulation:
                 print("Warning: operating at time time %f" % check_time)
             return True
 
-    def set_setting(self, type_, element_name, value, step = None, check_warning = False):
-        if not is_iterable(element_name):
-            if type(element_name) is str:
-                element_name = [element_name]
-                value = [value]
-            else:
-                raise ValueError("'element_name' should be iterable or str")
-        if not type_ in self.SETTING_TYPES:
-            raise ValueError("type_ should be in ('" + "', '".join(self.SETTING_TYPES) + "')")
-        if not step is None:
-            if not self.can_be_operated(step, check_warning):
-                return
-        for i, element in enumerate(element_name):
-            if type_ == 'valve':
-                if not (0 <= value[i] <= 1):
-                    raise ValueError("setting for valve '%s' not in [0, 1]" % element)
-                self.ic['valve'].setting[element] = value[i]
-            elif type_ == 'pump':
-                if value[i] not in (0, 1):
-                    raise ValueError("setting for pump '%s' can only be 0 (OFF) or 1 (ON)" % element)
-                self.ic['pump'].setting[element] = value[i]
-            elif type_ == 'burst':
-                if value[i] < 0:
-                    raise ValueError("burst coefficient for node '%s' has to be >= 0" % element)
-                self.ic['node'].leak_coefficient[element] = value[i]
-            elif type == 'demand':
-                if value[i] < 0:
-                    raise ValueError("demand coefficient for node '%s' has to be >= 0" % element)
-                self.ic['node'].demand_coefficient[element] = value[i]
-
     def initialize(self):
         if not self.settings.defined_wave_speeds:
             raise NotImplementedError("wave speed values have not been defined for the pipes")
@@ -327,6 +348,8 @@ class HammerSimulation:
         self._allocate_memory()
         self._load_initial_conditions()
         self.settings.is_initialized = True
+        for stype in self.SETTING_TYPES:
+            self.element_settings[stype]._sort()
 
     def run_step(self):
         if not self.settings.is_initialized:
