@@ -27,6 +27,7 @@ class HammerSettings:
         self.gpu = gpu
         self.defined_wave_speeds = False
         self.is_initialized = False
+        self.updated_settings = False
         self._super = _super
         self.settingsOK = True
 
@@ -132,7 +133,8 @@ class ElementSettings:
         if self.values:
             self.values.sort(key = lambda x : x[1])
             self.values = np.array(self.values, dtype=np.float)
-            self.values = np.array(self.values[:,1:])
+            self.elements = self.values[:,0].astype(np.int)
+            self.values = self.values[:,1:]
             self.activation_times, self.activation_indices = np.unique(self.values[:,0].astype(np.int), True)
             self.values = self.values[:,1]
             self.activation_times = dq(self.activation_times)
@@ -140,12 +142,14 @@ class ElementSettings:
         self.is_sorted = True
 
 class HammerSimulation:
+
     SETTING_TYPES = {
         'valve' : 'valve',
         'pump' : 'pump',
         'burst' : 'node',
         'demand' : 'node',
     }
+
     def __init__(self, inpfile, settings):
         if type(settings) != dict:
             raise TypeError("'settings' are not properly defined, use dict object")
@@ -285,8 +289,6 @@ class HammerSimulation:
 
         if type(value) != np.ndarray:
             value = np.array(value)
-        if type(element_name) != tuple:
-            element_name = tuple(element_name)
 
         if type_ == 'valve':
             if (value > 1).any() or (value < 0).any():
@@ -302,7 +304,37 @@ class HammerSimulation:
                 raise ValueError("demand coefficient has to be >= 0")
 
         ic_type = self.SETTING_TYPES[type_]
-        self.ic[ic_type].setting[self.ic[ic_type].iloc(element_name)] = value
+
+        if type(element_name) == np.ndarray:
+            if element_name.dtype == np.int:
+                self.ic[ic_type].setting[element_name] = value
+        else:
+            if type(element_name) != tuple:
+                element_name = tuple(element_name)
+            self.ic[ic_type].setting[self.ic[ic_type].iloc(element_name)] = value
+
+    def _update_settings(self):
+        for stype in self.SETTING_TYPES:
+            print(stype)
+            act_times = self.element_settings[stype].activation_times
+            act_indices = self.element_settings[stype].activation_indices
+            if act_times is None:
+                break
+            if len(act_times) == 0:
+                self.settings.updated_settings = True
+                break
+            if act_times[0] == 0:
+                act_times.popleft()
+                act_indices.popleft()
+                break
+            if self.t >= act_times[0]:
+                i1 = act_indices[0]
+                i2 = None if len(act_indices) <= 1 else act_indices[1]
+                settings = self.element_settings[stype].values[i1:i2]
+                elements = self.element_settings[stype].elements[i1:i2]
+                self._set_element_setting(stype, elements, settings)
+                act_times.popleft()
+                act_indices.popleft()
 
     def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
         if default_wave_speed is None and wave_speed_file is None:
@@ -341,11 +373,23 @@ class HammerSimulation:
     def define_pump_settings(self, pump_name, X, Y):
         self._define_element_setting(pump_name, 'pump', X, Y)
 
-    def set_valve_setting(self, element_name, value, step = None, check_warning = False):
-        self._set_element_setting('valve', element_name, value, step, check_warning)
+    def define_burst_settings(self, node_name, X, Y):
+        self._define_element_setting(node_name, 'burst', X, Y)
 
-    def set_pump_setting(self, element_name, value, step = None, check_warning = False):
-        self._set_element_setting('pump', element_name, value, step, check_warning)
+    def define_demand_settings(self, node_name, X, Y):
+        self._define_element_setting(node_name, 'demand', X, Y)
+
+    def set_valve_setting(self, valve_name, value, step = None, check_warning = False):
+        self._set_element_setting('valve', valve_name, value, step, check_warning)
+
+    def set_pump_setting(self, pump_name, value, step = None, check_warning = False):
+        self._set_element_setting('pump', pump_name, value, step, check_warning)
+
+    def set_burst_setting(self, node_name, value, step = None, check_warning = False):
+        self._set_element_setting('burst', node_name, value, step, check_warning)
+
+    def set_demand_setting(self, node_name, value, step = None, check_warning = False):
+        self._set_element_setting('demand', node_name, value, step, check_warning)
 
     def add_curve(self, curve_name, type_, X, Y):
         self.curves[curve_name] = HammerCurve(X, Y, type_)
@@ -382,8 +426,11 @@ class HammerSimulation:
     def run_step(self):
         if not self.settings.is_initialized:
             raise NotImplementedError("it is necessary to initialize the simulation before running it")
-        t1 = self.t % 2
-        t0 = 1 - t1
+        if not self.settings.updated_settings:
+            self._update_settings()
+
+        t1 = self.t % 2; t0 = 1 - t1
+
         run_interior_step(
             self.mem_pool_points.flowrate[:,t0],
             self.mem_pool_points.head[:,t0],
