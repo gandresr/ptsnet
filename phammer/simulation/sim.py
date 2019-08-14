@@ -1,5 +1,6 @@
 import numpy as np
 
+from collections import deque as dq
 from phammer.simulation.ic import get_initial_conditions, get_water_network
 from phammer.arrays.arrays import Table2D, Table, ObjArray
 from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G
@@ -69,7 +70,7 @@ class HammerCurve:
         self.Y = self.Y[order]
         self.fun = define_curve(self.X, self.Y)
 
-    def add_element(self, element):
+    def _add_element(self, element):
         if is_iterable(element):
             for e in element:
                 if not element in self.elements:
@@ -85,22 +86,30 @@ class HammerCurve:
         return len(self.elements)
 
 class ElementSettings:
-    def __init__(self):
+    def __init__(self, _super):
         self.entries = []
+        self.elements = None
+        self.activation_times = None
+        self.activation_indices = None
+        self._super = _super
 
-    def dump_settings(self, X, Y, element_index):
+    def _dump_settings(self, X, Y, element_index):
         if type(element_index) != int:
             raise ValueError("'element_index' is not int")
         if X.shape != Y.shape:
             raise ValueError("X and Y have different shapes")
         if len(X.shape) > 1:
             raise ValueError("X should be a 1D numpy array")
-        eidx = element_index * np.ones_like(X, dtype = np.int)
 
-        self.entries += list(zip(X, Y, eidx))
+        elist = [element_index for i in range(len(X))]
+        self.entries += list(zip(elist, X, Y))
 
-    def sort(self):
-        self.entries.sort(key = lambda x : x[0])
+    def _sort(self):
+        self.entries.sort(key = lambda x : x[1])
+        np_entries = np.array(self.entries)
+        x = np_entries[:,1] // self._super.time_step
+        self.activation_times, self.activation_indices = np.unique(x, True)
+        self.activation_times = dq(self.activation_times)
 
 class HammerSimulation:
     SETTING_TYPES = ('valve', 'pump', 'burst', 'demand',)
@@ -112,7 +121,7 @@ class HammerSimulation:
         self.ic = get_initial_conditions(inpfile, wn = self.wn)
         self.ng = self.wn.get_graph()
         self.curves = ObjArray()
-        self.element_settings = {type_ : ElementSettings() for type_ in self.SETTING_TYPES}
+        self.element_settings = {type_ : ElementSettings(self) for type_ in self.SETTING_TYPES}
         self.num_segments = 0
         self.num_points = 0
         self.t = 0
@@ -219,6 +228,9 @@ class HammerSimulation:
         self.num_segments = int(sum(self.ic['pipe'].segments))
         self.num_points = self.num_segments + self.wn.num_pipes
 
+    def _define_element_setting(self, element, type_, X, Y):
+        self.element_settings[type_].dump_settings(X, Y, element)
+
     def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
         if default_wave_speed is None and wave_speed_file is None:
             raise ValueError("wave_speed was not specified")
@@ -250,8 +262,11 @@ class HammerSimulation:
         self.settings.defined_wave_speeds = True
         self._set_segments()
 
-    def define_element_setting(self, element, type_, X, Y):
-        self.element_settings[type_].dump_settings(X, Y, element)
+    def define_valve_settings(self, valve_name, X, Y):
+        self._define_element_setting(valve_name, 'valve', X, Y)
+
+    def define_pump_settings(self, pump_name, X, Y):
+        self._define_element_setting(pump_name, 'pump', X, Y)
 
     def add_curve(self, curve_name, type_, X, Y):
         self.curves[curve_name] = HammerCurve(X, Y, type_)
@@ -264,7 +279,7 @@ class HammerSimulation:
             if self.ic[type_].curve_index[element] == -1:
                 N = len(self.curves[curve_name])
                 self.ic[type_].curve_index[element] = N
-                self.curves[curve_name].add_element(element)
+                self.curves[curve_name]._add_element(element)
 
     def can_be_operated(self, step, check_warning = False):
         check_time = self.t * self.settings.time_step
