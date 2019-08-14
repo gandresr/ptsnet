@@ -52,6 +52,11 @@ class HammerSettings:
                 if name == 'duration':
                     self.time_steps = int(round(value/self.time_step))
                 elif name == 'time_step':
+                    if self.defined_wave_speeds:
+                        raise ValueError("'%s' can not be modified since wave speeds have been defined" % name)
+                    lens = sum([len(self._super.element_settings[stype]) for stype in self._super.SETTING_TYPES])
+                    if lens > 0:
+                        raise ValueError("'%s' can not be modified since settings have been defined" % name)
                     self.time_steps = int(round(self.duration/value))
 
         object.__setattr__(self, name, value)
@@ -86,34 +91,61 @@ class HammerCurve:
         return len(self.elements)
 
 class ElementSettings:
+    ERROR_MSG = "the simulation has started, settings can not be added/modified"
     def __init__(self, _super):
-        self.entries = []
-        self.elements = None
+        self.values = []
+        self.elements = []
         self.activation_times = None
         self.activation_indices = None
+        self.is_sorted = False
         self._super = _super
 
-    def _dump_settings(self, X, Y, element_index):
+    def __len__(self):
+        return len(self.elements)
+
+    def _dump_settings(self, element_index, X, Y):
+        if self.is_sorted:
+            raise RuntimeError(self.ERROR_MSG)
         if type(element_index) != int:
             raise ValueError("'element_index' is not int")
         if X.shape != Y.shape:
             raise ValueError("X and Y have different shapes")
         if len(X.shape) > 1:
             raise ValueError("X should be a 1D numpy array")
+        xx = X // self._super.settings.time_step
+        if len(np.unique(xx)) != len(xx):
+            raise ValueError("more than one modification per time step")
+        if element_index in self.elements:
+            self._remove_entries_of(element_index)
 
         elist = [element_index for i in range(len(X))]
-        self.entries += list(zip(elist, X, Y))
+        self.values += list(zip(elist, xx, Y))
+        self.elements.append(element_index)
+
+    def _remove_entries_of(self, element_index):
+        if self.is_sorted:
+            raise RuntimeError(self.ERROR_MSG)
+        self.values = list(filter(lambda x : x[0] != element_index, self.values))
+        self.elements.remove(element_index)
 
     def _sort(self):
-        if self.entries:
-            self.entries.sort(key = lambda x : x[1])
-            np_entries = np.array(self.entries)
-            x = np_entries[:,1] // self._super.time_step
-            self.activation_times, self.activation_indices = np.unique(x, True)
+        if self.values:
+            self.values.sort(key = lambda x : x[1])
+            self.values = np.array(self.values, dtype=np.float)
+            self.values = np.array(self.values[:,1:])
+            self.activation_times, self.activation_indices = np.unique(self.values[:,0].astype(np.int), True)
+            self.values = self.values[:,1]
             self.activation_times = dq(self.activation_times)
+            self.activation_indices = dq(self.activation_indices)
+        self.is_sorted = True
 
 class HammerSimulation:
-    SETTING_TYPES = ('valve', 'pump', 'burst', 'demand',)
+    SETTING_TYPES = {
+        'valve' : 'valve',
+        'pump' : 'pump',
+        'burst' : 'node',
+        'demand' : 'node',
+    }
     def __init__(self, inpfile, settings):
         if type(settings) != dict:
             raise TypeError("'settings' are not properly defined, use dict object")
@@ -230,7 +262,8 @@ class HammerSimulation:
         self.num_points = self.num_segments + self.wn.num_pipes
 
     def _define_element_setting(self, element, type_, X, Y):
-        self.element_settings[type_].dump_settings(X, Y, element)
+        ic_type = self.SETTING_TYPES[type_]
+        self.element_settings[type_]._dump_settings(self.ic[ic_type].iloc(element), X, Y)
 
     def _set_element_setting(self, type_, element_name, value, step = None, check_warning = False):
         if self.t == 0:
@@ -255,25 +288,20 @@ class HammerSimulation:
         if type(element_name) != tuple:
             element_name = tuple(element_name)
 
-        ic_type = None
-
         if type_ == 'valve':
             if (value > 1).any() or (value < 0).any():
                 raise ValueError("valve setting not in [0, 1]" % element)
-            ic_type = 'valve'
         elif type_ == 'pump':
             if (not np.isin(value, (0,1,))).any():
                 raise ValueError("pump setting can only be 0 (OFF) or 1 (ON)")
-            ic_type = 'pump'
         elif type_ == 'burst':
             if (value < 0).any():
                 raise ValueError("burst coefficient has to be >= 0")
-            ic_type = 'node'
         elif type_ == 'demand':
             if (value < 0).any():
                 raise ValueError("demand coefficient has to be >= 0")
-            ic_type = 'node'
 
+        ic_type = self.SETTING_TYPES[type_]
         self.ic[ic_type].setting[self.ic[ic_type].iloc(element_name)] = value
 
     def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
@@ -294,8 +322,8 @@ class HammerSimulation:
                     self.ic['pipe'].wave_speed[pipe] = float(wave_speed)
                     modified_lines += 1
         else:
-            self.settings.defined_wave_speeds = True
             self._set_segments()
+            self.settings.defined_wave_speeds = True
             return
 
         if modified_lines != self.wn.num_pipes:
@@ -304,8 +332,8 @@ class HammerSimulation:
             excep += "it is necessary to define a default wave speed value"
             raise ValueError(excep)
 
-        self.settings.defined_wave_speeds = True
         self._set_segments()
+        self.settings.defined_wave_speeds = True
 
     def define_valve_settings(self, valve_name, X, Y):
         self._define_element_setting(valve_name, 'valve', X, Y)
@@ -344,12 +372,12 @@ class HammerSimulation:
     def initialize(self):
         if not self.settings.defined_wave_speeds:
             raise NotImplementedError("wave speed values have not been defined for the pipes")
+        for stype in self.SETTING_TYPES:
+            self.element_settings[stype]._sort()
         self._create_selectors()
         self._allocate_memory()
         self._load_initial_conditions()
         self.settings.is_initialized = True
-        for stype in self.SETTING_TYPES:
-            self.element_settings[stype]._sort()
 
     def run_step(self):
         if not self.settings.is_initialized:
