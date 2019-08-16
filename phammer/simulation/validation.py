@@ -1,0 +1,97 @@
+import numpy as np
+
+from phammer.simulation.ic import get_initial_conditions, get_water_network
+from phammer.epanet.util import EN
+
+class ModelError(Exception):
+    pass
+
+def check_compatibility(inpfile, wn=None, ic=None):
+
+    if wn is None and ic is None:
+        wn = get_water_network(inpfile)
+        ic = get_initial_conditions(inpfile, wn = wn)
+
+    min_degree = min(wn.get_graph().degree)
+    if min_degree[1] == 0:
+        raise ModelError("node '%s' is isolated" % min_degree[0])
+
+    not_inline_pumps = np.arange(wn.num_pumps)[~ic['pump'].is_inline]
+    inline_pumps = np.arange(wn.num_pumps)[ic['pump'].is_inline]
+    not_inline_valves = np.arange(wn.num_valves)[~ic['valve'].is_inline]
+    inline_valves = np.arange(wn.num_valves)[ic['valve'].is_inline]
+
+    # Pumps can not have dead ends
+    possible_dead_end = ic['node'].degree[ic['pump'].end_node] < 2
+    if possible_dead_end.any():
+        raise ModelError("there are pumps with an incompatible end node" % ic['node']._index_keys[possible_dead_end])
+
+    # Pumps/Valves can not have isolated start nodes that are not reservoirs
+    incompatible_start_pnodes = (ic['node'].degree[ic['pump'].start_node[not_inline_pumps]] == 1) * \
+        (ic['node'].degree[ic['pump'].end_node[not_inline_pumps]] > 1)
+    incompatible_start_vnodes = (ic['node'].degree[ic['valve'].start_node[not_inline_valves]] == 1) * \
+        (ic['node'].degree[ic['valve'].end_node[not_inline_valves]] > 1)
+
+    incompatible_start_pnodes = ~np.isin(
+        ic['node'].type[ic['pump'].start_node[not_inline_pumps][incompatible_start_pnodes]], (EN.TANK, EN.RESERVOIR,))
+    incompatible_start_pnodes = ic['node']._index_keys[not_inline_pumps][incompatible_start_pnodes]
+    incompatible_start_vnodes = ~np.isin(
+        ic['node'].type[ic['valve'].start_node[not_inline_valves][incompatible_start_vnodes]], (EN.TANK, EN.RESERVOIR,))
+    incompatible_start_vnodes = ic['node']._index_keys[not_inline_valves][incompatible_start_vnodes]
+
+    if len(incompatible_start_pnodes) > 0:
+        msg = "there are valves with an incompatible start nodes: \n"
+        msg += ', '.join(incompatible_start_pnodes)
+        raise ModelError(msg)
+    if len(incompatible_start_vnodes) > 0:
+        msg = "there are valves with an incompatible start nodes: \n"
+        msg += ', '.join(incompatible_start_vnodes)
+        raise ModelError(msg)
+
+    # Nodes of non-pipe elements can not be general junctions
+    start_valve_error = ic['node'].degree[ic['valve'].start_node] > 2
+    start_pump_error = ic['node'].degree[ic['pump'].start_node] > 2
+    end_valve_error = ic['node'].degree[ic['valve'].end_node] > 2
+    end_pump_error = ic['node'].degree[ic['pump'].end_node] > 2
+    if start_valve_error.any():
+        raise ModelError(
+            "start nodes of valves are connected to more than one pipe: \n%s" % \
+                ic['node']._index_keys[ic['valve'].start_node][start_valve_error])
+    if start_pump_error.any():
+        raise ModelError(
+            "start nodes of pumps are connected to more than one pipe: \n%s" % \
+                ic['node']._index_keys[ic['pump'].start_node][start_pump_error])
+    if end_valve_error.any():
+        raise ModelError(
+            "end nodes of valves are connected to more than one pipe: \n%s" % \
+                ic['node']._index_keys[ic['valve'].end_node][end_valve_error])
+    if end_pump_error.any():
+        raise ModelError(
+            "end nodes of pumps are connected to more than one pipe: \n%s" % \
+                ic['node']._index_keys[ic['pump'].end_node][end_pump_error])
+
+    # Reservoirs can not be at the end of a pump
+    if (ic['node'].type[ic['pump'].end_node] == EN.RESERVOIR).any():
+        raise ModelError("there is a pump with a reservoir at its end node")
+
+    all_non_pipe_nodes = np.concatenate((
+        ic['pump'].start_node,
+        ic['pump'].end_node,
+        ic['valve'].start_node,
+        ic['valve'].end_node))
+
+    all_non_pipe_nodes_nburst = np.concatenate((
+        ic['pump'].start_node,
+        ic['pump'].end_node[inline_pumps],
+        ic['valve'].start_node,
+        ic['valve'].end_node[inline_valves]))
+
+    # Non-pipe elements can only be connected to pipes
+    if len(all_non_pipe_nodes) != len(np.unique(all_non_pipe_nodes)):
+        raise ModelError("there are non-pipe elements connected to each other")
+
+    # No leaks/demands are allowed for nodes of non-pipe elements (except end-valve)
+    if (ic['node'].leak_coefficient[all_non_pipe_nodes_nburst] != 0).any():
+        raise ModelError("there is a non-pipe element connected to a leaking node")
+    if (ic['node'].demand_coefficient[all_non_pipe_nodes_nburst] != 0).any():
+        raise ModelError("there are non-pipe elements connected to a node with demand")

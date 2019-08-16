@@ -12,7 +12,8 @@ inpfile = '/home/watsup/Downloads/Tnet2.inp'
 
 sim = HammerSimulation(inpfile, {
     'time_step' : time_step,
-    'duration' : duration
+    'duration' : duration,
+    'skip_compatibility_check' : False,
 })
 
 sim.set_wave_speeds(1200)

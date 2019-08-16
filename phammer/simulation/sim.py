@@ -163,6 +163,16 @@ class HammerSimulation:
         self.settings = HammerSettings(**settings, _super = self)
         self.wn = get_water_network(inpfile)
         self.ic = get_initial_conditions(inpfile, wn = self.wn)
+        if not self.settings.skip_compatibility_check:
+            if self.settings.warnings_on:
+                t = time()
+            try:
+                check_compatibility(None, wn=self.wn, ic=self.ic)
+            except Exception as e:
+                print("Elapsed time (model check): ", time() - t, '[s]')
+                raise e
+            if self.settings.warnings_on:
+                print("Elapsed time (model check): ", time() - t, '[s]')
         self.ng = self.wn.get_graph()
         self.curves = ObjArray()
         self.element_settings = {type_ : ElementSettings(self) for type_ in self.SETTING_TYPES}
@@ -327,26 +337,26 @@ class HammerSimulation:
         self.settings.updated_settings = Y
         if not self.settings.updated_settings:
             for stype in self.SETTING_TYPES:
-            act_times = self.element_settings[stype].activation_times
-            act_indices = self.element_settings[stype].activation_indices
-            if act_times is None:
+                act_times = self.element_settings[stype].activation_times
+                act_indices = self.element_settings[stype].activation_indices
+                if act_times is None:
                     self.element_settings[stype].updated = True
                     continue
-            if len(act_times) == 0:
+                if len(act_times) == 0:
                     self.element_settings[stype].updated = True
                     continue
-            if act_times[0] == 0:
-                act_times.popleft()
-                act_indices.popleft()
+                if act_times[0] == 0:
+                    act_times.popleft()
+                    act_indices.popleft()
                     continue
-            if self.t >= act_times[0]:
-                i1 = act_indices[0]
-                i2 = None if len(act_indices) <= 1 else act_indices[1]
-                settings = self.element_settings[stype].values[i1:i2]
-                elements = self.element_settings[stype].elements[i1:i2]
-                self._set_element_setting(stype, elements, settings)
-                act_times.popleft()
-                act_indices.popleft()
+                if self.t >= act_times[0]:
+                    i1 = act_indices[0]
+                    i2 = None if len(act_indices) <= 1 else act_indices[1]
+                    settings = self.element_settings[stype].values[i1:i2]
+                    elements = self.element_settings[stype].elements[i1:i2]
+                    self._set_element_setting(stype, elements, settings)
+                    act_times.popleft()
+                    act_indices.popleft()
 
     def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
         if default_wave_speed is None and wave_speed_file is None:
