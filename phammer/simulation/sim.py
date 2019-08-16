@@ -1,5 +1,5 @@
 import numpy as np
-
+from time import time
 from collections import deque as dq
 from phammer.simulation.ic import get_initial_conditions, get_water_network
 from phammer.arrays.arrays import Table2D, Table, ObjArray
@@ -8,6 +8,7 @@ from phammer.arrays.selectors import SelectorSet
 from phammer.epanet.util import EN
 from phammer.simulation.util import imerge, define_curve, is_iterable
 from phammer.simulation.funcs import run_interior_step, run_boundary_step
+from phammer.simulation.validation import check_compatibility
 
 class HammerSettings:
     def __init__(self,
@@ -16,6 +17,7 @@ class HammerSettings:
         warnings_on: bool = True,
         parallel : bool = False,
         gpu : bool = False,
+        skip_compatibility_check : bool = False,
         _super = None):
 
         self.settingsOK = False
@@ -25,9 +27,9 @@ class HammerSettings:
         self.warnings_on = warnings_on
         self.parallel = parallel
         self.gpu = gpu
+        self.skip_compatibility_check = skip_compatibility_check
         self.defined_wave_speeds = False
-        self.is_initialized = False
-        self.updated_settings = False
+        self.set_default()
         self._super = _super
         self.settingsOK = True
 
@@ -61,6 +63,10 @@ class HammerSettings:
                     self.time_steps = int(round(self.duration/value))
 
         object.__setattr__(self, name, value)
+
+    def set_default(self):
+        self.is_initialized = False
+        self.updated_settings = False
 
 class HammerCurve:
     CURVE_TYPES = ('valve', 'pump',)
@@ -96,6 +102,7 @@ class ElementSettings:
     def __init__(self, _super):
         self.values = []
         self.elements = []
+        self.updated = False
         self.activation_times = None
         self.activation_indices = None
         self.is_sorted = False
@@ -130,7 +137,7 @@ class ElementSettings:
         self.elements.remove(element_index)
 
     def _sort(self):
-        if self.values:
+        if self.values != [] and not self.is_sorted:
             self.values.sort(key = lambda x : x[1])
             self.values = np.array(self.values, dtype=np.float)
             self.elements = self.values[:,0].astype(np.int)
@@ -244,7 +251,7 @@ class HammerSimulation:
         self.node_results.head[self.where.nodes['to_points',], self.t] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
         self.node_results.leak_flow[:, self.t] = self.ic['node'].leak_coefficient * np.sqrt(self.ic['node'].pressure)
         self.node_results.demand_flow[:, self.t] = self.ic['node'].demand_coefficient * np.sqrt(self.ic['node'].pressure)
-        self.t += 1
+        self.t = 1
 
     def _set_segments(self):
         self.ic['pipe'].segments = self.ic['pipe'].length
@@ -314,19 +321,24 @@ class HammerSimulation:
             self.ic[ic_type].setting[self.ic[ic_type].iloc(element_name)] = value
 
     def _update_settings(self):
+        Y = True
         for stype in self.SETTING_TYPES:
-            print(stype)
+            Y &= self.element_settings[stype].updated
+        self.settings.updated_settings = Y
+        if not self.settings.updated_settings:
+            for stype in self.SETTING_TYPES:
             act_times = self.element_settings[stype].activation_times
             act_indices = self.element_settings[stype].activation_indices
             if act_times is None:
-                break
+                    self.element_settings[stype].updated = True
+                    continue
             if len(act_times) == 0:
-                self.settings.updated_settings = True
-                break
+                    self.element_settings[stype].updated = True
+                    continue
             if act_times[0] == 0:
                 act_times.popleft()
                 act_indices.popleft()
-                break
+                    continue
             if self.t >= act_times[0]:
                 i1 = act_indices[0]
                 i2 = None if len(act_indices) <= 1 else act_indices[1]
@@ -418,6 +430,8 @@ class HammerSimulation:
             raise NotImplementedError("wave speed values have not been defined for the pipes")
         for stype in self.SETTING_TYPES:
             self.element_settings[stype]._sort()
+        self.settings.set_default()
+        self.t = 0
         self._create_selectors()
         self._allocate_memory()
         self._load_initial_conditions()
