@@ -66,40 +66,34 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
     Q1[where.points['jip_uboundaries']] = Cp[where.points['jip_uboundaries']] \
         - H1[where.points['jip_uboundaries']] * Bp[where.points['jip_uboundaries']]
 
-    # Get demand and leak flows
-    HH -= Z[where.nodes['just_in_pipes']]
-    HH[HH < 0] = 0 # No demand/leak flow with negative pressure
-    E1[where.nodes['just_in_pipes']] = Ke[where.nodes['just_in_pipes']] * np.sqrt(2*G*HH)
-    D1[where.nodes['just_in_pipes']] = Kd[where.nodes['just_in_pipes']] * np.sqrt(2*G*HH)
-
 # @jit(nopython = True, cache = True, parallel = PARALLEL)
-def run_valve_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, setting, coeff, where):
-    # K = 2*G*Bp[where.points['are_end_valves']] * settting[where.]
-    for v in range(valves_int.shape[0]):
-        start_id = valves_int.upstream_node[v]
-        end_id = valves_int.downstream_node[v]
-        unode = nodes_obj.upstream_points[start_id][0]
-        dnode = nodes_obj.downstream_points[end_id]
-        setting = valves_float.setting[v]
-        valve_coeff = valves_float.valve_coeff[v]
-        area = valves_float.area[v]
-        Cp = H0[unode-1] + B[unode-1]*Q0[unode-1]
-        Bp = B[unode-1] + R[unode-1]*abs(Q0[unode-1])
+def run_valve_step(H0, Q1, H1, Cp, Bp, Cm, Bm, setting, coeff, area, where):
+    # --- End valves
+    K = setting[where.points['are_end_valves',]] \
+        * coeff[where.points['are_end_valves',]] \
+            * area[where.points['are_end_valves',]]
 
-        if len(dnode) == 0:
-            # End-valve
-            K = 2*G*(Bp * setting * valve_coeff * area)**2
-            H1[unode] = ((2*Cp + K) - ((2*Cp + K)**2 - 4*Cp**2) ** 0.5) / 2
-            Q1[unode] = setting * valve_coeff * area * (2*G*H1[unode])
-        else:
-            dnode = dnode[0]
-            # Inline-valve
-            Cm = H0[dnode+1] - B[dnode+1]*Q0[dnode+1]
-            Bm = B[dnode+1] + R[dnode+1]*abs(Q0[dnode+1])
-            S = -1 if (Cp - Cm) < 0 else 1
-            Cv = 2*G*(valve_coeff*setting*area)**2
-            X = Cv*(Bp + Bm)
-            Q1[unode] = (-S*X + S*(X**2 + S*4*Cv*(Cp - Cm))**0.5)/2
-            Q1[dnode] = Q1[unode]
-            H1[unode] = Cp - Bp*Q1[unode]
-            H1[dnode] = Cm + Bm*Q1[dnode]
+    K0 = 2 * G * Bp[where.points['are_end_valves']]
+    Cp_end = Cp[where.points['are_end_valves']]
+
+    H1[where.points['are_end_valves']] = (
+        (2*Cp_end + K0*K) - np.sqrt((2*Cp_end + K0*K)**2 - 4*Cp_end**2)) / 2
+
+    Q1[where.points['are_end_valves']] = K * np.sqrt(2 * G * H1[where.points['are_end_valves']])
+
+    # # --- Inline valves
+    CM = Cm[where.points['start_inline_valves']]
+    BM = Bm[where.points['start_inline_valves']]
+    CP = Cm[where.points['end_inline_valves']]
+    BP = Bm[where.points['end_inline_valves']]
+
+    S = np.sign(CP - CM)
+    CV = 2 * G * (setting[where.points['start_inline_valves',]] \
+        * coeff[where.points['start_inline_valves',]] \
+            * area[where.points['start_inline_valves',]]) ** 2
+    X = CV * (BP + BM)
+    Q1[where.points['start_inline_valves',]] = np.sqrt(-S*X + S*(X**2 + S*4*CV*(CP - CM)))/2
+    QQ = Q1[where.points['start_inline_valves',]]
+    Q1[where.points['end_inline_valves',]] = QQ
+    H1[where.points['start_inline_valves',]] = CP - BP*QQ
+    H1[where.points['end_inline_valves',]] = CM + BM*QQ
