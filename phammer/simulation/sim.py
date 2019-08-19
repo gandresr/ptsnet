@@ -172,6 +172,7 @@ class HammerSimulation:
                 print("Elapsed time (model check): ", time() - t, '[s]')
                 raise e
             if self.settings.warnings_on:
+                print("Success - Compatible Model")
                 print("Elapsed time (model check): ", time() - t, '[s]')
         self.ng = self.wn.get_graph()
         self.curves = ObjArray()
@@ -195,9 +196,10 @@ class HammerSimulation:
         self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.settings.time_steps, index = self.ic['node']._index_keys)
 
     def _create_selectors(self):
-        self.where = SelectorSet(['points', 'pipes', 'nodes'])
+        self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves'])
         # Point, None and pipe selectors
         self.where.pipes['to_nodes'] = imerge(self.ic['pipe'].start_node, self.ic['pipe'].end_node)
+        self.where.valves['to_nodes'] = imerge(self.ic['valve'].start_node, self.ic['valve'].end_node)
         self.where.nodes['njust_in_pipes'] = np.unique(np.concatenate((
             self.ic['valve'].start_node, self.ic['valve'].end_node,
             self.ic['pump'].start_node, self.ic['pump'].end_node)))
@@ -209,9 +211,9 @@ class HammerSimulation:
         self.where.nodes['to_points'] = self.where.points['are_boundaries'][order][indices]
         self.where.nodes['to_points',] = nodes
         self.where.points['are_inner'] = np.setdiff1d(np.arange(self.num_points, dtype=np.int), self.where.points['are_boundaries'])
-        x = ~np.isin(self.where.pipes['to_nodes'], self.where.nodes['njust_in_pipes'])
-        self.where.points['just_in_pipes'] = self.where.points['are_boundaries'][x]
-        self.where.points['just_in_pipes',] = self.where.pipes['to_nodes'][x]
+        x0 = ~np.isin(self.where.pipes['to_nodes'], self.where.nodes['njust_in_pipes'])
+        self.where.points['just_in_pipes'] = self.where.points['are_boundaries'][x0]
+        self.where.points['just_in_pipes',] = self.where.pipes['to_nodes'][x0]
         order = np.argsort(self.where.points['just_in_pipes',])
         self.where.points['just_in_pipes'] = self.where.points['just_in_pipes'][order]
         self.where.points['just_in_pipes',] = self.where.points['just_in_pipes',][order]
@@ -222,22 +224,40 @@ class HammerSimulation:
         self.where.points['rjust_in_pipes',][1:] -= y
         self.where.nodes['just_in_pipes'] = np.unique(self.where.points['just_in_pipes',])
         self.where.nodes['rjust_in_pipes'] = np.unique(self.where.points['rjust_in_pipes',])
-        self.where.points['jip_dboundaries'] = self.where.points['are_dboundaries'][x[0::2]]
-        self.where.points['jip_uboundaries'] = self.where.points['are_uboundaries'][x[1::2]]
+        self.where.points['jip_dboundaries'] = self.where.points['are_dboundaries'][x0[0::2]]
+        self.where.points['jip_uboundaries'] = self.where.points['are_uboundaries'][x0[1::2]]
         bpoints_types = self.ic['node'].type[self.where.pipes['to_nodes']]
         self.where.points['are_reservoirs'] = self.where.points['are_boundaries'][bpoints_types == EN.RESERVOIR]
         self.where.points['are_tanks'] = self.where.points['are_boundaries'][bpoints_types == EN.TANK]
         bcount = np.bincount(self.where.points['just_in_pipes',])
         bcount = np.cumsum(bcount[bcount != 0]); bcount[1:] = bcount[:-1]; bcount[0] = 0
         self.where.nodes['just_in_pipes',] = bcount
-        x = np.isin(self.where.pipes['to_nodes'], self.ic['valve'].start_node[self.ic['valve'].is_inline])
-        self.where.points['in_valves'] = self.where.points['are_boundaries'][x]
-        x = np.isin(self.where.pipes['to_nodes'], self.ic['valve'].end_node[self.ic['valve'].is_inline])
-        self.where.points['out_valves'] = self.where.points['are_boundaries'][x]
-        x = np.isin(self.where.pipes['to_nodes'], self.ic['pump'].start_node[self.ic['pump'].is_inline])
-        self.where.points['in_pumps'] = self.where.points['are_boundaries'][x]
-        x = np.isin(self.where.pipes['to_nodes'], self.ic['pump'].end_node[self.ic['pump'].is_inline])
-        self.where.points['out_pumps'] = self.where.points['are_boundaries'][x]
+        x1 = np.isin(self.where.pipes['to_nodes'], self.ic['valve'].start_node[self.ic['valve'].is_inline])
+        x2 = np.isin(self.where.pipes['to_nodes'], self.ic['valve'].end_node[self.ic['valve'].is_inline])
+        x3 = np.isin(self.where.pipes['to_nodes'], self.ic['pump'].start_node[self.ic['pump'].is_inline])
+        x4 = np.isin(self.where.pipes['to_nodes'], self.ic['pump'].end_node[self.ic['pump'].is_inline])
+        x5 = np.isin(self.where.pipes['to_nodes'], self.ic['valve'].start_node[~self.ic['valve'].is_inline])
+        self.where.points['start_inline_valves'] = np.sort(self.where.points['are_boundaries'][x1])
+        ordered_valves = np.argsort(self.ic['valve'].start_node)
+        ordered_valves_end = np.argsort(self.ic['valve'].end_node)
+        self.where.points['start_inline_valves',] = ordered_valves[self.ic['valve'].is_inline[ordered_valves]]
+        last_order = np.argsort(self.where.points['start_inline_valves',])
+        self.where.points['start_inline_valves'][:] = self.where.points['start_inline_valves'][last_order]
+        self.where.points['start_inline_valves',][:] = self.where.points['start_inline_valves',][last_order]
+        self.where.points['in_valves'] = self.where.points['are_boundaries'][x1]
+        self.where.points['out_valves'] = self.where.points['are_boundaries'][x2]
+        self.where.points['end_inline_valves'] = np.sort(self.where.points['are_boundaries'][x2])
+        self.where.points['end_inline_valves',] = ordered_valves_end[self.ic['valve'].is_inline[ordered_valves_end]]
+        last_order = np.argsort(self.where.points['end_inline_valves',])
+        self.where.points['end_inline_valves'][:] = self.where.points['end_inline_valves'][last_order]
+        self.where.points['end_inline_valves',][:] = self.where.points['end_inline_valves',][last_order]
+        self.where.points['in_pumps'] = self.where.points['are_boundaries'][x3]
+        self.where.points['out_pumps'] = self.where.points['are_boundaries'][x4]
+        self.where.points['are_end_valves'] = np.sort(self.where.points['are_boundaries'][x5])
+        self.where.points['are_end_valves',] = ordered_valves[~self.ic['valve'].is_inline[ordered_valves]]
+        last_order = np.argsort(self.where.points['are_end_valves',])
+        self.where.points['are_end_valves'][:] = self.where.points['are_end_valves'][last_order]
+        self.where.points['are_end_valves',][:] = self.where.points['are_end_valves',][last_order]
 
     def _load_initial_conditions(self):
         self.mem_pool_points.head[self.where.points['are_boundaries'], 0] = self.ic['node'].head[self.where.pipes['to_nodes']]
@@ -355,8 +375,14 @@ class HammerSimulation:
                     settings = self.element_settings[stype].values[i1:i2]
                     elements = self.element_settings[stype].elements[i1:i2]
                     self._set_element_setting(stype, elements, settings)
+                    self._update_coefficients()
                     act_times.popleft()
                     act_indices.popleft()
+
+    def _update_coefficients(self):
+        for curve in self.curves:
+            if curve.type == 'valve':
+                self.ic['valve'].K[curve.elements] = curve(self.ic['valve'].setting[curve.elements])
 
     def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
         if default_wave_speed is None and wave_speed_file is None:

@@ -18,35 +18,27 @@ def check_compatibility(inpfile, wn=None, ic=None):
 
     not_inline_pumps = np.arange(wn.num_pumps)[~ic['pump'].is_inline]
     inline_pumps = np.arange(wn.num_pumps)[ic['pump'].is_inline]
-    not_inline_valves = np.arange(wn.num_valves)[~ic['valve'].is_inline]
     inline_valves = np.arange(wn.num_valves)[ic['valve'].is_inline]
 
     # Pumps can not have dead ends
     possible_dead_end = ic['node'].degree[ic['pump'].end_node] < 2
     if possible_dead_end.any():
         raise ModelError("there are pumps with an incompatible end node" % ic['node']._index_keys[possible_dead_end])
+    # Valves can not have isolated start nodes
+    possible_isolated_vstart = ic['node'].degree[ic['valve'].start_node] < 2
+    if possible_isolated_vstart.any():
+        raise ModelError("there are valves with an incompatible start node" % ic['node']._index_keys[possible_isolated_vstart])
 
-    # Pumps/Valves can not have isolated start nodes that are not reservoirs
+    # Pumps can not have isolated start nodes that are not reservoirs
     incompatible_start_pnodes = (ic['node'].degree[ic['pump'].start_node[not_inline_pumps]] == 1) * \
         (ic['node'].degree[ic['pump'].end_node[not_inline_pumps]] > 1)
-    incompatible_start_vnodes = (ic['node'].degree[ic['valve'].start_node[not_inline_valves]] == 1) * \
-        (ic['node'].degree[ic['valve'].end_node[not_inline_valves]] > 1)
 
     incompatible_start_pnodes = ~np.isin(
         ic['node'].type[ic['pump'].start_node[not_inline_pumps][incompatible_start_pnodes]], (EN.TANK, EN.RESERVOIR,))
     incompatible_start_pnodes = ic['node']._index_keys[not_inline_pumps][incompatible_start_pnodes]
-    incompatible_start_vnodes = ~np.isin(
-        ic['node'].type[ic['valve'].start_node[not_inline_valves][incompatible_start_vnodes]], (EN.TANK, EN.RESERVOIR,))
-    incompatible_start_vnodes = ic['node']._index_keys[not_inline_valves][incompatible_start_vnodes]
 
     if len(incompatible_start_pnodes) > 0:
-        msg = "there are valves with an incompatible start nodes: \n"
-        msg += ', '.join(incompatible_start_pnodes)
-        raise ModelError(msg)
-    if len(incompatible_start_vnodes) > 0:
-        msg = "there are valves with an incompatible start nodes: \n"
-        msg += ', '.join(incompatible_start_vnodes)
-        raise ModelError(msg)
+        raise ModelError("start nodes of pumps are incompatible: \n%s" % incompatible_start_pnodes)
 
     # Nodes of non-pipe elements can not be general junctions
     start_valve_error = ic['node'].degree[ic['valve'].start_node] > 2
@@ -73,6 +65,9 @@ def check_compatibility(inpfile, wn=None, ic=None):
     # Reservoirs can not be at the end of a pump
     if (ic['node'].type[ic['pump'].end_node] == EN.RESERVOIR).any():
         raise ModelError("there is a pump with a reservoir at its end node")
+    # Reservoirs can not be at the end of a valve
+    if (ic['node'].type[ic['valve'].end_node] == EN.RESERVOIR).any():
+        raise ModelError("there is a valvve with a reservoir at its end node")
 
     all_non_pipe_nodes = np.concatenate((
         ic['pump'].start_node,

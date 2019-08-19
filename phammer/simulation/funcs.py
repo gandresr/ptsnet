@@ -32,7 +32,7 @@ def run_interior_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm,
         H1[i] = (Cp[i]*Bm[i] + Cm[i]*Bp[i]) / (Bp[i] + Bm[i])
         Q1[i] = (Cp[i] - Cm[i]) / (Bp[i] + Bm[i])
 
-# @jit(nopython = True, cache = True, nogil=True, parallel=True)
+# @jit(nopython = False, cache = True, nogil=True, parallel=True)
 def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
     """Solves flow and head for boundary points attached to nodes
 
@@ -73,32 +73,33 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
     D1[where.nodes['just_in_pipes']] = Kd[where.nodes['just_in_pipes']] * np.sqrt(2*G*HH)
 
 # @jit(nopython = True, cache = True, parallel = PARALLEL)
-# def run_valve_step(Q0, H0, Q1, H1, B, R, valves_int, valves_float, nodes_obj):
-#     for v in range(valves_int.shape[0]):
-#         start_ids = valves_int.upstream_node
-#         end_ids = valves_int.downstream_node
-#         unodes = node_points[start_ids, 0]
-#         dnodes = node_points[end_ids, 0]
-#         setting = valves_float.setting
-#         valve_coeff = valves_float.valve_coeff
-#         area = valves_float.area
-#         Cp = H0[unode-1] + B[unode-1]*Q0[unode-1]
-#         Bp = B[unode-1] + R[unode-1]*abs(Q0[unode-1])
+def run_valve_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, setting, coeff, where):
+    # K = 2*G*Bp[where.points['are_end_valves']] * settting[where.]
+    for v in range(valves_int.shape[0]):
+        start_id = valves_int.upstream_node[v]
+        end_id = valves_int.downstream_node[v]
+        unode = nodes_obj.upstream_points[start_id][0]
+        dnode = nodes_obj.downstream_points[end_id]
+        setting = valves_float.setting[v]
+        valve_coeff = valves_float.valve_coeff[v]
+        area = valves_float.area[v]
+        Cp = H0[unode-1] + B[unode-1]*Q0[unode-1]
+        Bp = B[unode-1] + R[unode-1]*abs(Q0[unode-1])
 
-#         # End-valve
-#         K = 2*G*(Bp[unodes] * setting * valve_coeff * area)**2
-#         H1[unodes] = ((2*Cp[unodes] + K) - ((2*Cp[unodes] + K)**2 - 4*Cp[unodes]**2) ** 0.5) / 2
-#         Q1[unodes] = setting * valve_coeff * area * (2*G*H1[unodes])
-
-#         else:
-#             dnode = dnode[0]
-#             # Inline-valve
-#             Cm = H0[dnode+1] - B[dnode+1]*Q0[dnode+1]
-#             Bm = B[dnode+1] + R[dnode+1]*abs(Q0[dnode+1])
-#             S = -1 if (Cp - Cm) < 0 else 1
-#             Cv = 2*G*(valve_coeff*setting*area)**2
-#             X = Cv*(Bp + Bm)
-#             Q1[unode] = (-S*X + S*(X**2 + S*4*Cv*(Cp - Cm))**0.5)/2
-#             Q1[dnode] = Q1[unode]
-#             H1[unode] = Cp - Bp*Q1[unode]
-#             H1[dnode] = Cm + Bm*Q1[dnode]
+        if len(dnode) == 0:
+            # End-valve
+            K = 2*G*(Bp * setting * valve_coeff * area)**2
+            H1[unode] = ((2*Cp + K) - ((2*Cp + K)**2 - 4*Cp**2) ** 0.5) / 2
+            Q1[unode] = setting * valve_coeff * area * (2*G*H1[unode])
+        else:
+            dnode = dnode[0]
+            # Inline-valve
+            Cm = H0[dnode+1] - B[dnode+1]*Q0[dnode+1]
+            Bm = B[dnode+1] + R[dnode+1]*abs(Q0[dnode+1])
+            S = -1 if (Cp - Cm) < 0 else 1
+            Cv = 2*G*(valve_coeff*setting*area)**2
+            X = Cv*(Bp + Bm)
+            Q1[unode] = (-S*X + S*(X**2 + S*4*Cv*(Cp - Cm))**0.5)/2
+            Q1[dnode] = Q1[unode]
+            H1[unode] = Cp - Bp*Q1[unode]
+            H1[dnode] = Cm + Bm*Q1[dnode]

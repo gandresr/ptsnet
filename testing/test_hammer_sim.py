@@ -5,15 +5,16 @@ from phammer.simulation.sim import HammerSimulation
 
 from time import time
 
-duration = 20; time_step = 0.1
+duration = 1; time_step = 0.01
 inpfile = '/home/watsup/Downloads/Tnet2.inp'
-# duration = 1; time_step = 0.01
 # inpfile = '/home/watsup/Documents/Github/phammer/example_files/PHFC_SIM_17_4_13.inp'
+# duration = 50; time_step = 0.01
+inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet_valve.inp'
 
 sim = HammerSimulation(inpfile, {
     'time_step' : time_step,
     'duration' : duration,
-    'skip_compatibility_check' : False,
+    'skip_compatibility_check' : True,
 })
 
 sim.set_wave_speeds(1200)
