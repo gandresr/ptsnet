@@ -1,6 +1,6 @@
-; Filename: /home/watsup/Documents/Github/hammer-net/example_files/LoopedNet.inp
-; WNTR: 0.1.6
-; Created: 2019-07-29 12:46:50
+; Filename: /home/watsup/Documents/Github/phammer/example_files/LoopedNet_leak_us.inp
+; WNTR: 0.2.1
+; Created: 2019-08-20 13:31:56
 [TITLE]
 
 [JUNCTIONS]
@@ -11,7 +11,7 @@
  3                                  0               0                            ;
  5                                  0               0                            ;
  6                                  0               0                            ;
- 7                                  0             100                            ;
+ 7                                  0               1                            ;
 
 [RESERVOIRS]
 ;ID                                   Head                  Pattern
@@ -65,6 +65,7 @@ DEMAND CHARGE          0.0000
 
 [EMITTERS]
 ;ID        Flow coefficient
+5          1.0       
 
 [QUALITY]
 
@@ -101,7 +102,7 @@ SUMMARY    NO
 PAGE       0
 
 [OPTIONS]
-UNITS                LPS                 
+UNITS                CFS                 
 HEADLOSS             H-W                 
 SPECIFIC GRAVITY     1
 VISCOSITY            1
@@ -143,17 +144,14 @@ TOLERANCE            0.01
  -610.13          7398.71          "R1"
  42.82            6525.91          "N3"
  1404.32          7201.65          "N4"
- 2350.82          7160.49          "N6"
+ 2350.00          7155.56          "N6"
  964.83           5571.09          "N2"
  2677.61          5561.25          "N5"
  3940.86          5807.34          "VALVE"
 
 [BACKDROP]
-Graphics options:
-  dimensions          : ['0.00', '0.00', '10000.00', '10000.00']
-  units               : None                
-  offset              : ['0.00', '0.00']    
-  image_filename      : None                
-  map_filename        : None                
+DIMENSIONS    0.00    0.00    10000.00    10000.00
+UNITS    None
+OFFSET    0.00    0.00
 
 [END]
