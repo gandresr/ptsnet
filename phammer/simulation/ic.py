@@ -128,7 +128,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     to_si(flow_units, ic['node'].head, HydParam.HydraulicHead)
     to_si(flow_units, ic['node'].pressure, HydParam.Pressure)
     to_si(flow_units, ic['node'].elevation, HydParam.Elevation)
-    to_si(flow_units, ic['pipe'].head_loss, HydParam.HeadLoss)
+    to_si(flow_units, ic['pipe'].head_loss, HydParam.HydraulicHead)
     to_si(flow_units, ic['pipe'].flowrate, HydParam.Flow)
     to_si(flow_units, ic['pump'].flowrate, HydParam.Flow)
     to_si(flow_units, ic['valve'].flowrate, HydParam.Flow)
@@ -155,9 +155,9 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     ic['valve'].curve_index.fill(-1)
     ic['pump'].curve_index.fill(-1)
 
-    demanded = np.logical_and(ic['node'].pressure > 0, ic['node'].demand > 0)
-    ic['node'].demand_coefficient[demanded] = ic['node'].demand[demanded] / \
-        np.sqrt(abs(ic['node'].pressure[demanded]))
+    demanded = np.logical_and(ic['node'].type != EN.RESERVOIR, ic['node'].type != EN.TANK)
+    KeKd = ic['node'].demand[demanded] / np.sqrt(ic['node'].pressure[demanded])
+    ic['node'].demand_coefficient[demanded] = KeKd - ic['node'].leak_coefficient[demanded]
 
     nodes.setindex(node_ids)
     pipes.setindex(pipe_ids)

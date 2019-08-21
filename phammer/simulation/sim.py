@@ -274,6 +274,7 @@ class HammerSimulation:
             k = self.where.points['are_dboundaries'][i]
             s = int(self.ic['pipe'].segments[i])
             self.mem_pool_points.head[k:k+s+1, 0] = self.mem_pool_points.head[k,0] - (per_unit_hl[i] * np.arange(s+1))
+            xx = np.argwhere(self.mem_pool_points.head[k:k+s+1, 0] < 0).T
             self.mem_pool_points.flowrate[k:k+s+1, 0] = self.ic['pipe'].flowrate[i]
             self.point_properties.B[k:k+s+1] = self.ic['pipe'].wave_speed[i] / (G * self.ic['pipe'].area[i])
             self.point_properties.R[k:k+s+1] = self.ic['pipe'].ffactor[i] * self.ic['pipe'].dx[i] / \
@@ -282,11 +283,10 @@ class HammerSimulation:
         self.pipe_results.outflow[:,0] = self.mem_pool_points.flowrate[self.where.points['are_uboundaries'], 0]
         self.node_results.head[self.where.nodes['to_points',], 0] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
         self.node_results.head[self.where.nodes['to_points',], 0] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
-        positive_pressure = self.ic['node'].pressure > 0
-        self.node_results.leak_flow[positive_pressure, 0] = \
-            self.ic['node'].leak_coefficient[positive_pressure] * np.sqrt(self.ic['node'].pressure[positive_pressure])
-        self.node_results.demand_flow[positive_pressure, 0] = \
-            self.ic['node'].demand_coefficient[positive_pressure] * np.sqrt(self.ic['node'].pressure[positive_pressure])
+        self.node_results.leak_flow[:, 0] = \
+            self.ic['node'].leak_coefficient * np.sqrt(self.ic['node'].pressure)
+        self.node_results.demand_flow[:, 0] = \
+            self.ic['node'].demand_coefficient * np.sqrt(self.ic['node'].pressure)
         self.t = 1
 
     def _set_segments(self):
