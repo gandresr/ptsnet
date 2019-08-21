@@ -25,9 +25,9 @@ EPANET.ENopenH()
 EPANET.ENinitH(0)
 EPANET.ENrunH()
 
+flow_units = FlowUnits(EPANET.ENgetflowunits())
 emitter_coeff = to_si(flow_units, EPANET.ENgetnodevalue(5, EN.EMITTER), HydParam.EmitterCoeff)
 pressure = to_si(flow_units, EPANET.ENgetnodevalue(5, EN.PRESSURE), HydParam.Pressure)
-flow_units = FlowUnits(EPANET.ENgetflowunits())
 wntr_result = emitter_coeff * pressure ** 0.5
 
 EPANET.ENcloseH()
@@ -36,7 +36,7 @@ EPANET.ENclose()
 # Extracting results with phammer
 
 ic = get_initial_conditions(inpfile)
-K = ic['node'].emitter_coefficient['5']
+K = ic['node'].leak_coefficient['5']
 P = ic['node'].pressure['5']
 H = ic['node'].head['5']
 F = ic['node'].demand['5']

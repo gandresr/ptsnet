@@ -222,6 +222,7 @@ class HammerSimulation:
         self.where.points['rjust_in_pipes'] = self.where.points['just_in_pipes']
         self.where.points['rjust_in_pipes',] = np.copy(self.where.points['just_in_pipes',])
         y = self.where.points['rjust_in_pipes',]
+        y -= y[0]
         y = (y[1:] - y[:-1]) - 1; y[y < 0] = 0; y = np.cumsum(y)
         self.where.points['rjust_in_pipes',][1:] -= y
         self.where.nodes['just_in_pipes'] = np.unique(self.where.points['just_in_pipes',])
@@ -277,12 +278,15 @@ class HammerSimulation:
             self.point_properties.B[k:k+s+1] = self.ic['pipe'].wave_speed[i] / (G * self.ic['pipe'].area[i])
             self.point_properties.R[k:k+s+1] = self.ic['pipe'].ffactor[i] * self.ic['pipe'].dx[i] / \
                 (2 * G * self.ic['pipe'].diameter[i] * self.ic['pipe'].area[i] ** 2)
-        self.pipe_results.inflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_dboundaries'], 0]
-        self.pipe_results.outflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_uboundaries'], 0]
-        self.node_results.head[self.where.nodes['to_points',], self.t] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
-        self.node_results.head[self.where.nodes['to_points',], self.t] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
-        self.node_results.leak_flow[:, self.t] = self.ic['node'].leak_coefficient * np.sqrt(self.ic['node'].pressure)
-        self.node_results.demand_flow[:, self.t] = self.ic['node'].demand_coefficient * np.sqrt(self.ic['node'].pressure)
+        self.pipe_results.inflow[:,0] = self.mem_pool_points.flowrate[self.where.points['are_dboundaries'], 0]
+        self.pipe_results.outflow[:,0] = self.mem_pool_points.flowrate[self.where.points['are_uboundaries'], 0]
+        self.node_results.head[self.where.nodes['to_points',], 0] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
+        self.node_results.head[self.where.nodes['to_points',], 0] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
+        positive_pressure = self.ic['node'].pressure > 0
+        self.node_results.leak_flow[positive_pressure, 0] = \
+            self.ic['node'].leak_coefficient[positive_pressure] * np.sqrt(self.ic['node'].pressure[positive_pressure])
+        self.node_results.demand_flow[positive_pressure, 0] = \
+            self.ic['node'].demand_coefficient[positive_pressure] * np.sqrt(self.ic['node'].pressure[positive_pressure])
         self.t = 1
 
     def _set_segments(self):
@@ -353,11 +357,14 @@ class HammerSimulation:
             self.ic[ic_type].setting[self.ic[ic_type].iloc(element_name)] = value
 
     def _update_settings(self):
-        Y = True
-        for stype in self.SETTING_TYPES:
-            Y &= self.element_settings[stype].updated
-        self.settings.updated_settings = Y
         if not self.settings.updated_settings:
+            self._update_coefficients()
+            Y = True
+            for stype in self.SETTING_TYPES:
+                Y &= self.element_settings[stype].updated
+            self.settings.updated_settings = Y
+            if Y:
+                return
             for stype in self.SETTING_TYPES:
                 act_times = self.element_settings[stype].activation_times
                 act_indices = self.element_settings[stype].activation_indices
@@ -377,7 +384,6 @@ class HammerSimulation:
                     settings = self.element_settings[stype].values[i1:i2]
                     elements = self.element_settings[stype].elements[i1:i2]
                     self._set_element_setting(stype, elements, settings)
-                    self._update_coefficients()
                     act_times.popleft()
                     act_indices.popleft()
 
@@ -469,12 +475,16 @@ class HammerSimulation:
             raise NotImplementedError("wave speed values have not been defined for the pipes")
         for stype in self.SETTING_TYPES:
             self.element_settings[stype]._sort()
+        non_assigned_valves = self.ic['valve'].curve_index == -1
+        if non_assigned_valves.any():
+            raise NotImplementedError("it is necessary to assign curves for valves:\n%s" % str(self.ic['valve']._index_keys[non_assigned_valves]))
         self.settings.set_default()
         self.t = 0
         self._create_selectors()
         self._allocate_memory()
         self._load_initial_conditions()
         self.settings.is_initialized = True
+        self._update_settings()
 
     def run_step(self):
         if not self.settings.is_initialized:
@@ -512,7 +522,9 @@ class HammerSimulation:
             self.ic['node'].elevation,
             self.where)
         run_valve_step(
-            H0, Q1, H1,
+            Q0, H0, Q1, H1,
+            self.point_properties.B,
+            self.point_properties.R,
             self.point_properties.Cp,
             self.point_properties.Bp,
             self.point_properties.Cm,

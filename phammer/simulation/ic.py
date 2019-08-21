@@ -155,6 +155,10 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     ic['valve'].curve_index.fill(-1)
     ic['pump'].curve_index.fill(-1)
 
+    demanded = np.logical_and(ic['node'].pressure > 0, ic['node'].demand > 0)
+    ic['node'].demand_coefficient[demanded] = ic['node'].demand[demanded] / \
+        np.sqrt(abs(ic['node'].pressure[demanded]))
+
     nodes.setindex(node_ids)
     pipes.setindex(pipe_ids)
     valves.setindex(valve_ids)

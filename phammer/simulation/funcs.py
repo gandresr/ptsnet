@@ -4,7 +4,7 @@ import numpy as np
 
 # ------------------ SIM STEPS ------------------
 
-@jit(nopython = True, cache = True, parallel = PARALLEL)
+@jit(nopython = True, parallel = PARALLEL)
 def run_interior_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm,
     has_plus, has_minus):
     """Solves flow and head for interior points
@@ -43,6 +43,7 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
     Arguments:
         TODO: UPDATE ARGUMENTS
     """
+
     Cm[where.points['jip_dboundaries']] /= Bm[where.points['jip_dboundaries']]
     Cp[where.points['jip_uboundaries']] /= Bp[where.points['jip_uboundaries']]
     Bm[where.points['jip_dboundaries']] = 1 / Bm[where.points['jip_dboundaries']]
@@ -55,9 +56,7 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
 
     X =  sc / sb
     K = ((Ke[where.nodes['just_in_pipes']] + Kd[where.nodes['just_in_pipes']])/sb)**2
-
     HH = ((2*X + K) - np.sqrt(K**2 + 4*K*(X - Z[where.nodes['just_in_pipes']]))) / 2
-
     H1[where.points['just_in_pipes']] = HH[where.points['rjust_in_pipes',]]
     H1[where.points['are_reservoirs']] = H0[where.points['are_reservoirs']]
     H1[where.points['are_tanks']] = H0[where.points['are_tanks']]
@@ -66,34 +65,41 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
     Q1[where.points['jip_uboundaries']] = Cp[where.points['jip_uboundaries']] \
         - H1[where.points['jip_uboundaries']] * Bp[where.points['jip_uboundaries']]
 
+    # Get demand and leak flows
+    HH -= Z[where.nodes['just_in_pipes']]
+    HH[HH < 0] = 0 # No demand/leak flow with negative pressure
+    E1[where.nodes['just_in_pipes']] = Ke[where.nodes['just_in_pipes']] * np.sqrt(2*G*HH)
+    D1[where.nodes['just_in_pipes']] = Kd[where.nodes['just_in_pipes']] * np.sqrt(2*G*HH)
+
 # @jit(nopython = True, cache = True, parallel = PARALLEL)
-def run_valve_step(H0, Q1, H1, Cp, Bp, Cm, Bm, setting, coeff, area, where):
+def run_valve_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm, setting, coeff, area, where):
     # --- End valves
-    K = setting[where.points['are_end_valves',]] \
-        * coeff[where.points['are_end_valves',]] \
-            * area[where.points['are_end_valves',]]
+    if len(where.points['are_end_valves',]) > 0:
+        K0 = setting[where.points['are_end_valves',]] \
+            * coeff[where.points['are_end_valves',]] \
+                * area[where.points['are_end_valves',]]
 
-    K0 = 2 * G * Bp[where.points['are_end_valves']]
-    Cp_end = Cp[where.points['are_end_valves']]
+        K = 2*G*(Bp[where.points['are_end_valves']] * K0)**2
+        Cp_end = Cp[where.points['are_end_valves']]
 
-    H1[where.points['are_end_valves']] = (
-        (2*Cp_end + K0*K) - np.sqrt((2*Cp_end + K0*K)**2 - 4*Cp_end**2)) / 2
+        H1[where.points['are_end_valves']] =  \
+            ((2*Cp_end + K) - np.sqrt((2*Cp_end + K)**2 - 4*Cp_end**2)) / 2
 
-    Q1[where.points['are_end_valves']] = K * np.sqrt(2 * G * H1[where.points['are_end_valves']])
+        Q1[where.points['are_end_valves']] = K0 * np.sqrt(2 * G * H1[where.points['are_end_valves']])
 
-    # # --- Inline valves
-    CM = Cm[where.points['start_inline_valves']]
-    BM = Bm[where.points['start_inline_valves']]
-    CP = Cm[where.points['end_inline_valves']]
-    BP = Bm[where.points['end_inline_valves']]
+    # --- Inline valves
+    if len(where.points['start_inline_valves']) > 0:
+        CM = Cm[where.points['end_inline_valves']]
+        BM = Bm[where.points['end_inline_valves']]
+        CP = Cp[where.points['start_inline_valves']]
+        BP = Bp[where.points['start_inline_valves']]
 
-    S = np.sign(CP - CM)
-    CV = 2 * G * (setting[where.points['start_inline_valves',]] \
-        * coeff[where.points['start_inline_valves',]] \
-            * area[where.points['start_inline_valves',]]) ** 2
-    X = CV * (BP + BM)
-    Q1[where.points['start_inline_valves',]] = np.sqrt(-S*X + S*(X**2 + S*4*CV*(CP - CM)))/2
-    QQ = Q1[where.points['start_inline_valves',]]
-    Q1[where.points['end_inline_valves',]] = QQ
-    H1[where.points['start_inline_valves',]] = CP - BP*QQ
-    H1[where.points['end_inline_valves',]] = CM + BM*QQ
+        S = np.sign(CP - CM)
+        CV = 2 * G * (setting[where.points['start_inline_valves',]] \
+            * coeff[where.points['start_inline_valves',]] \
+                * area[where.points['start_inline_valves',]]) ** 2
+        X = CV * (BP + BM)
+        Q1[where.points['start_inline_valves']] = (-S*X + S*np.sqrt(X**2 + S*4*CV*(CP - CM)))/2
+        Q1[where.points['end_inline_valves']] = Q1[where.points['start_inline_valves']]
+        H1[where.points['start_inline_valves']] = CP - BP*Q1[where.points['start_inline_valves']]
+        H1[where.points['end_inline_valves']] = CM + BM*Q1[where.points['start_inline_valves']]

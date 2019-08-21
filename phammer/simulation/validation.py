@@ -86,7 +86,11 @@ def check_compatibility(inpfile, wn=None, ic=None):
         raise ModelError("there are non-pipe elements connected to each other")
 
     # No leaks/demands are allowed for nodes of non-pipe elements (except end-valve)
-    if (ic['node'].leak_coefficient[all_non_pipe_nodes_nburst] != 0).any():
-        raise ModelError("there is a non-pipe element connected to a leaking node")
-    if (ic['node'].demand_coefficient[all_non_pipe_nodes_nburst] != 0).any():
-        raise ModelError("there are non-pipe elements connected to a node with demand")
+    leaking = ic['node'].leak_coefficient[all_non_pipe_nodes_nburst] > 0
+    demanded = ic['node'].demand_coefficient[all_non_pipe_nodes_nburst] > 0
+    if leaking.any():
+        raise ModelError("there is a non-pipe element connected to a leaking node\n%s" % \
+            str(ic['node']._index_keys[all_non_pipe_nodes_nburst][leaking]))
+    if demanded.any():
+        raise ModelError("there are non-pipe elements connected to a node with demand\n%s" \
+            % str(ic['node']._index_keys[all_non_pipe_nodes_nburst][demanded]))
