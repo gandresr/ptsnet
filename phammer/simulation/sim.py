@@ -164,6 +164,7 @@ class HammerSimulation:
             raise TypeError("'settings' are not properly defined, use dict object")
         self.settings = HammerSettings(**settings, _super = self)
         self.wn = get_water_network(inpfile)
+        self.ng = self.wn.get_graph()
         self.ic = get_initial_conditions(inpfile, wn = self.wn)
         if not self.settings.skip_compatibility_check:
             if self.settings.warnings_on:
@@ -176,7 +177,6 @@ class HammerSimulation:
             if self.settings.warnings_on:
                 print("Success - Compatible Model")
                 print("Elapsed time (model check): ", time() - t, '[s]')
-        self.ng = self.wn.get_graph()
         self.curves = ObjArray()
         self.element_settings = {type_ : ElementSettings(self) for type_ in self.SETTING_TYPES}
         self.num_segments = 0
@@ -197,9 +197,36 @@ class HammerSimulation:
         self.pipe_results = Table2D(PIPE_RESULTS, self.wn.num_pipes, self.settings.time_steps, index = self.ic['pipe']._index_keys)
         self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.settings.time_steps, index = self.ic['node']._index_keys)
 
+    def _create_nonpipe_selectors(self, object_type):
+        x1 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].start_node[self.ic[object_type].is_inline])
+        x2 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].end_node[self.ic[object_type].is_inline])
+        if object_type == 'valve':
+            x3 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].start_node[~self.ic[object_type].is_inline])
+        elif object_type == 'pump':
+            x3 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].end_node[~self.ic[object_type].is_inline])
+        self.where.points['start_inline_' + object_type] = np.sort(self.where.points['are_boundaries'][x1])
+        ordered = np.argsort(self.ic[object_type].start_node)
+        ordered_end = np.argsort(self.ic[object_type].end_node)
+        self.where.points['start_inline_' + object_type,] = ordered[self.ic[object_type].is_inline[ordered]]
+        last_order = np.argsort(self.where.points['start_inline_' + object_type,])
+        self.where.points['start_inline_' + object_type][:] = self.where.points['start_inline_' + object_type][last_order]
+        self.where.points['start_inline_' + object_type,][:] = self.where.points['start_inline_' + object_type,][last_order]
+        self.where.points['end_inline_' + object_type] = np.sort(self.where.points['are_boundaries'][x2])
+        self.where.points['end_inline_' + object_type,] = ordered_end[self.ic[object_type].is_inline[ordered_end]]
+        last_order = np.argsort(self.where.points['end_inline_' + object_type,])
+        self.where.points['end_inline_' + object_type][:] = self.where.points['end_inline_' + object_type][last_order]
+        self.where.points['end_inline_' + object_type,][:] = self.where.points['end_inline_' + object_type,][last_order]
+        self.where.points['are_single_' + object_type] = np.sort(self.where.points['are_boundaries'][x3])
+        self.where.points['are_single_' + object_type,] = ordered[~self.ic[object_type].is_inline[ordered]]
+        last_order = np.argsort(self.where.points['are_single_' + object_type,])
+        self.where.points['are_single_' + object_type][:] = self.where.points['are_single_' + object_type][last_order]
+        self.where.points['are_single_' + object_type,][:] = self.where.points['are_single_' + object_type,][last_order]
+
     def _create_selectors(self):
         self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves'])
-        # Point, None and pipe selectors
+
+        # Point, Node and Pipe selectors
+
         self.where.pipes['to_nodes'] = imerge(self.ic['pipe'].start_node, self.ic['pipe'].end_node)
         self.where.valves['to_nodes'] = imerge(self.ic['valve'].start_node, self.ic['valve'].end_node)
         self.where.nodes['njust_in_pipes'] = np.unique(np.concatenate((
@@ -235,32 +262,13 @@ class HammerSimulation:
         bcount = np.bincount(self.where.points['just_in_pipes',])
         bcount = np.cumsum(bcount[bcount != 0]); bcount[1:] = bcount[:-1]; bcount[0] = 0
         self.where.nodes['just_in_pipes',] = bcount
-        x1 = np.isin(self.where.pipes['to_nodes'], self.ic['valve'].start_node[self.ic['valve'].is_inline])
-        x2 = np.isin(self.where.pipes['to_nodes'], self.ic['valve'].end_node[self.ic['valve'].is_inline])
-        x3 = np.isin(self.where.pipes['to_nodes'], self.ic['pump'].start_node[self.ic['pump'].is_inline])
-        x4 = np.isin(self.where.pipes['to_nodes'], self.ic['pump'].end_node[self.ic['pump'].is_inline])
-        x5 = np.isin(self.where.pipes['to_nodes'], self.ic['valve'].start_node[~self.ic['valve'].is_inline])
-        self.where.points['start_inline_valves'] = np.sort(self.where.points['are_boundaries'][x1])
-        ordered_valves = np.argsort(self.ic['valve'].start_node)
-        ordered_valves_end = np.argsort(self.ic['valve'].end_node)
-        self.where.points['start_inline_valves',] = ordered_valves[self.ic['valve'].is_inline[ordered_valves]]
-        last_order = np.argsort(self.where.points['start_inline_valves',])
-        self.where.points['start_inline_valves'][:] = self.where.points['start_inline_valves'][last_order]
-        self.where.points['start_inline_valves',][:] = self.where.points['start_inline_valves',][last_order]
-        self.where.points['in_valves'] = self.where.points['are_boundaries'][x1]
-        self.where.points['out_valves'] = self.where.points['are_boundaries'][x2]
-        self.where.points['end_inline_valves'] = np.sort(self.where.points['are_boundaries'][x2])
-        self.where.points['end_inline_valves',] = ordered_valves_end[self.ic['valve'].is_inline[ordered_valves_end]]
-        last_order = np.argsort(self.where.points['end_inline_valves',])
-        self.where.points['end_inline_valves'][:] = self.where.points['end_inline_valves'][last_order]
-        self.where.points['end_inline_valves',][:] = self.where.points['end_inline_valves',][last_order]
-        self.where.points['in_pumps'] = self.where.points['are_boundaries'][x3]
-        self.where.points['out_pumps'] = self.where.points['are_boundaries'][x4]
-        self.where.points['are_end_valves'] = np.sort(self.where.points['are_boundaries'][x5])
-        self.where.points['are_end_valves',] = ordered_valves[~self.ic['valve'].is_inline[ordered_valves]]
-        last_order = np.argsort(self.where.points['are_end_valves',])
-        self.where.points['are_end_valves'][:] = self.where.points['are_end_valves'][last_order]
-        self.where.points['are_end_valves',][:] = self.where.points['are_end_valves',][last_order]
+
+        # Valve selectors
+        self._create_nonpipe_selectors('valve')
+
+        # Pump selectors
+        self._create_nonpipe_selectors('pump')
+
 
     def _load_initial_conditions(self):
         self.mem_pool_points.head[self.where.points['are_boundaries'], 0] = self.ic['node'].head[self.where.pipes['to_nodes']]
