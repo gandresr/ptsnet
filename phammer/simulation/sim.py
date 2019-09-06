@@ -7,7 +7,7 @@ from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_RESULTS, NODE_RES
 from phammer.arrays.selectors import SelectorSet
 from phammer.epanet.util import EN
 from phammer.simulation.util import imerge, define_curve, is_iterable
-from phammer.simulation.funcs import run_interior_step, run_boundary_step, run_valve_step
+from phammer.simulation.funcs import run_interior_step, run_boundary_step, run_valve_step, run_pump_step
 from phammer.simulation.validation import check_compatibility
 
 class HammerSettings:
@@ -530,9 +530,7 @@ class HammerSimulation:
             self.ic['node'].elevation,
             self.where)
         run_valve_step(
-            Q0, H0, Q1, H1,
-            self.point_properties.B,
-            self.point_properties.R,
+            Q1, H1,
             self.point_properties.Cp,
             self.point_properties.Bp,
             self.point_properties.Cm,
@@ -540,6 +538,17 @@ class HammerSimulation:
             self.ic['valve'].setting,
             self.ic['valve'].K,
             self.ic['valve'].area,
+            self.where)
+        run_pump_step(
+            H0, Q1, H1,
+            self.point_properties.Cp,
+            self.point_properties.Bp,
+            self.point_properties.Cm,
+            self.point_properties.Bm,
+            self.ic['pump'].a1,
+            self.ic['pump'].a2,
+            self.ic['pump'].alpha,
+            self.ic['pump'].setting,
             self.where)
         self.pipe_results.inflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_dboundaries'], t1]
         self.pipe_results.outflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_uboundaries'], t1]

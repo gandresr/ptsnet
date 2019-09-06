@@ -53,9 +53,9 @@ PUMP_PROPERTIES = {
     'initial_status' : np.int, #
     'is_inline' : np.bool, #
     # ----------------------------------------
-    'A' : np.float, #
-    'B' : np.float, #
-    'C' : np.float, #
+    'a1' : np.float, #
+    'a2' : np.float, #
+    'alpha' : np.float, #
     'curve_index' : np.int,
     'setting' : np.float,
 }
