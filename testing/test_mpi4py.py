@@ -1,18 +1,47 @@
 from mpi4py import MPI
-from time import time
 import numpy as np
+from time import time
 
 comm = MPI.COMM_WORLD
+size = comm.Get_size()
 rank = comm.Get_rank()
 
-if rank == 0:
-    N = 1000
-    data = np.arange(N)
-    comm.send(1, dest=1, tag=1)
-    comm.send(data, dest=1, tag=11)
-elif rank == 1:
-    data = comm.recv(source=0, tag=1)
-    t = time()
-    data = comm.recv(source=0, tag=11)
-    print(time() - t)
-    print(data, rank)
+send_queue = {
+    0 : [],
+    1 : [],
+    2 : [],
+    3 : [1],
+    4 : [1],
+    5 : [4],
+    6 : [5],
+    7 : [],
+    8 : [5,7]
+}
+
+recv_queue = {
+    0 : [],
+    1 : [3,4],
+    2 : [],
+    3 : [],
+    4 : [5],
+    5 : [6,8],
+    6 : [],
+    7: [8],
+    8 : [],
+}
+
+data = np.zeros(9)
+
+t = time()
+while len(recv_queue[rank]) > 0 or len(send_queue[rank]) > 0:
+    if rank in recv_queue:
+        if len(recv_queue[rank]) > 0:
+            next = recv_queue[rank].pop(0)
+            data[next] = comm.recv(source = next)
+    if rank in send_queue:
+        if len(send_queue[rank]) > 0:
+            send_to = send_queue[rank].pop(0)
+            comm.send(rank, send_to)
+
+
+print(time()-t, rank, sum(data), recv_queue[rank], send_queue[rank])
