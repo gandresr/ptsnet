@@ -17,7 +17,7 @@
 
 [RESERVOIRS]
 ;ID              	Head        	Pattern         
- 0               	191         	                	;
+ 0               	250         	                	;
 
 [TANKS]
 ;ID              	Elevation   	InitLevel   	MinLevel    	MaxLevel    	Diameter    	MinVol      	VolCurve
@@ -34,7 +34,7 @@
  7               	1               	5               	488         	450         	140         	0           	Open  	;
  8               	3               	8               	200         	450         	105         	0           	Open  	;
  9               	9               	5               	257         	450         	105         	0           	Open  	;
- 13              	11              	3               	1000        	650          	100         	0           	Open  	;
+ 13              	11              	3               	1000        	450         	100         	0           	Open  	;
 
 [PUMPS]
 ;ID              	Node1           	Node2           	Parameters
@@ -60,14 +60,18 @@
 
 [CURVES]
 ;ID              	X-Value     	Y-Value
-;PUMP: 
- 1               	2           	100         
+;PUMP: PUMP: 
+ 1               	0           	133         
+ 1               	200         	100         
+ 1               	400         	10          
 
 [CONTROLS]
 
 
 
+
 [RULES]
+
 
 
 

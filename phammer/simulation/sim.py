@@ -269,7 +269,6 @@ class HammerSimulation:
         # Pump selectors
         self._create_nonpipe_selectors('pump')
 
-
     def _load_initial_conditions(self):
         self.mem_pool_points.head[self.where.points['are_boundaries'], 0] = self.ic['node'].head[self.where.pipes['to_nodes']]
         self.ic['pipe'].dx = self.ic['pipe'].length / self.ic['pipe'].segments
@@ -341,12 +340,9 @@ class HammerSimulation:
         if type(value) != np.ndarray:
             value = np.array(value)
 
-        if type_ == 'valve':
+        if type_ in ('valve', 'pump'):
             if (value > 1).any() or (value < 0).any():
-                raise ValueError("valve setting not in [0, 1]" % element)
-        elif type_ == 'pump':
-            if (not np.isin(value, (0,1,))).any():
-                raise ValueError("pump setting can only be 0 (OFF) or 1 (ON)")
+                raise ValueError("setting not in [0, 1]" % element)
         elif type_ == 'burst':
             if (value < 0).any():
                 raise ValueError("burst coefficient has to be >= 0")
@@ -547,7 +543,7 @@ class HammerSimulation:
             self.point_properties.Bm,
             self.ic['pump'].a1,
             self.ic['pump'].a2,
-            self.ic['pump'].alpha,
+            self.ic['pump'].Hs,
             self.ic['pump'].setting,
             self.where)
         self.pipe_results.inflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_dboundaries'], t1]

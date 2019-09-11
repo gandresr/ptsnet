@@ -88,10 +88,8 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
             pump_ids.append(link.name)
             ic[ltype].setting[k] = EPANET.ENgetlinkvalue(i, EN.SETTING)
             ic[ltype].initial_status[k] = link.initial_status
-            A, B, C = link.get_head_curve_coefficients()
-            ic[ltype].a1[k] = A
-            ic[ltype].alpha[k] = C**0.5
-            ic[ltype].a2[k] = B / ic[ltype].alpha[k]
+            qp, hp = list(zip(*link.get_pump_curve().points))
+            ic[ltype].a2[k], ic[ltype].a1[k], ic[ltype].Hs[k] = np.polyfit(qp, hp, 2)
         elif link.link_type == 'Valve':
             k = v; v += 1
             valve_ids.append(link.name)

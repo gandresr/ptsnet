@@ -55,7 +55,7 @@ PUMP_PROPERTIES = {
     # ----------------------------------------
     'a1' : np.float, #
     'a2' : np.float, #
-    'alpha' : np.float, #
+    'Hs' : np.float, #
     'curve_index' : np.int,
     'setting' : np.float,
 }
