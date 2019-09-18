@@ -49,6 +49,7 @@ PUMP_PROPERTIES = {
     'end_node' : np.int, #
     'flowrate' : np.float, #
     'velocity' : np.float, #
+    'headloss' : np.float, #
     'direction' : np.int, #
     'initial_status' : np.int, #
     'is_inline' : np.bool, #

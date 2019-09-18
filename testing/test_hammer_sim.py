@@ -24,7 +24,7 @@ sim.set_wave_speeds(1200)
 # valves = sim.wn.valve_name_list
 # sim.assign_curve_to('V_BUTTERFLY', valves)
 
-sim.define_pump_settings('pump', np.linspace(0, 5, 10), np.linspace(1, 0, 10))
+# sim.define_pump_settings('pump', np.linspace(0, 5, 10), np.linspace(1, 0, 10))
 
 sim.initialize()
 

@@ -556,6 +556,8 @@ class HydParam(enum.Enum):
             return dict(zip(data_keys, data))
         elif data_type is list:
             return list(data)
+        elif data_type is float:
+            return data
         else: # ndarray
             return
 

@@ -119,10 +119,9 @@ def run_pump_step(H0, Q1, H1, Cp, Bp, Cm, Bm, a1, a2, Hs, setting, where):
         B = a1[where.points['are_single_pump',]]*s - BM - BP
         C = Hs*s**2 - CM + CP
 
-        root = B ** 2 - 4 * A * C
-        root[root < 0] = 0
-        Q1[where.points['are_single_pump']] = (-B - np.sqrt(root)) / (2*A)
-        Q1[where.points['are_single_pump']][Q1[where.points['are_single_pump']] < 0] = 0
+        root = B ** 2 - 4 * A * C; root[root < 0] = 0
+        Q = (-B - np.sqrt(root)) / (2*A); Q[Q < 0] = 0
+        Q1[where.points['are_single_pump']] = Q
         H1[where.points['are_single_pump']] =  CM + BM * Q1[where.points['are_single_pump']]
 
     if len(where.points['start_inline_pump']) > 0:
@@ -136,10 +135,8 @@ def run_pump_step(H0, Q1, H1, Cp, Bp, Cm, Bm, a1, a2, Hs, setting, where):
         B = a1[where.points['start_inline_pump',]]*alpha - BM - BP
         C = Hs*alpha**2 - CM + CP
 
-        root = B ** 2 - 4 * A * C
-        root[root < 0] = 0
-        Q = (-B - np.sqrt(root)) / (2*A)
-        Q[Q < 0] = 0
+        root = B ** 2 - 4 * A * C; root[root < 0] = 0
+        Q = (-B - np.sqrt(root)) / (2*A); Q[Q < 0] = 0
         Q1[where.points['start_inline_pump']] = Q
         Q1[where.points['end_inline_pump']] = Q
 
