@@ -106,23 +106,27 @@ def run_valve_step(Q1, H1, Cp, Bp, Cm, Bm, setting, coeff, area, where):
         H1[where.points['start_inline_valve']] = CP - BP*Q1[where.points['start_inline_valve']]
         H1[where.points['end_inline_valve']] = CM + BM*Q1[where.points['start_inline_valve']]
 
-def run_pump_step(H0, Q1, H1, Cp, Bp, Cm, Bm, a1, a2, Hs, setting, where):
+def run_pump_step(source_head, Q1, H1, Cp, Bp, Cm, Bm, a1, a2, Hs, setting, where):
 
     if len(where.points['are_single_pump']) > 0:
-        CP = H0[where.points['are_single_pump']]
+        CP = source_head[where.points['are_single_pump']]
         BP = np.zeros(len(where.points['are_single_pump']))
         CM = Cm[where.points['are_single_pump']]
         BM = Bm[where.points['are_single_pump']]
 
-        s = setting[where.points['are_single_pump',]]
+        alpha = setting[where.points['are_single_pump',]]
         A = a2[where.points['are_single_pump',]]
-        B = a1[where.points['are_single_pump',]]*s - BM - BP
-        C = Hs*s**2 - CM + CP
+        B = a1[where.points['are_single_pump',]]*alpha - BM - BP
+        C = Hs[where.points['are_single_pump',]]*alpha**2 - CM + CP
 
         root = B ** 2 - 4 * A * C; root[root < 0] = 0
         Q = (-B - np.sqrt(root)) / (2*A); Q[Q < 0] = 0
         Q1[where.points['are_single_pump']] = Q
-        H1[where.points['are_single_pump']] =  CM + BM * Q1[where.points['are_single_pump']]
+
+        hp = a2[where.points['are_single_pump',]] * Q**2 + a1[where.points['are_single_pump',]]*alpha * Q + \
+            Hs[where.points['are_single_pump',]]*alpha**2
+
+        H1[where.points['are_single_pump']] =  CP + hp
 
     if len(where.points['start_inline_pump']) > 0:
         CP = Cp[where.points['start_inline_pump']]
@@ -133,12 +137,15 @@ def run_pump_step(H0, Q1, H1, Cp, Bp, Cm, Bm, a1, a2, Hs, setting, where):
         alpha = setting[where.points['start_inline_pump',]]
         A = a2[where.points['start_inline_pump',]]
         B = a1[where.points['start_inline_pump',]]*alpha - BM - BP
-        C = Hs*alpha**2 - CM + CP
+        C = Hs[where.points['start_inline_pump',]]*alpha**2 - CM + CP
 
         root = B ** 2 - 4 * A * C; root[root < 0] = 0
         Q = (-B - np.sqrt(root)) / (2*A); Q[Q < 0] = 0
         Q1[where.points['start_inline_pump']] = Q
         Q1[where.points['end_inline_pump']] = Q
 
-        H1[where.points['start_inline_pump']] =  CP - BP * Q1[where.points['start_inline_pump']]
-        H1[where.points['end_inline_pump']] =  CM + BM * Q1[where.points['end_inline_pump']]
+        hp = a2[where.points['start_inline_pump',]] * Q**2 + a1[where.points['start_inline_pump',]]*alpha * Q + \
+            Hs[where.points['start_inline_pump',]]*alpha**2
+
+        H1[where.points['start_inline_pump']] =  CP - BP * Q
+        H1[where.points['end_inline_pump']] =  H1[where.points['start_inline_pump']] + hp

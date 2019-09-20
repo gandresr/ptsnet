@@ -53,6 +53,7 @@ PUMP_PROPERTIES = {
     'direction' : np.int, #
     'initial_status' : np.int, #
     'is_inline' : np.bool, #
+    'source_head' : np.float, #
     # ----------------------------------------
     'a1' : np.float, #
     'a2' : np.float, #

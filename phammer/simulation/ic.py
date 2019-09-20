@@ -73,6 +73,13 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
         ic['node'].elevation[i-1] = z
         ic['node'].degree[i-1] = network_graph.degree(node_id)
 
+    # Unit conversion
+    to_si(flow_units, ic['node'].leak_coefficient, HydParam.EmitterCoeff)
+    to_si(flow_units, ic['node'].demand, HydParam.Flow)
+    to_si(flow_units, ic['node'].head, HydParam.HydraulicHead)
+    to_si(flow_units, ic['node'].pressure, HydParam.Pressure)
+    to_si(flow_units, ic['node'].elevation, HydParam.Elevation)
+
     p, pp, v = 0, 0, 0 # pipes, pumps, valves
     for i in range(1, wn.num_links+1):
 
@@ -85,14 +92,18 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
             ic[ltype].head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
         elif link.link_type == 'Pump':
             k = pp; pp += 1
+            sn, _ = EPANET.ENgetlinknodes(i)
             pump_ids.append(link.name)
             ic[ltype].setting[k] = EPANET.ENgetlinkvalue(i, EN.SETTING)
             ic[ltype].initial_status[k] = link.initial_status
+            # Pump curve parameters
             qp, hp = list(zip(*link.get_pump_curve().points)); qp = list(qp); hp = list(hp)
             qpp = to_si(flow_units, EPANET.ENgetlinkvalue(i, EN.FLOW), HydParam.Flow)
             hpp = to_si(flow_units, EPANET.ENgetlinkvalue(i, EN.HEADLOSS), HydParam.HydraulicHead)
             qp.append(qpp); hp.append(abs(hpp))
             ic[ltype].a2[k], ic[ltype].a1[k], ic[ltype].Hs[k] = np.polyfit(qp, hp, 2)
+            # Source head
+            ic[ltype].source_head[k] = ic['node'].head[sn-1]
         elif link.link_type == 'Valve':
             k = v; v += 1
             valve_ids.append(link.name)
@@ -128,11 +139,6 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     EPANET.ENclose()
 
     # Unit conversion
-    to_si(flow_units, ic['node'].leak_coefficient, HydParam.EmitterCoeff)
-    to_si(flow_units, ic['node'].demand, HydParam.Flow)
-    to_si(flow_units, ic['node'].head, HydParam.HydraulicHead)
-    to_si(flow_units, ic['node'].pressure, HydParam.Pressure)
-    to_si(flow_units, ic['node'].elevation, HydParam.Elevation)
     to_si(flow_units, ic['pipe'].head_loss, HydParam.HydraulicHead)
     to_si(flow_units, ic['pipe'].flowrate, HydParam.Flow)
     to_si(flow_units, ic['pump'].flowrate, HydParam.Flow)

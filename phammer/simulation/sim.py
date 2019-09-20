@@ -536,7 +536,8 @@ class HammerSimulation:
             self.ic['valve'].area,
             self.where)
         run_pump_step(
-            H0, Q1, H1,
+            self.ic['pump'].source_head,
+            Q1, H1,
             self.point_properties.Cp,
             self.point_properties.Bp,
             self.point_properties.Cm,
