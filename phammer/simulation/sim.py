@@ -3,7 +3,7 @@ from time import time
 from collections import deque as dq
 from phammer.simulation.ic import get_initial_conditions, get_water_network
 from phammer.arrays.arrays import Table2D, Table, ObjArray
-from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G
+from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G, COEFF_TOL
 from phammer.arrays.selectors import SelectorSet
 from phammer.epanet.util import EN
 from phammer.simulation.util import imerge, define_curve, is_iterable
@@ -327,7 +327,7 @@ class HammerSimulation:
                 return
         if not is_iterable(element_name):
             if type(element_name) is str:
-                element_name = [element_name]
+                element_name = (element_name,)
                 value = [value]
             else:
                 raise ValueError("'element_name' should be iterable or str")
@@ -394,7 +394,8 @@ class HammerSimulation:
     def _update_coefficients(self):
         for curve in self.curves:
             if curve.type == 'valve':
-                self.ic['valve'].K[curve.elements] = curve(self.ic['valve'].setting[curve.elements])
+                self.ic['valve'].K[curve.elements] = \
+                    self.ic['valve'].adjustment[curve.elements] * curve(self.ic['valve'].setting[curve.elements])
 
     def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
         if default_wave_speed is None and wave_speed_file is None:
@@ -460,6 +461,17 @@ class HammerSimulation:
         type_ = self.curves[curve_name].type
         for element in elements:
             if self.ic[type_].curve_index[element] == -1:
+                if type_ == 'valve':
+                    Kv = self.ic[type_].K[element]
+                    Kc = self.curves[curve_name](self.ic[type_].setting[element])
+                    diff = abs(Kv - Kc)
+                    if Kv == 0:
+                        self.ic[type_].adjustment[element] = 1
+                        self.ic[type_].K[element] = Kc
+                    else:
+                        self.ic[type_].adjustment[element] = Kv / Kc
+                        if diff > COEFF_TOL:
+                            print("Warning: the steady state coefficient of valve '%s' is not in the curve, the curve will be adjusted" % element)
                 N = len(self.curves[curve_name])
                 self.ic[type_].curve_index[element] = N
                 element_index = self.ic[type_].iloc(element)

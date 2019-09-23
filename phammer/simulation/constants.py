@@ -11,6 +11,7 @@ FLOOR_FFACTOR = 1E-4
 DEFAULT_FFACTOR = 0.035
 G = 9.807 # SI gravity
 TOL = 1E-6
+COEFF_TOL = 1E-6
 
 # ----- Initial Conditions -----
 
@@ -73,6 +74,7 @@ VALVE_PROPERTIES = {
     'initial_status' : np.int, #
     'type' : np.int, #
     'is_inline' : np.bool, #
+    'adjustment' : np.float, #
     # ----------------------------------------
     'K' : np.float,
     'setting' : np.float,

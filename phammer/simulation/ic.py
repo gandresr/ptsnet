@@ -85,43 +85,21 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
 
         link = wn.get_link(EPANET.ENgetlinkid(i))
         ltype = link.link_type.lower()
+
         if link.link_type == 'Pipe':
             k = p; p += 1
-            pipe_ids.append(link.name)
-            ic[ltype].length[k] = link.length
-            ic[ltype].head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
         elif link.link_type == 'Pump':
             k = pp; pp += 1
-            sn, _ = EPANET.ENgetlinknodes(i)
-            pump_ids.append(link.name)
-            ic[ltype].setting[k] = EPANET.ENgetlinkvalue(i, EN.SETTING)
-            ic[ltype].initial_status[k] = link.initial_status
-            # Pump curve parameters
-            qp, hp = list(zip(*link.get_pump_curve().points)); qp = list(qp); hp = list(hp)
-            qpp = to_si(flow_units, EPANET.ENgetlinkvalue(i, EN.FLOW), HydParam.Flow)
-            hpp = to_si(flow_units, EPANET.ENgetlinkvalue(i, EN.HEADLOSS), HydParam.HydraulicHead)
-            qp.append(qpp); hp.append(abs(hpp))
-            ic[ltype].a2[k], ic[ltype].a1[k], ic[ltype].Hs[k] = np.polyfit(qp, hp, 2)
-            # Source head
-            ic[ltype].source_head[k] = ic['node'].head[sn-1]
         elif link.link_type == 'Valve':
             k = v; v += 1
-            valve_ids.append(link.name)
-            ic[ltype].initial_status[k] = EPANET.ENgetlinkvalue(i, EN.INITSTATUS)
-            ic[ltype].setting[k] = ic[ltype].initial_status[k]
-
-        if link.link_type in ('Pipe', 'Valve'):
-            ic[ltype].diameter[k] = link.diameter
-            ic[ltype].area[k] = np.pi * link.diameter ** 2 / 4
-            ic[ltype].type[k] = EPANET.ENgetlinktype(i)
 
         ic[ltype].start_node[k], ic[ltype].end_node[k] = EPANET.ENgetlinknodes(i)
         ic[ltype].flowrate[k] = EPANET.ENgetlinkvalue(i, EN.FLOW)
         ic[ltype].velocity[k] = EPANET.ENgetlinkvalue(i, EN.VELOCITY)
 
-        if ic['node'].degree[ic[ltype].start_node[k]-1] >= 2 and \
-            ic['node'].degree[ic[ltype].end_node[k]-1] >= 2:
-            ic[ltype].is_inline[k] = True
+        # Indexes are adjusted to fit the new Table / Indexing in EPANET's C code starts in 1
+        ic[ltype].start_node[k] -= 1
+        ic[ltype].end_node[k] -= 1
 
         if -TOL < ic[ltype].flowrate[k] < TOL:
             ic[ltype].direction[k] = 0
@@ -135,6 +113,42 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
             ic[ltype].flowrate[k] *= -1
             ic[ltype].start_node[k], ic[ltype].end_node[k] = ic[ltype].end_node[k], ic[ltype].start_node[k]
 
+        if ic['node'].degree[ic[ltype].start_node[k]] >= 2 and \
+            ic['node'].degree[ic[ltype].end_node[k]] >= 2:
+            ic[ltype].is_inline[k] = True
+
+        if link.link_type in ('Pipe', 'Valve'):
+            ic[ltype].diameter[k] = link.diameter
+            ic[ltype].area[k] = np.pi * link.diameter ** 2 / 4
+            ic[ltype].type[k] = EPANET.ENgetlinktype(i)
+
+        if link.link_type == 'Pipe':
+            pipe_ids.append(link.name)
+            ic[ltype].length[k] = link.length
+            ic[ltype].head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
+        elif link.link_type == 'Pump':
+            pump_ids.append(link.name)
+            ic[ltype].setting[k] = EPANET.ENgetlinkvalue(i, EN.SETTING)
+            ic[ltype].initial_status[k] = link.initial_status
+            # Pump curve parameters
+            qp, hp = list(zip(*link.get_pump_curve().points)); qp = list(qp); hp = list(hp)
+            qpp = to_si(flow_units, float(ic[ltype].flowrate[k]), HydParam.Flow)
+            hpp = to_si(flow_units, EPANET.ENgetlinkvalue(i, EN.HEADLOSS), HydParam.HydraulicHead)
+            qp.append(qpp); hp.append(abs(hpp))
+            ic[ltype].a2[k], ic[ltype].a1[k], ic[ltype].Hs[k] = np.polyfit(qp, hp, 2)
+            # Source head
+            ic[ltype].source_head[k] = ic['node'].head[ic[ltype].start_node[k]]
+        elif link.link_type == 'Valve':
+            valve_ids.append(link.name)
+            ic[ltype].initial_status[k] = EPANET.ENgetlinkvalue(i, EN.INITSTATUS)
+            ic[ltype].setting[k] = ic[ltype].initial_status[k]
+            ic[ltype].flowrate[k] = to_si(flow_units, float(ic[ltype].flowrate[k]), HydParam.Flow)
+            ha = ic['node'].head[ic[ltype].start_node[k]]
+            hb = ic['node'].head[ic[ltype].end_node[k]] if ic['node'].degree[ic[ltype].end_node[k]] > 1 else 0
+            hl = ha - hb
+            if hl > 0:
+                ic[ltype].K[k] = ic[ltype].flowrate[k]/(ic[ltype].area[k]*(2*G*hl)**0.5)
+
     EPANET.ENcloseH()
     EPANET.ENclose()
 
@@ -142,18 +156,9 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     to_si(flow_units, ic['pipe'].head_loss, HydParam.HydraulicHead)
     to_si(flow_units, ic['pipe'].flowrate, HydParam.Flow)
     to_si(flow_units, ic['pump'].flowrate, HydParam.Flow)
-    to_si(flow_units, ic['valve'].flowrate, HydParam.Flow)
     to_si(flow_units, ic['pipe'].velocity, HydParam.Velocity)
     to_si(flow_units, ic['pump'].velocity, HydParam.Velocity)
     to_si(flow_units, ic['valve'].velocity, HydParam.Velocity)
-
-    # Indexes are adjusted to fit the new Table / Indexing in C code starts in 1
-    ic['pipe'].start_node -= 1
-    ic['pipe'].end_node -= 1
-    ic['pump'].start_node -= 1
-    ic['pump'].end_node -= 1
-    ic['valve'].start_node -= 1
-    ic['valve'].end_node -= 1
 
     idx = ic['pipe'].ffactor == 0
     ic['pipe'].ffactor[idx] = \
