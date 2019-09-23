@@ -1,14 +1,13 @@
 import numpy as np
 from time import time
 from collections import deque as dq
-from phammer.simulation.ic import get_initial_conditions, get_water_network
 from phammer.arrays.arrays import Table2D, Table, ObjArray
 from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G, COEFF_TOL
 from phammer.arrays.selectors import SelectorSet
 from phammer.epanet.util import EN
 from phammer.simulation.util import imerge, define_curve, is_iterable
 from phammer.simulation.funcs import run_interior_step, run_boundary_step, run_valve_step, run_pump_step
-from phammer.simulation.validation import check_compatibility
+from phammer.simulation.init import Initializator
 
 class HammerSettings:
     def __init__(self,
@@ -16,6 +15,7 @@ class HammerSettings:
         duration: float = 20,
         warnings_on: bool = True,
         parallel : bool = False,
+        num_processors : int = 1,
         gpu : bool = False,
         skip_compatibility_check : bool = False,
         _super = None):
@@ -26,6 +26,7 @@ class HammerSettings:
         self.time_steps = int(round(duration/time_step))
         self.warnings_on = warnings_on
         self.parallel = parallel
+        self.num_processors = num_processors
         self.gpu = gpu
         self.skip_compatibility_check = skip_compatibility_check
         self.defined_wave_speeds = False
@@ -159,28 +160,15 @@ class HammerSimulation:
         'demand' : 'node',
     }
 
-    def __init__(self, inpfile, settings):
+    def __init__(self, inpfile, settings, ic, num_segments, num_points):
         if type(settings) != dict:
             raise TypeError("'settings' are not properly defined, use dict object")
         self.settings = HammerSettings(**settings, _super = self)
-        self.wn = get_water_network(inpfile)
-        self.ng = self.wn.get_graph()
-        self.ic = get_initial_conditions(inpfile, wn = self.wn)
-        if not self.settings.skip_compatibility_check:
-            if self.settings.warnings_on:
-                t = time()
-            try:
-                check_compatibility(None, wn=self.wn, ic=self.ic)
-            except Exception as e:
-                print("Elapsed time (model check): ", time() - t, '[s]')
-                raise e
-            if self.settings.warnings_on:
-                print("Success - Compatible Model")
-                print("Elapsed time (model check): ", time() - t, '[s]')
         self.curves = ObjArray()
         self.element_settings = {type_ : ElementSettings(self) for type_ in self.SETTING_TYPES}
-        self.num_segments = 0
-        self.num_points = 0
+        self.ic = ic
+        self.num_segments = num_segments
+        self.num_points = num_points
         self.t = 0
 
     def __repr__(self):
@@ -196,78 +184,6 @@ class HammerSimulation:
         self.point_properties = Table(POINT_PROPERTIES, self.num_points)
         self.pipe_results = Table2D(PIPE_RESULTS, self.wn.num_pipes, self.settings.time_steps, index = self.ic['pipe']._index_keys)
         self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.settings.time_steps, index = self.ic['node']._index_keys)
-
-    def _create_nonpipe_selectors(self, object_type):
-        x1 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].start_node[self.ic[object_type].is_inline])
-        x2 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].end_node[self.ic[object_type].is_inline])
-        if object_type == 'valve':
-            x3 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].start_node[~self.ic[object_type].is_inline])
-        elif object_type == 'pump':
-            x3 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].end_node[~self.ic[object_type].is_inline])
-        self.where.points['start_inline_' + object_type] = np.sort(self.where.points['are_boundaries'][x1])
-        ordered = np.argsort(self.ic[object_type].start_node)
-        ordered_end = np.argsort(self.ic[object_type].end_node)
-        self.where.points['start_inline_' + object_type,] = ordered[self.ic[object_type].is_inline[ordered]]
-        last_order = np.argsort(self.where.points['start_inline_' + object_type,])
-        self.where.points['start_inline_' + object_type][:] = self.where.points['start_inline_' + object_type][last_order]
-        self.where.points['start_inline_' + object_type,][:] = self.where.points['start_inline_' + object_type,][last_order]
-        self.where.points['end_inline_' + object_type] = np.sort(self.where.points['are_boundaries'][x2])
-        self.where.points['end_inline_' + object_type,] = ordered_end[self.ic[object_type].is_inline[ordered_end]]
-        last_order = np.argsort(self.where.points['end_inline_' + object_type,])
-        self.where.points['end_inline_' + object_type][:] = self.where.points['end_inline_' + object_type][last_order]
-        self.where.points['end_inline_' + object_type,][:] = self.where.points['end_inline_' + object_type,][last_order]
-        self.where.points['are_single_' + object_type] = np.sort(self.where.points['are_boundaries'][x3])
-        self.where.points['are_single_' + object_type,] = ordered[~self.ic[object_type].is_inline[ordered]]
-        last_order = np.argsort(self.where.points['are_single_' + object_type,])
-        self.where.points['are_single_' + object_type][:] = self.where.points['are_single_' + object_type][last_order]
-        self.where.points['are_single_' + object_type,][:] = self.where.points['are_single_' + object_type,][last_order]
-
-    def _create_selectors(self):
-        self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves'])
-
-        # Point, Node and Pipe selectors
-
-        self.where.pipes['to_nodes'] = imerge(self.ic['pipe'].start_node, self.ic['pipe'].end_node)
-        self.where.valves['to_nodes'] = imerge(self.ic['valve'].start_node, self.ic['valve'].end_node)
-        self.where.nodes['njust_in_pipes'] = np.unique(np.concatenate((
-            self.ic['valve'].start_node, self.ic['valve'].end_node,
-            self.ic['pump'].start_node, self.ic['pump'].end_node)))
-        self.where.points['are_uboundaries'] = np.cumsum(self.ic['pipe'].segments.astype(np.int)+1) - 1
-        self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ic['pipe'].segments.astype(np.int)
-        self.where.points['are_boundaries'] = imerge(self.where.points['are_dboundaries'], self.where.points['are_uboundaries'])
-        order = np.argsort(self.where.pipes['to_nodes'])
-        nodes, indices = np.unique(self.where.pipes['to_nodes'][order], True)
-        self.where.nodes['to_points'] = self.where.points['are_boundaries'][order][indices]
-        self.where.nodes['to_points',] = nodes
-        self.where.points['are_inner'] = np.setdiff1d(np.arange(self.num_points, dtype=np.int), self.where.points['are_boundaries'])
-        x0 = ~np.isin(self.where.pipes['to_nodes'], self.where.nodes['njust_in_pipes'])
-        self.where.points['just_in_pipes'] = self.where.points['are_boundaries'][x0]
-        self.where.points['just_in_pipes',] = self.where.pipes['to_nodes'][x0]
-        order = np.argsort(self.where.points['just_in_pipes',])
-        self.where.points['just_in_pipes'] = self.where.points['just_in_pipes'][order]
-        self.where.points['just_in_pipes',] = self.where.points['just_in_pipes',][order]
-        self.where.points['rjust_in_pipes'] = self.where.points['just_in_pipes']
-        self.where.points['rjust_in_pipes',] = np.copy(self.where.points['just_in_pipes',])
-        y = self.where.points['rjust_in_pipes',]
-        y -= y[0]
-        y = (y[1:] - y[:-1]) - 1; y[y < 0] = 0; y = np.cumsum(y)
-        self.where.points['rjust_in_pipes',][1:] -= y
-        self.where.nodes['just_in_pipes'] = np.unique(self.where.points['just_in_pipes',])
-        self.where.nodes['rjust_in_pipes'] = np.unique(self.where.points['rjust_in_pipes',])
-        self.where.points['jip_dboundaries'] = self.where.points['are_dboundaries'][x0[0::2]]
-        self.where.points['jip_uboundaries'] = self.where.points['are_uboundaries'][x0[1::2]]
-        bpoints_types = self.ic['node'].type[self.where.pipes['to_nodes']]
-        self.where.points['are_reservoirs'] = self.where.points['are_boundaries'][bpoints_types == EN.RESERVOIR]
-        self.where.points['are_tanks'] = self.where.points['are_boundaries'][bpoints_types == EN.TANK]
-        bcount = np.bincount(self.where.points['just_in_pipes',])
-        bcount = np.cumsum(bcount[bcount != 0]); bcount[1:] = bcount[:-1]; bcount[0] = 0
-        self.where.nodes['just_in_pipes',] = bcount
-
-        # Valve selectors
-        self._create_nonpipe_selectors('valve')
-
-        # Pump selectors
-        self._create_nonpipe_selectors('pump')
 
     def _load_initial_conditions(self):
         self.mem_pool_points.head[self.where.points['are_boundaries'], 0] = self.ic['node'].head[self.where.pipes['to_nodes']]
@@ -296,28 +212,21 @@ class HammerSimulation:
             self.ic['node'].demand_coefficient * np.sqrt(self.ic['node'].pressure)
         self.t = 1
 
-    def _set_segments(self):
-        self.ic['pipe'].segments = self.ic['pipe'].length
-        self.ic['pipe'].segments /= self.ic['pipe'].wave_speed
-
-        # Maximum time_step in the system to capture waves in all pipes
-        max_dt = min(self.ic['pipe'].segments) / 2 # at least 2 segments in critical pipe
-
-        self.settings.time_step = min(self.settings.time_step, max_dt)
-
-        # The number of segments is defined
-        self.ic['pipe'].segments /= self.settings.time_step
-        int_segments = np.round(self.ic['pipe'].segments)
-
-        # The wave_speed values are adjusted to compensate the truncation error
-        self.ic['pipe'].wave_speed = self.ic['pipe'].wave_speed * self.ic['pipe'].segments/int_segments
-        self.ic['pipe'].segments = int_segments
-        self.num_segments = int(sum(self.ic['pipe'].segments))
-        self.num_points = self.num_segments + self.wn.num_pipes
-
     def _define_element_setting(self, element, type_, X, Y):
         ic_type = self.SETTING_TYPES[type_]
         self.element_settings[type_]._dump_settings(self.ic[ic_type].iloc(element), X, Y)
+
+    def define_valve_settings(self, valve_name, X, Y):
+        self._define_element_setting(valve_name, 'valve', X, Y)
+
+    def define_pump_settings(self, pump_name, X, Y):
+        self._define_element_setting(pump_name, 'pump', X, Y)
+
+    def define_burst_settings(self, node_name, X, Y):
+        self._define_element_setting(node_name, 'burst', X, Y)
+
+    def define_demand_settings(self, node_name, X, Y):
+        self._define_element_setting(node_name, 'demand', X, Y)
 
     def _set_element_setting(self, type_, element_name, value, step = None, check_warning = False):
         if self.t == 0:
@@ -396,49 +305,6 @@ class HammerSimulation:
             if curve.type == 'valve':
                 self.ic['valve'].K[curve.elements] = \
                     self.ic['valve'].adjustment[curve.elements] * curve(self.ic['valve'].setting[curve.elements])
-
-    def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
-        if default_wave_speed is None and wave_speed_file is None:
-            raise ValueError("wave_speed was not specified")
-
-        if not default_wave_speed is None:
-            self.ic['pipe'].wave_speed[:] = default_wave_speed
-
-        modified_lines = 0
-        if not wave_speed_file is None:
-            with open(wave_speed_file, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if len(line) <= 1:
-                        raise ValueError("The wave_speed file has to have to entries per line 'pipe,wave_speed'")
-                    pipe, wave_speed = line.split(delimiter)
-                    self.ic['pipe'].wave_speed[pipe] = float(wave_speed)
-                    modified_lines += 1
-        else:
-            self._set_segments()
-            self.settings.defined_wave_speeds = True
-            return
-
-        if modified_lines != self.wn.num_pipes:
-            self.ic['pipe'].wave_speed[:] = 0
-            excep = "The file does not specify wave speed values for all the pipes,\n"
-            excep += "it is necessary to define a default wave speed value"
-            raise ValueError(excep)
-
-        self._set_segments()
-        self.settings.defined_wave_speeds = True
-
-    def define_valve_settings(self, valve_name, X, Y):
-        self._define_element_setting(valve_name, 'valve', X, Y)
-
-    def define_pump_settings(self, pump_name, X, Y):
-        self._define_element_setting(pump_name, 'pump', X, Y)
-
-    def define_burst_settings(self, node_name, X, Y):
-        self._define_element_setting(node_name, 'burst', X, Y)
-
-    def define_demand_settings(self, node_name, X, Y):
-        self._define_element_setting(node_name, 'demand', X, Y)
 
     def set_valve_setting(self, valve_name, value, step = None, check_warning = False):
         self._set_element_setting('valve', valve_name, value, step, check_warning)
