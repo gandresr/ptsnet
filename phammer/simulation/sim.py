@@ -17,7 +17,6 @@ class HammerSettings:
         duration: float = 20,
         warnings_on: bool = True,
         parallel : bool = False,
-        num_processors : int = 1,
         gpu : bool = False,
         skip_compatibility_check : bool = False,
         _super = None):
@@ -28,7 +27,6 @@ class HammerSettings:
         self.time_steps = int(round(duration/time_step))
         self.warnings_on = warnings_on
         self.parallel = parallel
-        self.num_processors = num_processors
         self.gpu = gpu
         self.skip_compatibility_check = skip_compatibility_check
         self.defined_wave_speeds = False
@@ -49,7 +47,8 @@ class HammerSettings:
         try:
             if self.__getattribute__(name) != value:
                 if name != 'settingsOK':
-                    print("Warning: '%s' value has been changed to %s" % (name, str(value)))
+                    if self.warnings_on:
+                        print("Warning: '%s' value has been changed to %s" % (name, str(value)))
         except:
             pass
 
@@ -64,11 +63,6 @@ class HammerSettings:
                     if lens > 0:
                         raise ValueError("'%s' can not be modified since settings have been defined" % name)
                     self.time_steps = int(round(self.duration/value))
-                elif name == 'num_processors':
-                    if value > self._super.num_points:
-                        raise ValueError("The number of processors is greater than the number of points in the simulation")
-                    if value > 1:
-                        self.parallel = True
 
         object.__setattr__(self, name, value)
 
@@ -183,9 +177,10 @@ class HammerSimulation:
         self.initializator.create_selectors()
         # ----------------------------------------
         self.comm = MPI.COMM_WORLD
+        if self.comm.size > self.num_points:
+            raise ValueError("The number of cores is higher than the number of simulation points")
         self.rank = self.comm.Get_rank()
         self.worker = None
-        self.settings.num_processors = self.comm.size
 
     def __repr__(self):
         return "HammerSimulation <duration = %d [s] | time_steps = %d | num_points = %s>" % \
@@ -250,7 +245,8 @@ class HammerSimulation:
                     else:
                         self.ic[type_].adjustment[element] = Kv / Kc
                         if diff > COEFF_TOL:
-                            print("Warning: the steady state coefficient of valve '%s' is not in the curve, the curve will be adjusted" % element)
+                            if self.settings.warnings_on:
+                                print("Warning: the steady state coefficient of valve '%s' is not in the curve, the curve will be adjusted" % element)
                 N = len(self.curves[curve_name])
                 self.ic[type_].curve_index[element] = N
                 element_index = self.ic[type_].iloc(element)
@@ -269,15 +265,15 @@ class HammerSimulation:
         self._distribute_work()
 
     def _distribute_work(self):
-        n = self.num_points // self.settings.num_processors
-        remainder = self.num_points % self.settings.num_processors
+        n = self.num_points // self.comm.size
+        remainder = self.num_points % self.comm.size
         start_index = 0
         if self.rank < remainder:
             N = n + 1
             start_index = N * self.rank
         else:
             N = n
-            start_index = (n + 1) * remainder + n * (self.rank + 1 - remainder)
+            start_index = N * self.rank + remainder
 
         self.worker = Worker(
             rank = self.rank,

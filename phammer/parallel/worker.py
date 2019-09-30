@@ -29,8 +29,6 @@ class Worker:
         self._allocate_memory()
         self._create_selectors(kwargs['where'])
         # self._load_initial_conditions()
-        print(self.rank)
-        print(self.where.points)
 
     def _allocate_memory(self):
         self.mem_pool_points = Table2D(MEM_POOL_POINTS, self.num_points, 2)

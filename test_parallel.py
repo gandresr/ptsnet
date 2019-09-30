@@ -7,7 +7,7 @@ from phammer.simulation.sim import HammerSimulation
 from time import time
 
 duration = 200; time_step = 0.01
-inpfile = '/home/griano/Documents/Github/phammer/example_files/LoopedNet.inp'
+inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet.inp'
 
 sim = HammerSimulation(
     inpfile,
@@ -15,6 +15,7 @@ sim = HammerSimulation(
         'time_step' : time_step,
         'duration' : duration,
         'skip_compatibility_check' : True,
+        'warnings_on' : False,
     },
     default_wave_speed = 1200)
 
