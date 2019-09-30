@@ -24,5 +24,5 @@ sim.add_curve('V_BUTTERFLY', 'valve',
 
 valves = sim.wn.valve_name_list
 sim.assign_curve_to('V_BUTTERFLY', valves)
-sim.settings.num_processors = 458
+sim.settings.num_processors = 4
 sim.initialize()

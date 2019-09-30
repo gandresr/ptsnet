@@ -1,4 +1,6 @@
 import numpy as np
+import subprocess
+
 from scipy.interpolate import splev, splrep
 
 def define_curve(X, Y):
@@ -28,3 +30,6 @@ def imerge(A, B):
     x[1::2] = B
 
     return x
+
+def run_shell(command):
+    subprocess.run(command.split(' '))
