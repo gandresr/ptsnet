@@ -58,5 +58,9 @@ class SelectorSet:
         self.append(category)
         return self
 
+    @property
+    def categories(self):
+        return list(self.__dict__.keys())
+
     def append(self, category):
         self.__dict__[category] = SelectorList()

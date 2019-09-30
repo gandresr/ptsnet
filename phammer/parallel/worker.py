@@ -1,23 +1,24 @@
 from collections import deque
 from phammer.simulation.init import Initializator
-from phammer.simulation.sim import HammerSettings
 from phammer.arrays.arrays import Table2D, Table, ObjArray
 from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G, COEFF_TOL
 from phammer.simulation.util import is_iterable
+from phammer.arrays.selectors import SelectorSet
 
 class Worker:
-    def __init__(self, rank, comm, num_points, wn, ic, time_steps, curves, element_settings):
+    def __init__(self, **kwargs):
         self.send_queue = deque()
         self.recv_queue = deque()
-        self.rank = rank
         self.is_initialized = False
-        self.comm = comm
-        self.num_points = num_points
-        self.wn = wn
-        self.ic = ic
-        self.time_steps = time_steps
-        self.curves = curves
-        self.element_settings = element_settings
+        self.comm = kwargs['comm']
+        self.rank = kwargs['rank']
+        self.num_points = kwargs['num_points']
+        self.wn = kwargs['wn']
+        self.start_index = kwargs['start_index']
+        self.ic = kwargs['ic']
+        self.time_steps = kwargs['time_steps']
+        self.curves = kwargs['curves']
+        self.element_settings = kwargs['element_settings']
         self.t = 0
         self.mem_pool_points = None
         self.point_properties = None
@@ -26,6 +27,10 @@ class Worker:
         self.where = None
 
         self._allocate_memory()
+        self._create_selectors(kwargs['where'])
+        # self._load_initial_conditions()
+        print(self.rank)
+        print(self.where.points)
 
     def _allocate_memory(self):
         self.mem_pool_points = Table2D(MEM_POOL_POINTS, self.num_points, 2)
@@ -33,7 +38,21 @@ class Worker:
         self.pipe_results = Table2D(PIPE_RESULTS, self.wn.num_pipes, self.time_steps, index = self.ic['pipe']._index_keys)
         self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.time_steps, index = self.ic['node']._index_keys)
 
-    def create_selectors(self, where):
+    def _create_selectors(self, where):
+        self.where = SelectorSet(where.categories)
+        for category in where.categories:
+            sset = where.__dict__[category].__dict__
+            selectors = list(sset['_selectors'].keys())
+            for selector in selectors:
+                s = sset['_selectors'][selector]
+                try:
+                    c = sset['_contexts'][selector] # context
+                except:
+                    c = None
+                components = (s >= self.start_index) & (s < self.start_index + self.num_points)
+                self.where.__dict__[category].__dict__['_selectors'][selector] = s[components]
+                if not c is None:
+                    self.where.__dict__[category].__dict__['_contexts'][selector] = c[components]
 
     def _load_initial_conditions(self):
         self.mem_pool_points.head[self.where.points['are_boundaries'], 0] = self.ic['node'].head[self.where.pipes['to_nodes']]

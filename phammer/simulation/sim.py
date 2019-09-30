@@ -271,13 +271,22 @@ class HammerSimulation:
     def _distribute_work(self):
         n = self.num_points // self.settings.num_processors
         remainder = self.num_points % self.settings.num_processors
-        N = n + 1 if self.rank < remainder else n
+        start_index = 0
+        if self.rank < remainder:
+            N = n + 1
+            start_index = N * self.rank
+        else:
+            N = n
+            start_index = (n + 1) * remainder + n * (self.rank + 1 - remainder)
+
         self.worker = Worker(
-            self.rank,
-            self.comm,
-            N,
-            self.wn,
-            self.ic,
-            self.settings.time_steps,
-            self.curves,
-            self.element_settings)
+            rank = self.rank,
+            comm = self.comm,
+            num_points = N,
+            start_index = start_index,
+            where = self.where,
+            wn = self.wn,
+            ic = self.ic,
+            time_steps = self.settings.time_steps,
+            curves = self.curves,
+            element_settings = self.element_settings)
