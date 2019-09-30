@@ -3,10 +3,8 @@ from time import time
 from collections import deque as dq
 from phammer.arrays.arrays import Table2D, Table, ObjArray
 from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G, COEFF_TOL
-from phammer.arrays.selectors import SelectorSet
 from phammer.epanet.util import EN
-from phammer.simulation.util import imerge, define_curve, is_iterable
-from phammer.simulation.funcs import run_interior_step, run_boundary_step, run_valve_step, run_pump_step
+from phammer.simulation.util import define_curve, is_iterable
 from phammer.simulation.init import Initializator
 
 class HammerSettings:
@@ -62,6 +60,9 @@ class HammerSettings:
                     if lens > 0:
                         raise ValueError("'%s' can not be modified since settings have been defined" % name)
                     self.time_steps = int(round(self.duration/value))
+                elif name == 'num_processors':
+                    if value > self._super.num_points:
+                        raise ValueError("The number of processors is greater than the number of points in the simulation")
 
         object.__setattr__(self, name, value)
 
@@ -160,24 +161,48 @@ class HammerSimulation:
         'demand' : 'node',
     }
 
-    def __init__(self, inpfile, settings, ic, num_segments, num_points):
+    def __init__(self, inpfile, settings, default_wave_speed = None, wave_speed_file = None, delimiter=','):
         if type(settings) != dict:
             raise TypeError("'settings' are not properly defined, use dict object")
-        self.settings = HammerSettings(**settings, _super = self)
+        self.settings = HammerSettings(**settings, _super=self)
+        self.initializator = Initializator(
+            inpfile,
+            self.settings.skip_compatibility_check,
+            self.settings.warnings_on,
+            _super = self)
         self.curves = ObjArray()
         self.element_settings = {type_ : ElementSettings(self) for type_ in self.SETTING_TYPES}
-        self.ic = ic
-        self.num_segments = num_segments
-        self.num_points = num_points
         self.t = 0
+        self.settings.defined_wave_speeds = self.initializator.set_wave_speeds(default_wave_speed, wave_speed_file, delimiter)
+        self.initializator.create_selectors()
 
     def __repr__(self):
         return "HammerSimulation <duration = %d [s] | time_steps = %d | num_points = %s>" % \
-            (self.settings.duration, self.settings.time_steps, format(self.num_points, ',d'))
+            (self.settings.duration, self.settings.time_steps, format(self.initializator.num_points, ',d'))
+
+    @property
+    def wn(self):
+        return self.initializator.wn
+
+    @property
+    def ic(self):
+        return self.initializator.ic
 
     @property
     def is_over(self):
         return self.t > self.settings.time_steps - 1
+
+    @property
+    def where(self):
+        return self.initializator.where
+
+    @property
+    def num_points(self):
+        return self.initializator.num_points
+
+    @property
+    def num_segments(self):
+        return self.initializator.num_segments
 
     def _allocate_memory(self):
         self.mem_pool_points = Table2D(MEM_POOL_POINTS, self.num_points, 2)
@@ -362,70 +387,12 @@ class HammerSimulation:
             raise NotImplementedError("it is necessary to assign curves for valves:\n%s" % str(self.ic['valve']._index_keys[non_assigned_valves]))
         self.settings.set_default()
         self.t = 0
-        self._create_selectors()
         self._allocate_memory()
         self._load_initial_conditions()
         self.settings.is_initialized = True
         self._update_settings()
 
-    def run_step(self):
-        if not self.settings.is_initialized:
-            raise NotImplementedError("it is necessary to initialize the simulation before running it")
-        if not self.settings.updated_settings:
-            self._update_settings()
+class HammerSubRoutine(HammerSimulation):
+    def __init__(self):
+        pass
 
-        t1 = self.t % 2; t0 = 1 - t1
-
-        Q0 = self.mem_pool_points.flowrate[:,t0]
-        H0 = self.mem_pool_points.head[:,t0]
-        Q1 = self.mem_pool_points.flowrate[:,t1]
-        H1 = self.mem_pool_points.head[:,t1]
-
-        run_interior_step(
-            Q0, H0, Q1, H1,
-            self.point_properties.B,
-            self.point_properties.R,
-            self.point_properties.Cp,
-            self.point_properties.Bp,
-            self.point_properties.Cm,
-            self.point_properties.Bm,
-            self.point_properties.has_plus,
-            self.point_properties.has_minus)
-        run_boundary_step(
-            H0, Q1, H1,
-            self.node_results.leak_flow[:,self.t],
-            self.node_results.demand_flow[:,self.t],
-            self.point_properties.Cp,
-            self.point_properties.Bp,
-            self.point_properties.Cm,
-            self.point_properties.Bm,
-            self.ic['node'].leak_coefficient,
-            self.ic['node'].demand_coefficient,
-            self.ic['node'].elevation,
-            self.where)
-        run_valve_step(
-            Q1, H1,
-            self.point_properties.Cp,
-            self.point_properties.Bp,
-            self.point_properties.Cm,
-            self.point_properties.Bm,
-            self.ic['valve'].setting,
-            self.ic['valve'].K,
-            self.ic['valve'].area,
-            self.where)
-        run_pump_step(
-            self.ic['pump'].source_head,
-            Q1, H1,
-            self.point_properties.Cp,
-            self.point_properties.Bp,
-            self.point_properties.Cm,
-            self.point_properties.Bm,
-            self.ic['pump'].a1,
-            self.ic['pump'].a2,
-            self.ic['pump'].Hs,
-            self.ic['pump'].setting,
-            self.where)
-        self.pipe_results.inflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_dboundaries'], t1]
-        self.pipe_results.outflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['are_uboundaries'], t1]
-        self.node_results.head[self.where.nodes['to_points',], self.t] = self.mem_pool_points.head[self.where.nodes['to_points'], t1]
-        self.t += 1

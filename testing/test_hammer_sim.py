@@ -7,15 +7,16 @@ from phammer.simulation.sim import HammerSimulation
 from time import time
 
 duration = 200; time_step = 0.01
-inpfile = '/home/watsup/Documents/Github/phammer/example_files/Tnet2.inp'
+inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet.inp'
 
-sim = HammerSimulation(inpfile, {
-    'time_step' : time_step,
-    'duration' : duration,
-    'skip_compatibility_check' : True,
-})
-
-sim.set_wave_speeds(1200)
+sim = HammerSimulation(
+    inpfile,
+    {
+        'time_step' : time_step,
+        'duration' : duration,
+        'skip_compatibility_check' : True,
+    },
+    default_wave_speed = 1200)
 
 sim.add_curve('V_BUTTERFLY', 'valve',
     [1, 0.8, 0.6, 0.4, 0.2, 0],
@@ -24,7 +25,7 @@ sim.add_curve('V_BUTTERFLY', 'valve',
 valves = sim.wn.valve_name_list
 sim.assign_curve_to('V_BUTTERFLY', valves)
 
-sim.define_valve_settings('TCV-1', np.linspace(0, 5, 50), np.linspace(1, 1, 50))
+# sim.define_valve_settings('TCV-1', np.linspace(0, 5, 50), np.linspace(1, 1, 50))
 # sim.define_pump_settings('pump', np.linspace(0, 1, 50), np.linspace(1, 0, 50))
 
 sim.initialize()

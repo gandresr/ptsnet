@@ -1,16 +1,11 @@
 import numpy as np
 
-from phammer.simulation.ic import get_initial_conditions, get_water_network
 from phammer.epanet.util import EN
 
 class ModelError(Exception):
     pass
 
-def check_compatibility(inpfile, wn=None, ic=None):
-
-    if wn is None and ic is None:
-        wn = get_water_network(inpfile)
-        ic = get_initial_conditions(inpfile, wn = wn)
+def check_compatibility(wn, ic):
 
     min_degree = min(wn.get_graph().degree)
     if min_degree[1] == 0:

@@ -8,25 +8,27 @@ from phammer.epanet.util import EN, FlowUnits, HydParam, to_si
 from phammer.simulation.constants import G, TOL, FLOOR_FFACTOR, CEIL_FFACTOR, DEFAULT_FFACTOR
 from phammer.simulation.constants import NODE_PROPERTIES, PIPE_PROPERTIES, PUMP_PROPERTIES, VALVE_PROPERTIES
 from phammer.simulation.validation import check_compatibility
+from phammer.arrays.selectors import SelectorSet
+from phammer.simulation.util import imerge
 
 from time import time
 
 class Initializator:
 
-    def __init__(self, inpfile, skip_compatibility_check = False, warnings_on = True):
+    def __init__(self, inpfile, skip_compatibility_check = False, warnings_on = True, _super = None):
         self.wn = get_water_network(inpfile)
         self.ng = self.wn.get_graph()
         self.ic = get_initial_conditions(inpfile, wn = self.wn)
-        self.defined_wave_speeds = False
         self.num_points = 0
         self.num_segments = 0
         self.where = None
+        self._super = _super
 
         if not skip_compatibility_check:
             if warnings_on:
                 t = time()
             try:
-                check_compatibility(None, wn=self.wn, ic=self.ic)
+                check_compatibility(wn=self.wn, ic=self.ic)
             except Exception as e:
                 print("Elapsed time (model check): ", time() - t, '[s]')
                 raise e
@@ -34,36 +36,35 @@ class Initializator:
                 print("Success - Compatible Model")
                 print("Elapsed time (model check): ", time() - t, '[s]')
 
-def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
-        if default_wave_speed is None and wave_speed_file is None:
-            raise ValueError("wave_speed was not specified")
+    def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
+            if default_wave_speed is None and wave_speed_file is None:
+                raise ValueError("wave_speed was not specified")
 
-        if not default_wave_speed is None:
-            self.ic['pipe'].wave_speed[:] = default_wave_speed
+            if not default_wave_speed is None:
+                self.ic['pipe'].wave_speed[:] = default_wave_speed
 
-        modified_lines = 0
-        if not wave_speed_file is None:
-            with open(wave_speed_file, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if len(line) <= 1:
-                        raise ValueError("The wave_speed file has to have to entries per line 'pipe,wave_speed'")
-                    pipe, wave_speed = line.split(delimiter)
-                    self.ic['pipe'].wave_speed[pipe] = float(wave_speed)
-                    modified_lines += 1
-        else:
+            modified_lines = 0
+            if not wave_speed_file is None:
+                with open(wave_speed_file, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if len(line) <= 1:
+                            raise ValueError("The wave_speed file has to have to entries per line 'pipe,wave_speed'")
+                        pipe, wave_speed = line.split(delimiter)
+                        self.ic['pipe'].wave_speed[pipe] = float(wave_speed)
+                        modified_lines += 1
+            else:
+                self._set_segments()
+                return True
+
+            if modified_lines != self.wn.num_pipes:
+                self.ic['pipe'].wave_speed[:] = 0
+                excep = "The file does not specify wave speed values for all the pipes,\n"
+                excep += "it is necessary to define a default wave speed value"
+                raise ValueError(excep)
+
             self._set_segments()
-            self.defined_wave_speeds = True
-            return
-
-        if modified_lines != self.wn.num_pipes:
-            self.ic['pipe'].wave_speed[:] = 0
-            excep = "The file does not specify wave speed values for all the pipes,\n"
-            excep += "it is necessary to define a default wave speed value"
-            raise ValueError(excep)
-
-        self._set_segments()
-        self.defined_wave_speeds = True
+            return True
 
     def _set_segments(self):
         self.ic['pipe'].segments = self.ic['pipe'].length
@@ -72,10 +73,10 @@ def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, del
         # Maximum time_step in the system to capture waves in all pipes
         max_dt = min(self.ic['pipe'].segments) / 2 # at least 2 segments in critical pipe
 
-        self.settings.time_step = min(self.settings.time_step, max_dt)
+        self._super.settings.time_step = min(self._super.settings.time_step, max_dt)
 
         # The number of segments is defined
-        self.ic['pipe'].segments /= self.settings.time_step
+        self.ic['pipe'].segments /= self._super.settings.time_step
         int_segments = np.round(self.ic['pipe'].segments)
 
         # The wave_speed values are adjusted to compensate the truncation error
@@ -109,7 +110,7 @@ def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, del
         self.where.points['are_single_' + object_type][:] = self.where.points['are_single_' + object_type][last_order]
         self.where.points['are_single_' + object_type,][:] = self.where.points['are_single_' + object_type,][last_order]
 
-    def _create_selectors(self):
+    def create_selectors(self):
         self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves'])
 
         # Point, Node and Pipe selectors

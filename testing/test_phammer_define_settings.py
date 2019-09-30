@@ -14,7 +14,7 @@ sim = HammerSimulation(inpfile, {
 })
 
 sim.set_wave_speeds(1200)
-valves = sim.wn.valve_name_list
+valves = sim.initializator.wn.valve_name_list
 x = np.linspace(0, 1, 100)
 sim.define_valve_settings(valves[0], x, np.zeros(len(x)))
 sim.define_valve_settings(valves[1], x, np.zeros(len(x)))

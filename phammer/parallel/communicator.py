@@ -1,5 +1,7 @@
 from collections import deque
 
-class Comm:
-    def __init__(self):
-        pass
+def send_selectors(where, p):
+    
+
+def communicate(self, p, obj):
+    pass
