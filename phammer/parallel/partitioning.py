@@ -8,6 +8,6 @@ def even(N, k):
         if i < r:
             start += i; end += i
         elif r > 0:
-            start += r
+            start += r; end += r
         p[start:end+1] = i
     return p
