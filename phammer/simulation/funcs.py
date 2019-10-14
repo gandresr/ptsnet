@@ -49,10 +49,10 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
     Bm[where.points['jip_dboundaries']] = 1 / Bm[where.points['jip_dboundaries']]
     Bp[where.points['jip_uboundaries']] = 1 / Bp[where.points['jip_uboundaries']]
 
-    sc = np.add.reduceat(Cm[where.points['rjust_in_pipes']], where.nodes['just_in_pipes',]) + \
-        np.add.reduceat(Cp[where.points['rjust_in_pipes']], where.nodes['just_in_pipes',])
-    sb = np.add.reduceat(Bm[where.points['rjust_in_pipes']], where.nodes['just_in_pipes',]) + \
-        np.add.reduceat(Bp[where.points['rjust_in_pipes']], where.nodes['just_in_pipes',])
+    sc = np.add.reduceat(Cm[where.points['just_in_pipes']], where.nodes['just_in_pipes',]) + \
+        np.add.reduceat(Cp[where.points['just_in_pipes']], where.nodes['just_in_pipes',])
+    sb = np.add.reduceat(Bm[where.points['just_in_pipes']], where.nodes['just_in_pipes',]) + \
+        np.add.reduceat(Bp[where.points['just_in_pipes']], where.nodes['just_in_pipes',])
 
     X =  sc / sb
     K = ((Ke[where.nodes['just_in_pipes']] + Kd[where.nodes['just_in_pipes']])/sb)**2

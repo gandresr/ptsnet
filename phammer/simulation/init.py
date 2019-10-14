@@ -82,6 +82,7 @@ class Initializator:
         # The wave_speed values are adjusted to compensate the truncation error
         self.ic['pipe'].wave_speed = self.ic['pipe'].wave_speed * self.ic['pipe'].segments/int_segments
         self.ic['pipe'].segments = int_segments
+        self.ic['pipe'].dx = self.ic['pipe'].length / self.ic['pipe'].segments
         self.num_segments = int(sum(self.ic['pipe'].segments))
         self.num_points = self.num_segments + self.wn.num_pipes
 
@@ -111,51 +112,67 @@ class Initializator:
         self.where.points['are_single_' + object_type,][:] = self.where.points['are_single_' + object_type,][last_order]
 
     def create_selectors(self):
+        # ---------------------- USED SELECTORS ----------------------
+
         self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves'])
 
-        # Point, Node and Pipe selectors
-
         self.where.pipes['to_nodes'] = imerge(self.ic['pipe'].start_node, self.ic['pipe'].end_node)
-        self.where.valves['to_nodes'] = imerge(self.ic['valve'].start_node, self.ic['valve'].end_node)
-        self.where.nodes['njust_in_pipes'] = np.unique(np.concatenate((
-            self.ic['valve'].start_node, self.ic['valve'].end_node,
-            self.ic['pump'].start_node, self.ic['pump'].end_node)))
+        pipes_idx = np.cumsum(self.ic['pipe'].segments+1).astype(int)
+        self.where.points['to_pipes'] = np.zeros(pipes_idx[-1], dtype=int)
+        for i in range(1, len(pipes_idx)):
+            start = pipes_idx[i-1]
+            end = pipes_idx[i]
+            self.where.points['to_pipes'][start:end] = i
         self.where.points['are_uboundaries'] = np.cumsum(self.ic['pipe'].segments.astype(np.int)+1) - 1
         self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ic['pipe'].segments.astype(np.int)
         self.where.points['are_boundaries'] = imerge(self.where.points['are_dboundaries'], self.where.points['are_uboundaries'])
-        order = np.argsort(self.where.pipes['to_nodes'])
-        nodes, indices = np.unique(self.where.pipes['to_nodes'][order], True)
-        self.where.nodes['to_points'] = self.where.points['are_boundaries'][order][indices]
-        self.where.nodes['to_points',] = nodes
-        self.where.points['are_inner'] = np.setdiff1d(np.arange(self.num_points, dtype=np.int), self.where.points['are_boundaries'])
-        x0 = ~np.isin(self.where.pipes['to_nodes'], self.where.nodes['njust_in_pipes'])
-        self.where.points['just_in_pipes'] = self.where.points['are_boundaries'][x0]
-        self.where.points['just_in_pipes',] = self.where.pipes['to_nodes'][x0]
-        order = np.argsort(self.where.points['just_in_pipes',])
-        self.where.points['just_in_pipes'] = self.where.points['just_in_pipes'][order]
-        self.where.points['just_in_pipes',] = self.where.points['just_in_pipes',][order]
-        self.where.points['rjust_in_pipes'] = self.where.points['just_in_pipes']
-        self.where.points['rjust_in_pipes',] = np.copy(self.where.points['just_in_pipes',])
-        y = self.where.points['rjust_in_pipes',]
-        y -= y[0]
-        y = (y[1:] - y[:-1]) - 1; y[y < 0] = 0; y = np.cumsum(y)
-        self.where.points['rjust_in_pipes',][1:] -= y
-        self.where.nodes['just_in_pipes'] = np.unique(self.where.points['just_in_pipes',])
-        self.where.nodes['rjust_in_pipes'] = np.unique(self.where.points['rjust_in_pipes',])
-        self.where.points['jip_dboundaries'] = self.where.points['are_dboundaries'][x0[0::2]]
-        self.where.points['jip_uboundaries'] = self.where.points['are_uboundaries'][x0[1::2]]
-        bpoints_types = self.ic['node'].type[self.where.pipes['to_nodes']]
-        self.where.points['are_reservoirs'] = self.where.points['are_boundaries'][bpoints_types == EN.RESERVOIR]
-        self.where.points['are_tanks'] = self.where.points['are_boundaries'][bpoints_types == EN.TANK]
-        bcount = np.bincount(self.where.points['just_in_pipes',])
-        bcount = np.cumsum(bcount[bcount != 0]); bcount[1:] = bcount[:-1]; bcount[0] = 0
-        self.where.nodes['just_in_pipes',] = bcount
+        self.where.points['are_boundaries',] = (np.arange(len(self.where.points['are_boundaries'])) % 2 != 0)
 
-        # Valve selectors
-        self._create_nonpipe_selectors('valve')
+        node_points_order = np.argsort(self.where.pipes['to_nodes'])
+        self.where.nodes['not_in_pipes'] = np.isin(np.arange(self.wn.num_nodes),
+            np.unique(np.concatenate((
+                self.ic['valve'].start_node, self.ic['valve'].end_node,
+                self.ic['pump'].start_node, self.ic['pump'].end_node)))
+        ).astype(int)
 
-        # Pump selectors
-        self._create_nonpipe_selectors('pump')
+        self.where.nodes['to_points'] = self.where.points['are_boundaries'][node_points_order]
+        self.where.nodes['to_points_are_uboundaries'] = (np.arange(2*self.wn.num_pipes) % 2 != 0).astype(int)[node_points_order]
+        # Real degree
+        self.where.nodes['to_points',] = self.ic['node'].degree - self.where.nodes['not_in_pipes']
+
+        # ---------------------- (END) ----------------------
+
+        # x0 = ~np.isin(self.where.pipes['to_nodes'], self.where.nodes['njust_in_pipes'])
+        # self.where.points['just_in_pipes'] = self.where.points['are_boundaries'][x0]
+
+        # self.where.valves['to_nodes'] = imerge(self.ic['valve'].start_node, self.ic['valve'].end_node)
+        # order = np.argsort(self.where.pipes['to_nodes'])
+        # self.where.points['are_inner'] = np.setdiff1d(np.arange(self.num_points, dtype=np.int), self.where.points['are_boundaries'])
+        # self.where.points['just_in_pipes',] = self.where.pipes['to_nodes'][x0]
+        # order = np.argsort(self.where.points['just_in_pipes',])
+        # self.where.points['just_in_pipes'] = self.where.points['just_in_pipes'][order]
+        # self.where.points['just_in_pipes',] = self.where.points['just_in_pipes',][order]
+        # self.where.points['rjust_in_pipes'] = self.where.points['just_in_pipes']
+        # self.where.points['rjust_in_pipes',] = np.copy(self.where.points['just_in_pipes',])
+        # y = self.where.points['rjust_in_pipes',]
+        # y -= y[0]; y = (y[1:] - y[:-1]) - 1; y[y < 0] = 0; y = np.cumsum(y)
+        # self.where.points['rjust_in_pipes',][1:] -= y
+        # self.where.nodes['just_in_pipes'] = np.unique(self.where.points['just_in_pipes',])
+        # self.where.nodes['rjust_in_pipes'] = np.unique(self.where.points['rjust_in_pipes',])
+        # self.where.points['jip_dboundaries'] = self.where.points['are_dboundaries'][x0[0::2]]
+        # self.where.points['jip_uboundaries'] = self.where.points['are_uboundaries'][x0[1::2]]
+        # bpoints_types = self.ic['node'].type[self.where.pipes['to_nodes']]
+        # self.where.points['are_reservoirs'] = self.where.points['are_boundaries'][bpoints_types == EN.RESERVOIR]
+        # self.where.points['are_tanks'] = self.where.points['are_boundaries'][bpoints_types == EN.TANK]
+        # bcount = np.bincount(self.where.points['just_in_pipes',])
+        # bcount = np.cumsum(bcount[bcount != 0]); bcount[1:] = bcount[:-1]; bcount[0] = 0
+        # self.where.nodes['just_in_pipes',] = bcount
+
+        # # Valve selectors
+        # self._create_nonpipe_selectors('valve')
+
+        # # Pump selectors
+        # self._create_nonpipe_selectors('pump')
 
 def get_water_network(inpfile):
     ENFile = InpFile()

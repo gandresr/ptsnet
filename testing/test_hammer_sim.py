@@ -6,7 +6,7 @@ import wntr
 from phammer.simulation.sim import HammerSimulation
 from time import time
 
-duration = 200; time_step = 0.01
+duration = 200; time_step = 1
 inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet.inp'
 
 sim = HammerSimulation(

@@ -1,3 +1,5 @@
+import numpy as np
+
 from collections import deque
 from phammer.simulation.init import Initializator
 from phammer.arrays.arrays import Table2D, Table, ObjArray
@@ -26,9 +28,9 @@ class Worker:
         self.node_results = None
         self.where = None
 
-        self._allocate_memory()
         self._create_selectors(kwargs['where'])
-        # self._load_initial_conditions()
+        self._allocate_memory()
+        self._load_initial_conditions()
 
     def _allocate_memory(self):
         self.mem_pool_points = Table2D(MEM_POOL_POINTS, self.num_points, 2)
@@ -37,47 +39,10 @@ class Worker:
         self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.time_steps, index = self.ic['node']._index_keys)
 
     def _create_selectors(self, where):
-        self.where = SelectorSet(where.categories)
-        for category in where.categories:
-            sset = where.__dict__[category].__dict__
-            selectors = list(sset['_selectors'].keys())
-            for selector in selectors:
-                s = sset['_selectors'][selector]
-                try:
-                    c = sset['_contexts'][selector] # context
-                except:
-                    c = None
-                components = (s >= self.start_index) & (s < self.start_index + self.num_points)
-                self.where.__dict__[category].__dict__['_selectors'][selector] = s[components]
-                if not c is None:
-                    self.where.__dict__[category].__dict__['_contexts'][selector] = c[components]
+        pass
 
     def _load_initial_conditions(self):
-        self.mem_pool_points.head[self.where.points['are_boundaries'], 0] = self.ic['node'].head[self.where.pipes['to_nodes']]
-        self.ic['pipe'].dx = self.ic['pipe'].length / self.ic['pipe'].segments
-        per_unit_hl = self.ic['pipe'].head_loss / self.ic['pipe'].segments
-        self.point_properties.has_plus[self.where.points['are_uboundaries']] = 1
-        self.point_properties.has_plus[self.where.points['are_inner']] = 1
-        self.point_properties.has_minus[self.where.points['are_dboundaries']] = 1
-        self.point_properties.has_minus[self.where.points['are_inner']] = 1
-        for i in range(self.wn.num_pipes):
-            k = self.where.points['are_dboundaries'][i]
-            s = int(self.ic['pipe'].segments[i])
-            self.mem_pool_points.head[k:k+s+1, 0] = self.mem_pool_points.head[k,0] - (per_unit_hl[i] * np.arange(s+1))
-            xx = np.argwhere(self.mem_pool_points.head[k:k+s+1, 0] < 0).T
-            self.mem_pool_points.flowrate[k:k+s+1, 0] = self.ic['pipe'].flowrate[i]
-            self.point_properties.B[k:k+s+1] = self.ic['pipe'].wave_speed[i] / (G * self.ic['pipe'].area[i])
-            self.point_properties.R[k:k+s+1] = self.ic['pipe'].ffactor[i] * self.ic['pipe'].dx[i] / \
-                (2 * G * self.ic['pipe'].diameter[i] * self.ic['pipe'].area[i] ** 2)
-        self.pipe_results.inflow[:,0] = self.mem_pool_points.flowrate[self.where.points['are_dboundaries'], 0]
-        self.pipe_results.outflow[:,0] = self.mem_pool_points.flowrate[self.where.points['are_uboundaries'], 0]
-        self.node_results.head[self.where.nodes['to_points',], 0] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
-        self.node_results.head[self.where.nodes['to_points',], 0] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
-        self.node_results.leak_flow[:, 0] = \
-            self.ic['node'].leak_coefficient * np.sqrt(self.ic['node'].pressure)
-        self.node_results.demand_flow[:, 0] = \
-            self.ic['node'].demand_coefficient * np.sqrt(self.ic['node'].pressure)
-        self.t = 1
+        pass
 
     def _set_element_setting(self, type_, element_name, value, step = None, check_warning = False):
         if self.t == 0:

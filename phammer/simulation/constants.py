@@ -5,7 +5,6 @@ import numpy as np
 WARNINGS = True
 TIMEIT = True
 PARALLEL = False
-DEFAULT_FLUID_DENSITY = 997 # kg/m^3
 CEIL_FFACTOR = 0.035
 FLOOR_FFACTOR = 1E-4
 DEFAULT_FFACTOR = 0.035
@@ -22,6 +21,7 @@ NODE_PROPERTIES = {
     'elevation' : np.float, #
     'type' : np.int, #
     'degree' : np.int, #
+    'processor' : np.int,
     # ----------------------------------------
     'leak_coefficient' : np.float, #
     'demand_coefficient' : np.float, #
