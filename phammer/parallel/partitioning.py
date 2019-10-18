@@ -1,9 +1,11 @@
 import numpy as np
 from phammer.simulation.util import imerge
 
-def even(N, k):
-    p = np.ones(N); n = N // k; r = N % k
-    for i in range(k):
+def even(num_points, num_processors):
+    p = np.ones(num_points)
+    n = num_points // num_processors
+    r = num_points % num_processors
+    for i in range(num_processors):
         start = i*n
         end = start + n
         if i < r:
@@ -13,7 +15,7 @@ def even(N, k):
         p[start:end+1] = i
     return p
 
-def get_points(processors, N, k, where, rank):
+def get_points(processors, rank, where):
     # List of points needs to be sorted
     worker_points = np.where(processors == rank)[0]
     worker_points.sort()
@@ -56,6 +58,7 @@ def get_points(processors, N, k, where, rank):
 
     # Determine extra data for dependent points
     visited_nodes = []
+
     for i, b in enumerate(dependent):
         try:
             # Boundary point
@@ -75,6 +78,7 @@ def get_points(processors, N, k, where, rank):
             processor_in_charge = min(processors[node_points])
 
             if processor_in_charge != rank:
+                processors[node_points] = processor_in_charge
                 points.append(b)
                 continue
 
@@ -94,6 +98,7 @@ def get_points(processors, N, k, where, rank):
             pad = 1 - 2*to_points_are_uboundaries
             slots[idx + pad] = node_points + pad
             points += list(slots)
+            processors[node_points] = processor_in_charge
         except:
             # Inner point
             points.append(b-1)
@@ -102,4 +107,6 @@ def get_points(processors, N, k, where, rank):
 
     points = np.unique(points)
     points.sort()
-    return points
+    p = processors[points]
+    rcv = np.where(p != rank)
+    return points, rcv

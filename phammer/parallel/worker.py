@@ -3,6 +3,7 @@ import numpy as np
 from collections import deque
 from phammer.simulation.init import Initializator
 from phammer.arrays.arrays import Table2D, Table, ObjArray
+from phammer.parallel.partitioning import even, get_points
 from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G, COEFF_TOL
 from phammer.simulation.util import is_iterable
 from phammer.arrays.selectors import SelectorSet
@@ -15,31 +16,46 @@ class Worker:
         self.comm = kwargs['comm']
         self.rank = kwargs['rank']
         self.num_points = kwargs['num_points']
+        self.num_processors = kwargs['num_processors']
         self.wn = kwargs['wn']
-        self.start_index = kwargs['start_index']
         self.ic = kwargs['ic']
         self.time_steps = kwargs['time_steps']
         self.curves = kwargs['curves']
         self.element_settings = kwargs['element_settings']
         self.t = 0
+        self.global_where = kwargs['where']
         self.mem_pool_points = None
         self.point_properties = None
         self.pipe_results = None
         self.node_results = None
         self.where = None
+        self.processors = even(self.num_points, self.num_processors)
+        self.points = None
+        self.receive_data = {}
+        self.send_data = {}
 
-        self._create_selectors(kwargs['where'])
+        self._create_selectors()
+        self._define_worker_points()
         self._allocate_memory()
         self._load_initial_conditions()
 
     def _allocate_memory(self):
-        self.mem_pool_points = Table2D(MEM_POOL_POINTS, self.num_points, 2)
-        self.point_properties = Table(POINT_PROPERTIES, self.num_points)
-        self.pipe_results = Table2D(PIPE_RESULTS, self.wn.num_pipes, self.time_steps, index = self.ic['pipe']._index_keys)
-        self.node_results = Table2D(NODE_RESULTS, self.wn.num_nodes, self.time_steps, index = self.ic['node']._index_keys)
+        self.mem_pool_points = Table2D(MEM_POOL_POINTS, len(self.points), 2)
+        self.point_properties = Table(POINT_PROPERTIES, len(self.points))
+        # self.pipe_results = Table2D(PIPE_RESULTS, self.num_pipes, self.time_steps, index = self.ic['pipe']._index_keys)
+        # self.node_results = Table2D(NODE_RESULTS, self.num_nodes, self.time_steps, index = self.ic['node']._index_keys)
 
-    def _create_selectors(self, where):
+    def _define_worker_points(self):
+        self.points, rcv = get_points(self.processors, self.rank, self.global_where)
+        rcv_points = self.points[rcv]
+        rcv_processors = self.processors[rcv]
+        for k in np.arange(self.num_processors):
+            self.receive_data[k] = rcv_points[rcv_processors == k]
+
+    def _create_selectors(self):
         pass
+        # self.global_where.points['']
+        # self.global_where.
 
     def _load_initial_conditions(self):
         pass

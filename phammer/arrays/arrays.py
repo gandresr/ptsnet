@@ -175,3 +175,6 @@ class ObjArray:
 
     def iloc(self, index):
         return self.index[index]
+
+class DictQueue:
+    pass

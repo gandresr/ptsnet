@@ -110,11 +110,16 @@ class Initializator:
         last_order = np.argsort(self.where.points['are_single_' + object_type,])
         self.where.points['are_single_' + object_type][:] = self.where.points['are_single_' + object_type][last_order]
         self.where.points['are_single_' + object_type,][:] = self.where.points['are_single_' + object_type,][last_order]
+        self.where.points['are_' + object_type] = np.concatenate((
+                self.where.points['are_single_' + object_type],
+                self.where.points['start_inline_' + object_type],
+                self.where.points['end_inline_' + object_type]))
+        self.where.points['are_' + object_type].sort()
 
     def create_selectors(self):
         # ---------------------- USED SELECTORS ----------------------
 
-        self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves'])
+        self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves', 'pumps'])
 
         self.where.pipes['to_nodes'] = imerge(self.ic['pipe'].start_node, self.ic['pipe'].end_node)
         pipes_idx = np.cumsum(self.ic['pipe'].segments+1).astype(int)
@@ -133,12 +138,20 @@ class Initializator:
             np.unique(np.concatenate((
                 self.ic['valve'].start_node, self.ic['valve'].end_node,
                 self.ic['pump'].start_node, self.ic['pump'].end_node)))
-        ).astype(int)
+        )
+
+        self.where.nodes['in_pipes'] = np.isin(self.where.pipes['to_nodes'], np.where(self.where.nodes['not_in_pipes'])[0])
+        self.where.nodes['in_pipes'] = np.isin(self.where.pipes['to_nodes'], np.where(self.where.nodes['not_in_pipes'])[0])
 
         self.where.nodes['to_points'] = self.where.points['are_boundaries'][node_points_order]
         self.where.nodes['to_points_are_uboundaries'] = (np.arange(2*self.wn.num_pipes) % 2 != 0).astype(int)[node_points_order]
-        # Real degree
-        self.where.nodes['to_points',] = self.ic['node'].degree - self.where.nodes['not_in_pipes']
+        self.where.nodes['to_points',] = self.ic['node'].degree - self.where.nodes['not_in_pipes'] # Real degree
+
+        # # Valve selectors
+        self._create_nonpipe_selectors('valve')
+
+        # # Pump selectors
+        self._create_nonpipe_selectors('pump')
 
         # ---------------------- (END) ----------------------
 
@@ -168,11 +181,6 @@ class Initializator:
         # bcount = np.cumsum(bcount[bcount != 0]); bcount[1:] = bcount[:-1]; bcount[0] = 0
         # self.where.nodes['just_in_pipes',] = bcount
 
-        # # Valve selectors
-        # self._create_nonpipe_selectors('valve')
-
-        # # Pump selectors
-        # self._create_nonpipe_selectors('pump')
 
 def get_water_network(inpfile):
     ENFile = InpFile()
@@ -246,6 +254,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     to_si(flow_units, ic['node'].pressure, HydParam.Pressure)
     to_si(flow_units, ic['node'].elevation, HydParam.Elevation)
 
+    non_pipe_nodes = []
     p, pp, v = 0, 0, 0 # pipes, pumps, valves
     for i in range(1, wn.num_links+1):
 
@@ -267,12 +276,13 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
         ic[ltype].start_node[k] -= 1
         ic[ltype].end_node[k] -= 1
 
-        if -TOL < ic[ltype].flowrate[k] < TOL:
+        flow = to_si(flow_units, [ic[ltype].flowrate[k]], HydParam.Flow)[0]
+        if abs(flow) < TOL:
             ic[ltype].direction[k] = 0
             ic[ltype].flowrate[k] = 0
             if link.link_type == 'Pipe':
                 ic[ltype].ffactor[k] = DEFAULT_FFACTOR
-        elif ic[ltype].flowrate[k] > TOL:
+        elif flow > TOL:
             ic[ltype].direction[k] = 1
         else:
             ic[ltype].direction[k] = -1
@@ -304,6 +314,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
             ic[ltype].a2[k], ic[ltype].a1[k], ic[ltype].Hs[k] = np.polyfit(qp, hp, 2)
             # Source head
             ic[ltype].source_head[k] = ic['node'].head[ic[ltype].start_node[k]]
+            non_pipe_nodes += [ic[ltype].start_node[k], ic[ltype].end_node[k]]
         elif link.link_type == 'Valve':
             valve_ids.append(link.name)
             ic[ltype].initial_status[k] = EPANET.ENgetlinkvalue(i, EN.INITSTATUS)
@@ -314,6 +325,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
             hl = ha - hb
             if hl > 0:
                 ic[ltype].K[k] = ic[ltype].flowrate[k]/(ic[ltype].area[k]*(2*G*hl)**0.5)
+            non_pipe_nodes += [ic[ltype].start_node[k], ic[ltype].end_node[k]]
 
     EPANET.ENcloseH()
     EPANET.ENclose()
@@ -346,4 +358,35 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     valves.setindex(valve_ids)
     pumps.setindex(pump_ids)
 
+    non_pipe_nodes = np.array(non_pipe_nodes)
+    zero_flow_pipes = ic['pipe'].flowrate == 0
+    zf = ic['pipe'].start_node[zero_flow_pipes]
+    zf = np.concatenate((zf, ic['pipe'].end_node[zero_flow_pipes]))
+    _fix_zero_flow_convention('valve', non_pipe_nodes, zf, wn, ic)
+    _fix_zero_flow_convention('pump', non_pipe_nodes, zf, wn, ic)
+
     return ic
+
+def _fix_zero_flow_convention(ltype, non_pipe_nodes, zf, wn, ic):
+    # Define flow convention for zero flow pipes attached to
+    zero_flow = np.where(np.isin(ic[ltype].start_node, zf))[0]
+
+    for k in zero_flow:
+        upipe = wn.get_links_for_node(ic['node'].ival(ic[ltype].start_node[k]))
+        upipe.remove(ic[ltype]._index_keys[k])
+        upipe = ic['pipe'].iloc(upipe[0])
+        dpipe = wn.get_links_for_node(ic['node'].ival(ic[ltype].end_node[k]))
+        dpipe.remove(ic[ltype]._index_keys[k])
+        dpipe = ic['pipe'].iloc(dpipe[0])
+
+        if ic['pipe'].end_node[upipe] != ic[ltype].start_node[k]:
+            ic['pipe'].direction[upipe] = -1
+            ic['pipe'].start_node[upipe], ic['pipe'].end_node[upipe] = ic['pipe'].end_node[upipe], ic['pipe'].start_node[upipe]
+        else:
+            ic['pipe'].direction[upipe] = 1
+
+        if ic['pipe'].start_node[dpipe] != ic[ltype].end_node[k]:
+            ic['pipe'].direction[dpipe] = -1
+            ic['pipe'].start_node[dpipe], ic['pipe'].end_node[dpipe] = ic['pipe'].end_node[dpipe], ic['pipe'].start_node[dpipe]
+        else:
+            ic['pipe'].direction[dpipe] = 1

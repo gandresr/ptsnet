@@ -33,9 +33,9 @@ class SelectorList:
             else:
                 self._contexts[index[0]] = value
         else:
-            if (type(value) == np.ndarray and value.dtype != np.int) or \
-                (not type(value) in (Row, np.ndarray)) or (type(value) == Row and value.dtype != np.int):
-                    raise ValueError("'selector' is not valid: Only numpy arrays of dtype = int")
+            if (type(value) == np.ndarray and value.dtype not in (np.int, np.bool)) or \
+                (not type(value) in (Row, np.ndarray)) or (type(value) == Row and value.dtype not in (np.int, np.bool)):
+                    raise ValueError("'selector' is not valid: Only numpy arrays of dtype = int/bool")
             self._selectors[index] = value
 
     def __repr__(self):
