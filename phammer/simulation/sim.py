@@ -276,4 +276,4 @@ class HammerSimulation:
             time_steps = self.settings.time_steps,
             curves = self.curves,
             element_settings = self.element_settings)
-        print("WORKER ", self.worker.rank, self.worker.points)
+        print("WORKER ", self.worker.rank, self.worker.points, self.worker.processors[self.worker.points])

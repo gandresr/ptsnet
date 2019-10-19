@@ -46,7 +46,7 @@ class Worker:
         # self.node_results = Table2D(NODE_RESULTS, self.num_nodes, self.time_steps, index = self.ic['node']._index_keys)
 
     def _define_worker_points(self):
-        self.points, rcv = get_points(self.processors, self.rank, self.global_where)
+        self.points, rcv = get_points(self.processors, self.rank, self.global_where, self.ic, self.wn)
         rcv_points = self.points[rcv]
         rcv_processors = self.processors[rcv]
         for k in np.arange(self.num_processors):

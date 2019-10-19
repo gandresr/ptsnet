@@ -16,6 +16,7 @@ sim = HammerSimulation(
         'time_step' : time_step,
         'duration' : duration,
         'skip_compatibility_check' : True,
+        'warnings_on' : False,
     },
     default_wave_speed = 1200)
 

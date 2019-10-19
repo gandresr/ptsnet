@@ -15,7 +15,8 @@ def even(num_points, num_processors):
         p[start:end+1] = i
     return p
 
-def get_points(processors, rank, where):
+def get_points(processors, rank, where, ic, wn):
+
     # List of points needs to be sorted
     worker_points = np.where(processors == rank)[0]
     worker_points.sort()
@@ -23,9 +24,13 @@ def get_points(processors, rank, where):
     diff = np.where(np.diff(worker_pipes) > 0)[0]
     extradiff = []
 
-    if worker_points[diff[0]] != worker_points[0]:
+    if len(diff) > 0:
+        if worker_points[diff[0]] != worker_points[0]:
+            extradiff.append(0)
+        if worker_points[diff[-1]]+1 != worker_points[-1]:
+            extradiff.append(-1)
+    else:
         extradiff.append(0)
-    if worker_points[diff[-1]]+1 != worker_points[-1]:
         extradiff.append(-1)
 
     # d is the list of indexes in worker_points that correspond to
@@ -41,8 +46,10 @@ def get_points(processors, rank, where):
         else:
             d[0:-1] = imerge(diff, diff+1)
             d[-1] = extradiff[-1]
-    else:
+    elif len(diff) > 0:
         d[:] = imerge(diff, diff+1)
+    elif len(diff) == 0:
+        d[:] = extradiff
 
     points_idx = np.ones_like(worker_points).astype(bool)
     points_idx[d] = 0
@@ -60,14 +67,58 @@ def get_points(processors, rank, where):
     visited_nodes = []
 
     for i, b in enumerate(dependent):
-        try:
+        if b in boundaries_to_nodes:
             # Boundary point
             node = boundaries_to_nodes[b]
             degree = where.nodes['to_points',][node]
 
             if node in visited_nodes:
                 continue
+
             if degree == 1:
+                if b in where.points['end_inline_valve']:
+                    valve = np.where(where.points['end_inline_valve'] == b)[0][0]
+                    point_start_valve = where.points['start_inline_valve'][valve]
+                    processors[b] = processors[point_start_valve]
+                    visited_nodes.append(node); points.append(b)
+                    continue
+                if b in where.points['end_inline_pump']:
+                    pump = np.where(where.points['end_inline_pump'] == b)[0][0]
+                    point_start_pump = where.points['start_inline_pump'][pump]
+                    processors[b] = processors[point_start_pump]
+                    visited_nodes.append(node); points.append(b)
+                    continue
+                if b in where.points['start_inline_valve']:
+                    valve = np.where(where.points['start_inline_valve'] == b)[0][0]
+                    valve_real = where.points['start_inline_valve',][valve]
+                    point_end_valve = where.points['end_inline_valve'][valve]
+                    pipe = wn.get_links_for_node(ic['node'].ival(ic['valve'].end_node[valve_real]))
+                    pipe.remove(ic['valve'].ival(valve_real))
+                    dpipe = ic['pipe'].iloc(pipe[0])
+                    dpipe_points = where.points['are_boundaries'][2*dpipe:2*dpipe+2]
+                    pad = 1 if dpipe_points[0] == point_end_valve else -1
+                    visited_nodes.append(node)
+                    points.append(point_end_valve+pad)
+                    points.append(point_end_valve)
+                    points.append(b)
+                    processors[point_end_valve] = rank
+                    continue
+                if b in where.points['start_inline_pump']:
+                    pump = np.where(where.points['start_inline_pump'] == b)[0][0]
+                    pump_real = where.points['start_inline_pump',][pump]
+                    point_end_pump = where.points['end_inline_pump'][pump]
+                    pipe = wn.get_links_for_node(ic['node'].ival(ic['pump'].end_node[pump_real]))
+                    pipe.remove(ic['pump'].ival(pump_real))
+                    dpipe = ic['pipe'].iloc(pipe[0])
+                    dpipe_points = where.points['are_boundaries'][2*dpipe:2*dpipe+2]
+                    pad = 1 if dpipe_points[0] == point_end_pump else -1
+                    visited_nodes.append(node)
+                    points.append(point_end_pump+pad)
+                    points.append(point_end_pump)
+                    points.append(b)
+                    processors[point_end_pump] = rank
+                    continue
+
                 visited_nodes.append(node)
                 points.append(b)
                 continue
@@ -78,7 +129,6 @@ def get_points(processors, rank, where):
             processor_in_charge = min(processors[node_points])
 
             if processor_in_charge != rank:
-                processors[node_points] = processor_in_charge
                 points.append(b)
                 continue
 
@@ -99,14 +149,23 @@ def get_points(processors, rank, where):
             slots[idx + pad] = node_points + pad
             points += list(slots)
             processors[node_points] = processor_in_charge
-        except:
+        else:
             # Inner point
-            points.append(b-1)
-            points.append(b)
-            points.append(b+1)
+            node = None
+            if b-1 in boundaries_to_nodes:
+                node = boundaries_to_nodes[b-1]
+            if b+1 in boundaries_to_nodes:
+                node = boundaries_to_nodes[b+1]
+            if not node is None:
+                start = sum(where.nodes['to_points',][:node])
+                end = start + where.nodes['to_points',][node]
+                node_points = where.nodes['to_points'][start:end]
+                processors[node_points] = min(processors[node_points])
+            points.append(b-1); points.append(b); points.append(b+1)
 
     points = np.unique(points)
     points.sort()
     p = processors[points]
     rcv = np.where(p != rank)
+
     return points, rcv
