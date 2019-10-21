@@ -110,7 +110,7 @@ class Worker:
         # ---------------------------
         self.where.nodes['just_in_pipes'] = np.arange(len(nodes))
         diff = np.diff(njip)
-        self.where.points['just_in_pipes',] = np.array([i for i in range(len(nodes)) for j in range(diff[i])])
+        self.where.points['just_in_pipes',] = np.array([i for i in range(len(nodes)) for j in range(diff[i])], dtype = int)
         # ---------------------------
         self.where.points['start_inline_valve'] = sorter[np.searchsorted(points, self.partition['inline_valves']['start_points'], sorter=sorter)]
         self.where.points['end_inline_valve'] = sorter[np.searchsorted(points, self.partition['inline_valves']['end_points'], sorter=sorter)]

@@ -29,7 +29,7 @@ sim.assign_curve_to('V_BUTTERFLY', sim.wn.valve_name_list)
 sim.initialize()
 
 sim.worker.run_step()
-t = time()
-while sim.worker.t < 1000:
-    sim.worker.run_step()
-print(t, time())
+# t = time()
+# while sim.worker.t < 1000:
+#     sim.worker.run_step()
+# print(t, time())
