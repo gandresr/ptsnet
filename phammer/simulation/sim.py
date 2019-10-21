@@ -2,7 +2,7 @@ import numpy as np
 from time import time
 from collections import deque as dq
 from phammer.arrays.arrays import Table2D, Table, ObjArray
-from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G, COEFF_TOL
+from phammer.simulation.constants import COEFF_TOL
 from phammer.epanet.util import EN
 from phammer.simulation.util import define_curve, is_iterable, run_shell
 from phammer.simulation.init import Initializator
@@ -275,5 +275,5 @@ class HammerSimulation:
             ic = self.ic,
             time_steps = self.settings.time_steps,
             curves = self.curves,
-            element_settings = self.element_settings)
-        print("WORKER ", self.worker.rank, self.worker.points, self.worker.processors[self.worker.points])
+            element_settings = self.element_settings,
+            settings = self.settings)

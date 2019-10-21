@@ -103,7 +103,12 @@ NODE_RESULTS = {
     'demand_flow' : np.float,
 }
 
-PIPE_RESULTS = {
+PIPE_START_RESULTS = {
+    'global_idx' : np.int,
     'inflow' : np.float,
+}
+
+PIPE_END_RESULTS = {
+    'global_idx' : np.int,
     'outflow' : np.float,
 }

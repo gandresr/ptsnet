@@ -4,10 +4,10 @@ import pandas as pd
 import wntr
 
 from phammer.simulation.sim import HammerSimulation
-from phammer.parallel.partitioning import get_points, even
+from phammer.parallel.partitioning import even
 from time import time
 
-duration = 200; time_step = 1
+duration = 200; time_step = 0.00002
 inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet_valve.inp'
 
 sim = HammerSimulation(
@@ -27,3 +27,9 @@ sim.add_curve('V_BUTTERFLY', 'valve',
 sim.assign_curve_to('V_BUTTERFLY', sim.wn.valve_name_list)
 
 sim.initialize()
+
+sim.worker.run_step()
+t = time()
+while sim.worker.t < 1000:
+    sim.worker.run_step()
+print(t, time())
