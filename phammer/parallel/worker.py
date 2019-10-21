@@ -143,17 +143,20 @@ class Worker:
         points = self.partition['points']
         pipes = self.global_where.points['to_pipes'][points]
         diff = np.where(np.diff(pipes) >= 1)[0] + 1
-        for i in range(len(diff)+1):
-            if i == 0:
-                start = 0
-                end = diff[i]
-            elif i == len(diff):
-                start = diff[i-1]
-                end = None
-            else:
-                start = diff[i-1]
-                end = diff[i]
-            self.define_initial_conditions_for_points(points[start:end], pipes[start], start, end)
+        if len(diff) > 0:
+            for i in range(len(diff)+1):
+                if i == 0:
+                    start = 0
+                    end = diff[i]
+                elif i == len(diff):
+                    start = diff[i-1]
+                    end = None
+                else:
+                    start = diff[i-1]
+                    end = diff[i]
+                self.define_initial_conditions_for_points(points[start:end], pipes[start], start, end)
+        else:
+            self.define_initial_conditions_for_points(points, pipes[0], 0, None)
 
         self.point_properties.has_plus[self.where.points['are_uboundaries']] = 1
         self.point_properties.has_minus[self.where.points['are_dboundaries']] = 1
