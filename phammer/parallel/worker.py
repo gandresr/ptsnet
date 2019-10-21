@@ -45,17 +45,46 @@ class Worker:
         # self.pipe_results = Table2D(PIPE_RESULTS, self.num_pipes, self.time_steps, index = self.ic['pipe']._index_keys)
         # self.node_results = Table2D(NODE_RESULTS, self.num_nodes, self.time_steps, index = self.ic['node']._index_keys)
 
-    def _define_worker_points(self):
-        self.points, rcv = get_points(self.processors, self.rank, self.global_where, self.ic, self.wn)
-        rcv_points = self.points[rcv]
+    def _define_worker_partition(self):
+        self.partition, rcv = get_partition(self.processors, self.rank, self.global_where, self.ic, self.wn)
+        rcv_points = self.partition['points'][rcv]
         rcv_processors = self.processors[rcv]
-        for k in np.arange(self.num_processors):
+        for k in np.unique(rcv_processors):
             self.receive_data[k] = rcv_points[rcv_processors == k]
 
     def _create_selectors(self):
-        pass
-        # self.global_where.points['']
-        # self.global_where.
+        points = self.partition['points']
+        nodes = self.partition['nodes']['global_idx']
+
+        sorter = np.argsort(points)
+        self.where.points['just_in_pipes'] = sorter[np.searchsorted(points, self.partition['nodes']['points'], sorter=sorter)]
+        self.where.points['are_tanks'] = sorter[np.searchsorted(points, self.partition['tanks']['points'], sorter=sorter)]
+        self.where.points['are_reservoirs'] = sorter[np.searchsorted(points, self.partition['reservoirs']['points'], sorter=sorter)]
+        self.where.nodes['just_in_pipes',] = np.cumsum(self.partition['nodes']['context'])
+
+        nonpipe = np.isin(self.global_where.points['are_boundaries'], self.global_where.points['are_valve'])
+        nonpipe = nonpipe | np.isin(self.global_where.points['are_boundaries'], self.global_where.points['are_pump'])
+        local_points = np.isin(self.global_where.points['are_boundaries'], points[self.processors[points] == self.rank])
+        dboundary = np.zeros(len(nonpipe), dtype=bool); dboundary[::2] = 1
+        uboundary = np.zeros(len(nonpipe), dtype=bool); uboundary[1::2] = 1
+        # ---------------------------
+        self.where.points['jip_dboundaries'] = np.where(np.isin(points, self.global_where.points['are_boundaries'][dboundary & (~nonpipe) & local_points]))[0]
+        self.where.points['jip_uboundaries'] = np.where(np.isin(points, self.global_where.points['are_boundaries'][uboundary & (~nonpipe) & local_points]))[0]
+        # ---------------------------
+        self.where.nodes['just_in_pipes'] = np.arange(len(nodes))
+        diff = np.diff(self.where.nodes['just_in_pipes',])
+        self.where.points['just_in_pipes',] = np.array([i for i in range(len(nodes)) for j in range(diff[i])])
+        # ---------------------------
+        self.where.points['start_inline_valve'] = self.partition['inline_valves']['start_points']
+        self.where.points['end_inline_valve'] = self.partition['inline_valves']['end_points']
+        self.where.points['start_inline_valve',] = self.partition['inline_valves']['global_idx']
+        self.where.points['start_inline_pump'] = self.partition['inline_pumps']['start_points']
+        self.where.points['end_inline_pump'] = self.partition['inline_pumps']['end_points']
+        self.where.points['start_inline_pump',] = self.partition['inline_pumps']['global_idx']
+        self.where.points['are_single_valve'] = self.partition['single_valves']['points']
+        self.where.points['are_single_valve',] = self.partition['single_valves']['global_idx']
+        self.where.points['are_single_pump'] = self.partition['single_pumps']['points']
+        self.where.points['are_single_pump',] = self.partition['single_pumps']['global_idx']
 
     def _load_initial_conditions(self):
         pass

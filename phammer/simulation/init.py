@@ -155,32 +155,6 @@ class Initializator:
 
         # ---------------------- (END) ----------------------
 
-        # x0 = ~np.isin(self.where.pipes['to_nodes'], self.where.nodes['njust_in_pipes'])
-        # self.where.points['just_in_pipes'] = self.where.points['are_boundaries'][x0]
-
-        # self.where.valves['to_nodes'] = imerge(self.ic['valve'].start_node, self.ic['valve'].end_node)
-        # order = np.argsort(self.where.pipes['to_nodes'])
-        # self.where.points['are_inner'] = np.setdiff1d(np.arange(self.num_points, dtype=np.int), self.where.points['are_boundaries'])
-        # self.where.points['just_in_pipes',] = self.where.pipes['to_nodes'][x0]
-        # order = np.argsort(self.where.points['just_in_pipes',])
-        # self.where.points['just_in_pipes'] = self.where.points['just_in_pipes'][order]
-        # self.where.points['just_in_pipes',] = self.where.points['just_in_pipes',][order]
-        # self.where.points['rjust_in_pipes'] = self.where.points['just_in_pipes']
-        # self.where.points['rjust_in_pipes',] = np.copy(self.where.points['just_in_pipes',])
-        # y = self.where.points['rjust_in_pipes',]
-        # y -= y[0]; y = (y[1:] - y[:-1]) - 1; y[y < 0] = 0; y = np.cumsum(y)
-        # self.where.points['rjust_in_pipes',][1:] -= y
-        # self.where.nodes['just_in_pipes'] = np.unique(self.where.points['just_in_pipes',])
-        # self.where.nodes['rjust_in_pipes'] = np.unique(self.where.points['rjust_in_pipes',])
-        # self.where.points['jip_dboundaries'] = self.where.points['are_dboundaries'][x0[0::2]]
-        # self.where.points['jip_uboundaries'] = self.where.points['are_uboundaries'][x0[1::2]]
-        # bpoints_types = self.ic['node'].type[self.where.pipes['to_nodes']]
-        # self.where.points['are_reservoirs'] = self.where.points['are_boundaries'][bpoints_types == EN.RESERVOIR]
-        # self.where.points['are_tanks'] = self.where.points['are_boundaries'][bpoints_types == EN.TANK]
-        # bcount = np.bincount(self.where.points['just_in_pipes',])
-        # bcount = np.cumsum(bcount[bcount != 0]); bcount[1:] = bcount[:-1]; bcount[0] = 0
-        # self.where.nodes['just_in_pipes',] = bcount
-
 
 def get_water_network(inpfile):
     ENFile = InpFile()
