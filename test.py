@@ -8,7 +8,7 @@ from phammer.parallel.partitioning import even
 from time import time
 
 duration = 200; time_step = 0.00002
-inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet_valve.inp'
+inpfile = '/home/gr24269/Documents/Github/phammer/example_files/LoopedNet_valve.inp'
 
 sim = HammerSimulation(
     inpfile,
