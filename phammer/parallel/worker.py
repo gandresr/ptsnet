@@ -75,15 +75,15 @@ class Worker:
         diff = np.diff(self.where.nodes['just_in_pipes',])
         self.where.points['just_in_pipes',] = np.array([i for i in range(len(nodes)) for j in range(diff[i])])
         # ---------------------------
-        self.where.points['start_inline_valve'] = self.partition['inline_valves']['start_points']
-        self.where.points['end_inline_valve'] = self.partition['inline_valves']['end_points']
+        self.where.points['start_inline_valve'] = sorter[np.searchsorted(points, self.partition['inline_valves']['start_points'], sorter=sorter)]
+        self.where.points['end_inline_valve'] = sorter[np.searchsorted(points, self.partition['inline_valves']['end_points'], sorter=sorter)]
         self.where.points['start_inline_valve',] = self.partition['inline_valves']['global_idx']
-        self.where.points['start_inline_pump'] = self.partition['inline_pumps']['start_points']
-        self.where.points['end_inline_pump'] = self.partition['inline_pumps']['end_points']
+        self.where.points['start_inline_pump'] = sorter[np.searchsorted(points, self.partition['inline_pumps']['start_points'], sorter=sorter)]
+        self.where.points['end_inline_pump'] = sorter[np.searchsorted(points, self.partition['inline_pumps']['end_points'], sorter=sorter)]
         self.where.points['start_inline_pump',] = self.partition['inline_pumps']['global_idx']
-        self.where.points['are_single_valve'] = self.partition['single_valves']['points']
+        self.where.points['are_single_valve'] = sorter[np.searchsorted(points, self.partition['single_valves']['points'], sorter=sorter)]
         self.where.points['are_single_valve',] = self.partition['single_valves']['global_idx']
-        self.where.points['are_single_pump'] = self.partition['single_pumps']['points']
+        self.where.points['are_single_pump'] = sorter[np.searchsorted(points, self.partition['single_pumps']['points'], sorter=sorter)]
         self.where.points['are_single_pump',] = self.partition['single_pumps']['global_idx']
 
     def _load_initial_conditions(self):
