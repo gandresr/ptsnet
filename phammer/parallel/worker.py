@@ -12,18 +12,12 @@ class Worker:
     def __init__(self, **kwargs):
         self.send_queue = deque()
         self.recv_queue = deque()
-        self.is_initialized = False
         self.comm = kwargs['comm']
         self.rank = kwargs['rank']
         self.num_points = kwargs['num_points']
         self.num_processors = kwargs['num_processors']
         self.wn = kwargs['wn']
         self.ic = kwargs['ic']
-        self.settings = kwargs['settings']
-        self.time_steps = kwargs['time_steps']
-        self.curves = kwargs['curves']
-        self.element_settings = kwargs['element_settings']
-        self.t = 0
         self.global_where = kwargs['where']
         self.mem_pool_points = None
         self.point_properties = None
@@ -171,15 +165,9 @@ class Worker:
         #     self.ic['node'].leak_coefficient * np.sqrt(self.ic['node'].pressure)
         # self.node_results.demand_flow[:, 0] = \
         #     self.ic['node'].demand_coefficient * np.sqrt(self.ic['node'].pressure)
-        self.t = 1
 
-    def run_step(self):
-        # if not self.settings.is_initialized:
-        #     raise NotImplementedError("it is necessary to initialize the simulation before running it")
-        # if not self.settings.updated_settings:
-        #     self._update_settings()
-
-        t1 = self.t % 2; t0 = 1 - t1
+    def run_step(self, t):
+        t1 = t % 2; t0 = 1 - t1
 
         Q0 = self.mem_pool_points.flowrate[:,t0]
         H0 = self.mem_pool_points.head[:,t0]
@@ -198,8 +186,8 @@ class Worker:
             self.point_properties.has_minus)
         run_boundary_step(
             H0, Q1, H1,
-            self.node_results.leak_flow[:,self.t],
-            self.node_results.demand_flow[:,self.t],
+            self.node_results.leak_flow[:,t],
+            self.node_results.demand_flow[:,t],
             self.point_properties.Cp,
             self.point_properties.Bp,
             self.point_properties.Cm,
@@ -230,106 +218,6 @@ class Worker:
             self.ic['pump'].Hs,
             self.ic['pump'].setting,
             self.where)
-        # self.pipe_results.inflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['jip_dboundaries'], t1]
-        # self.pipe_results.outflow[:,self.t] = self.mem_pool_points.flowrate[self.where.points['jip_uboundaries'], t1]
-        # self.node_results.head[self.where.nodes['to_points',], self.t] = self.mem_pool_points.head[self.where.nodes['to_points'], t1]
-        self.t += 1
-
-    def _set_element_setting(self, type_, element_name, value, step = None, check_warning = False):
-        if self.t == 0:
-            raise NotImplementedError("simulation has not been initialized")
-        if not step is None:
-            if not self.can_be_operated(step, check_warning):
-                return
-        if not is_iterable(element_name):
-            if type(element_name) is str:
-                element_name = (element_name,)
-                value = [value]
-            else:
-                raise ValueError("'element_name' should be iterable or str")
-        else:
-            if not is_iterable(value):
-                value = np.ones(len(element_name)) * value
-            elif len(element_name) != len(value):
-                raise ValueError("len of 'element_name' array does not match len of 'value' array")
-
-        if type(value) != np.ndarray:
-            value = np.array(value)
-
-        if type_ in ('valve', 'pump'):
-            if (value > 1).any() or (value < 0).any():
-                raise ValueError("setting not in [0, 1]" % element)
-        elif type_ == 'burst':
-            if (value < 0).any():
-                raise ValueError("burst coefficient has to be >= 0")
-        elif type_ == 'demand':
-            if (value < 0).any():
-                raise ValueError("demand coefficient has to be >= 0")
-
-        ic_type = self.SETTING_TYPES[type_]
-
-        if type(element_name) == np.ndarray:
-            if element_name.dtype == np.int:
-                self.ic[ic_type].setting[element_name] = value
-        else:
-            if type(element_name) != tuple:
-                element_name = tuple(element_name)
-            self.ic[ic_type].setting[self.ic[ic_type].iloc(element_name)] = value
-
-    def _update_settings(self):
-        if not self.settings.updated_settings:
-            self._update_coefficients()
-            Y = True
-            for stype in self.SETTING_TYPES:
-                Y &= self.element_settings[stype].updated
-            self.settings.updated_settings = Y
-            if Y:
-                return
-            for stype in self.SETTING_TYPES:
-                act_times = self.element_settings[stype].activation_times
-                act_indices = self.element_settings[stype].activation_indices
-                if act_times is None:
-                    self.element_settings[stype].updated = True
-                    continue
-                if len(act_times) == 0:
-                    self.element_settings[stype].updated = True
-                    continue
-                if act_times[0] == 0:
-                    act_times.popleft()
-                    act_indices.popleft()
-                    continue
-                if self.t >= act_times[0]:
-                    i1 = act_indices[0]
-                    i2 = None if len(act_indices) <= 1 else act_indices[1]
-                    settings = self.element_settings[stype].values[i1:i2]
-                    elements = self.element_settings[stype].elements[i1:i2]
-                    self._set_element_setting(stype, elements, settings)
-                    act_times.popleft()
-                    act_indices.popleft()
-
-    def _update_coefficients(self):
-        for curve in self.curves:
-            if curve.type == 'valve':
-                self.ic['valve'].K[curve.elements] = \
-                    self.ic['valve'].adjustment[curve.elements] * curve(self.ic['valve'].setting[curve.elements])
-
-    def set_valve_setting(self, valve_name, value, step = None, check_warning = False):
-        self._set_element_setting('valve', valve_name, value, step, check_warning)
-
-    def set_pump_setting(self, pump_name, value, step = None, check_warning = False):
-        self._set_element_setting('pump', pump_name, value, step, check_warning)
-
-    def set_burst_setting(self, node_name, value, step = None, check_warning = False):
-        self._set_element_setting('burst', node_name, value, step, check_warning)
-
-    def set_demand_setting(self, node_name, value, step = None, check_warning = False):
-        self._set_element_setting('demand', node_name, value, step, check_warning)
-
-    def can_be_operated(self, step, check_warning = False):
-        check_time = self.t * self.settings.time_step
-        if check_time % step >= self.settings.time_step:
-            return False
-        else:
-            if check_warning:
-                print("Warning: operating at time time %f" % check_time)
-            return True
+        # self.pipe_results.inflow[:,t] = self.mem_pool_points.flowrate[self.where.points['jip_dboundaries'], t1]
+        # self.pipe_results.outflow[:,t] = self.mem_pool_points.flowrate[self.where.points['jip_uboundaries'], t1]
+        # self.node_results.head[self.where.nodes['to_points',], t] = self.mem_pool_points.head[self.where.nodes['to_points'], t1]

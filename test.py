@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import wntr
-
+from tqdm import tqdm
 from phammer.simulation.sim import HammerSimulation
 from phammer.parallel.partitioning import even
 from time import time
@@ -30,6 +30,6 @@ sim.initialize()
 
 sim.worker.run_step()
 t = time()
-while sim.worker.t < 1000:
+for _ in tqdm(range(sim.settings.time_steps)):
     sim.worker.run_step()
 print(t, time())

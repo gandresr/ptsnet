@@ -172,9 +172,9 @@ class HammerSimulation:
             _super = self)
         self.curves = ObjArray()
         self.element_settings = {type_ : ElementSettings(self) for type_ in self.SETTING_TYPES}
-        self.t = 0
         self.settings.defined_wave_speeds = self.initializator.set_wave_speeds(default_wave_speed, wave_speed_file, delimiter)
         self.initializator.create_selectors()
+        self.t = 0
         # ----------------------------------------
         self.comm = MPI.COMM_WORLD
         if self.comm.size > self.num_points:
@@ -263,6 +263,7 @@ class HammerSimulation:
         self.settings.set_default()
         self.t = 0
         self._distribute_work()
+        self.t = 1
 
     def _distribute_work(self):
         self.worker = Worker(
@@ -277,3 +278,111 @@ class HammerSimulation:
             curves = self.curves,
             element_settings = self.element_settings,
             settings = self.settings)
+
+    def run_step(self):
+        if not self.settings.is_initialized:
+            raise NotImplementedError("it is necessary to initialize the simulation before running it")
+        if not self.settings.updated_settings:
+            self._update_settings()
+        self.worker.run_step()
+        self.t += 1
+
+    def _set_element_setting(self, type_, element_name, value, step = None, check_warning = False):
+        if self.t == 0:
+            raise NotImplementedError("simulation has not been initialized")
+        if not step is None:
+            if not self.can_be_operated(step, check_warning):
+                return
+        if not is_iterable(element_name):
+            if type(element_name) is str:
+                element_name = (element_name,)
+                value = [value]
+            else:
+                raise ValueError("'element_name' should be iterable or str")
+        else:
+            if not is_iterable(value):
+                value = np.ones(len(element_name)) * value
+            elif len(element_name) != len(value):
+                raise ValueError("len of 'element_name' array does not match len of 'value' array")
+
+        if type(value) != np.ndarray:
+            value = np.array(value)
+
+        if type_ in ('valve', 'pump'):
+            if (value > 1).any() or (value < 0).any():
+                raise ValueError("setting not in [0, 1]" % element)
+        elif type_ == 'burst':
+            if (value < 0).any():
+                raise ValueError("burst coefficient has to be >= 0")
+        elif type_ == 'demand':
+            if (value < 0).any():
+                raise ValueError("demand coefficient has to be >= 0")
+
+        ic_type = self.SETTING_TYPES[type_]
+
+        if type(element_name) == np.ndarray:
+            if element_name.dtype == np.int:
+                self.ic[ic_type].setting[element_name] = value
+        else:
+            if type(element_name) != tuple:
+                element_name = tuple(element_name)
+            self.ic[ic_type].setting[self.ic[ic_type].iloc(element_name)] = value
+
+    def _update_settings(self):
+        if not self.settings.updated_settings:
+            self._update_coefficients()
+            Y = True
+            for stype in self.SETTING_TYPES:
+                Y &= self.element_settings[stype].updated
+            self.settings.updated_settings = Y
+            if Y:
+                return
+            for stype in self.SETTING_TYPES:
+                act_times = self.element_settings[stype].activation_times
+                act_indices = self.element_settings[stype].activation_indices
+                if act_times is None:
+                    self.element_settings[stype].updated = True
+                    continue
+                if len(act_times) == 0:
+                    self.element_settings[stype].updated = True
+                    continue
+                if act_times[0] == 0:
+                    act_times.popleft()
+                    act_indices.popleft()
+                    continue
+                if self.t >= act_times[0]:
+                    i1 = act_indices[0]
+                    i2 = None if len(act_indices) <= 1 else act_indices[1]
+                    settings = self.element_settings[stype].values[i1:i2]
+                    elements = self.element_settings[stype].elements[i1:i2]
+                    self._set_element_setting(stype, elements, settings)
+                    act_times.popleft()
+                    act_indices.popleft()
+
+    def _update_coefficients(self):
+        for curve in self.curves:
+            if curve.type == 'valve':
+                self.ic['valve'].K[curve.elements] = \
+                    self.ic['valve'].adjustment[curve.elements] * curve(self.ic['valve'].setting[curve.elements])
+
+    def set_valve_setting(self, valve_name, value, step = None, check_warning = False):
+        if self.ic['valve'].iloc(valve_name) in self.worker.partition['']
+        self._set_element_setting('valve', valve_name, value, step, check_warning)
+
+    def set_pump_setting(self, pump_name, value, step = None, check_warning = False):
+        self._set_element_setting('pump', pump_name, value, step, check_warning)
+
+    def set_burst_setting(self, node_name, value, step = None, check_warning = False):
+        self._set_element_setting('burst', node_name, value, step, check_warning)
+
+    def set_demand_setting(self, node_name, value, step = None, check_warning = False):
+        self._set_element_setting('demand', node_name, value, step, check_warning)
+
+    def can_be_operated(self, step, check_warning = False):
+        check_time = self.t * self.settings.time_step
+        if check_time % step >= self.settings.time_step:
+            return False
+        else:
+            if check_warning:
+                print("Warning: operating at time time %f" % check_time)
+            return True
