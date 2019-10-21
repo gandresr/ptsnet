@@ -7,8 +7,8 @@ from phammer.simulation.sim import HammerSimulation
 from phammer.parallel.partitioning import even
 from time import time
 
-duration = 200; time_step = 0.00002
-inpfile = '/home/gr24269/Documents/Github/phammer/example_files/LoopedNet_valve.inp'
+duration = 0.1; time_step = 0.00002
+inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet_valve.inp'
 
 sim = HammerSimulation(
     inpfile,
@@ -28,8 +28,9 @@ sim.assign_curve_to('V_BUTTERFLY', sim.wn.valve_name_list)
 
 sim.initialize()
 
-sim.worker.run_step()
+sim.run_step()
 t = time()
-for _ in tqdm(range(sim.settings.time_steps)):
-    sim.worker.run_step()
-print(t, time())
+while not sim.is_over:
+    sim.run_step()
+t1 = time()
+print(t, t1)

@@ -264,6 +264,7 @@ class HammerSimulation:
         self.t = 0
         self._distribute_work()
         self.t = 1
+        self.settings.is_initialized = True
 
     def _distribute_work(self):
         self.worker = Worker(
@@ -274,18 +275,29 @@ class HammerSimulation:
             where = self.where,
             wn = self.wn,
             ic = self.ic,
-            time_steps = self.settings.time_steps,
-            curves = self.curves,
-            element_settings = self.element_settings,
-            settings = self.settings)
+            time_steps = self.settings.time_steps)
 
     def run_step(self):
         if not self.settings.is_initialized:
             raise NotImplementedError("it is necessary to initialize the simulation before running it")
         if not self.settings.updated_settings:
             self._update_settings()
-        self.worker.run_step()
+        self.worker.run_step(self.t)
         self.t += 1
+        self.comm.Barrier()
+
+    def _element_belongs_to_worker(self, type_, element_name):
+        pass
+        # TODO: MULTIPLE ELEMENTS
+        # pos = self.ic[type_].iloc(element_name)
+        # if type_ == 'valve':
+        #     if np.all(np.isin(pos, self.worker.partition['valves'])):
+        #         return False
+        # elif type_ in ('burst', 'demand'):
+        #     if not (pos in self.worker.partition['nodes']['global_idx'] or
+        #         pos in self.worker.partition['nodes']['global_idx']):
+        #         return False
+        # return True
 
     def _set_element_setting(self, type_, element_name, value, step = None, check_warning = False):
         if self.t == 0:
@@ -310,7 +322,7 @@ class HammerSimulation:
 
         if type_ in ('valve', 'pump'):
             if (value > 1).any() or (value < 0).any():
-                raise ValueError("setting not in [0, 1]" % element)
+                raise ValueError("setting for %s '%s' not in [0, 1]" % (type_, element_name))
         elif type_ == 'burst':
             if (value < 0).any():
                 raise ValueError("burst coefficient has to be >= 0")
@@ -366,7 +378,6 @@ class HammerSimulation:
                     self.ic['valve'].adjustment[curve.elements] * curve(self.ic['valve'].setting[curve.elements])
 
     def set_valve_setting(self, valve_name, value, step = None, check_warning = False):
-        if self.ic['valve'].iloc(valve_name) in self.worker.partition['']
         self._set_element_setting('valve', valve_name, value, step, check_warning)
 
     def set_pump_setting(self, pump_name, value, step = None, check_warning = False):

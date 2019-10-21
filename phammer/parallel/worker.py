@@ -19,6 +19,7 @@ class Worker:
         self.wn = kwargs['wn']
         self.ic = kwargs['ic']
         self.global_where = kwargs['where']
+        self.time_steps = kwargs['time_steps']
         self.mem_pool_points = None
         self.point_properties = None
         self.pipe_start_results = None
@@ -29,7 +30,6 @@ class Worker:
         self.partition = None
         self.receive_data = {}
         self.send_data = {}
-
         self._define_worker_partition()
         self._create_selectors()
         self._allocate_memory()
