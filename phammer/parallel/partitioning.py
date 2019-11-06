@@ -111,76 +111,69 @@ def get_partition(processors, rank, where, ic, wn):
                     l2 = wn.get_link(links[1])
 
                     nonpipe = l1 if l1.link_type.lower() != 'pipe' else l2
-
-                    nonpipe_start = ic['node'].iloc(nonpipe.start_node.name)
-                    nonpipe_end = ic['node'].iloc(nonpipe.end_node.name)
                     nonpipe_type = nonpipe.link_type.lower()
-                    inline = sum(ic['node'].degree[[nonpipe_start, nonpipe_end]]) > 3
-                    x = ic['node'].degree[[nonpipe_start, nonpipe_end]]
+                    non_pipe_idx = ic[nonpipe_type].iloc(nonpipe.name)
+                    nonpipe_start = ic[nonpipe_type].start_node[non_pipe_idx]
+                    nonpipe_end = ic[nonpipe_type].end_node[non_pipe_idx]
+                    is_inline = ic[nonpipe_type].is_inline[non_pipe_idx]
 
-                    if inline:
-                        if node == nonpipe_end and nonpipe_type == 'valve':
-                            valve = np.where(where.points['end_inline_valve'] == b)[0][0]
-                            processors[b] = processors[where.points['start_inline_valve'][valve]]
-                            visited_nodes.append(node); points.append(b); continue
-                        if node == nonpipe_end and nonpipe_type == 'pump':
-                            pump = np.where(where.points['end_inline_pump'] == b)[0][0]
-                            processors[b] = processors[where.points['start_inline_pump'][pump]]
-                            visited_nodes.append(node); points.append(b); continue
-                        if node == nonpipe_start and nonpipe_type == 'valve':
-                            valve = np.where(where.points['start_inline_valve'] == b)[0][0]
-                            valve_real = where.points['start_inline_valve',][valve]
-                            point_end_valve = where.points['end_inline_valve'][valve]
-                            pipe = wn.get_links_for_node(ic['node'].ival(ic['valve'].end_node[valve_real]))
-                            pipe.remove(ic['valve'].ival(valve_real))
-                            dpipe = ic['pipe'].iloc(pipe[0])
-                            dpipe_points = where.points['are_boundaries'][2*dpipe:2*dpipe+2]
-                            pad = 1 if dpipe_points[0] == point_end_valve else -1
-                            visited_nodes.append(node)
-                            points.append(point_end_valve+pad)
-                            points.append(point_end_valve)
+                    start_deg, end_deg = ic['node'].degree[[nonpipe_start, nonpipe_end]]
+                    nonpipe_start_point = None
+                    nonpipe_end_point = None
+
+                    # Get upstream and downstream pipes
+                    if start_deg == 2:
+                        start_links = wn.get_links_for_node(nonpipe.start_node.name)
+                        start_links.remove(nonpipe.name)
+                        start_pipe_idx = ic['pipe'].iloc(start_links[0])
+                        nonpipe_start_point = where.points['are_boundaries'][2*start_pipe_idx+1]
+                    if end_deg == 2:
+                        end_links = wn.get_links_for_node(nonpipe.end_node.name)
+                        end_links.remove(nonpipe.name)
+                        end_pipe_idx = ic['pipe'].iloc(end_links[0])
+                        nonpipe_end_point = where.points['are_boundaries'][2*end_pipe_idx]
+
+                    if is_inline:
+                        nonpipe_points = [nonpipe_start_point, nonpipe_end_point]
+                        processor_in_charge = min(processors[nonpipe_points])
+                        processors[nonpipe_points] = processor_in_charge
                             points.append(b)
-                            processors[point_end_valve] = rank
-                            start_inline_valves.append(b)
-                            end_inline_valves.append(point_end_valve)
-                            inline_valves.append(valve_real)
+                        if processor_in_charge != rank:
+                            visited_nodes.append(node)
                             continue
-                        if node == nonpipe_start and nonpipe_type == 'pump':
-                            pump = np.where(where.points['start_inline_pump'] == b)[0][0]
-                            pump_real = where.points['start_inline_pump',][pump]
-                            point_end_pump = where.points['end_inline_pump'][pump]
-                            pipe = wn.get_links_for_node(ic['node'].ival(ic['pump'].end_node[pump_real]))
-                            pipe.remove(ic['pump'].ival(pump_real))
-                            dpipe = ic['pipe'].iloc(pipe[0])
-                            dpipe_points = where.points['are_boundaries'][2*dpipe:2*dpipe+2]
-                            pad = 1 if dpipe_points[0] == point_end_pump else -1
-                            points.append(point_end_pump+pad)
-                            points.append(point_end_pump)
-                            points.append(b)
-                            processors[point_end_pump] = rank
+                        else:
+                            points.append(nonpipe_start_point)
+                            points.append(nonpipe_end_point)
+                            if processors[nonpipe_start_point - 1] != rank:
+                                points.append(nonpipe_start_point-1)
+                            if processors[nonpipe_end_point + 1] != rank:
+                                points.append(nonpipe_end_point-1)
+                            if nonpipe_type == 'valve':
+                                inline_valves.append(ic['valve'].iloc(nonpipe.name))
+                                start_inline_valves.append(nonpipe_start_point)
+                                end_inline_valves.append(nonpipe_end_point)
+                            elif nonpipe_type == 'pump':
+                                inline_pumps.append(ic['pump'].iloc(nonpipe.name))
+                                start_inline_pumps.append(nonpipe_start_point)
+                                end_inline_pumps.append(nonpipe_end_point)
                             visited_nodes.append(node)
-                            start_inline_pumps.append(b)
-                            end_inline_pumps.append(point_end_pump)
-                            inline_pumps.append(pump_real)
+                            continue
                             continue
                     else:
-                        if nonpipe_type == 'pump':
-                            single_pump_points.append(b)
-                            pump = np.where(where.points['are_single_pump'] == b)[0][0]
-                            single_pumps.append(where.points['are_single_pump',][pump])
-                        elif nonpipe_type == 'valve':
-                            single_valve_points.append(b)
-                            valve = np.where(where.points['are_single_valve'] == b)[0][0]
-                            single_valves.append(where.points['are_single_valve',][valve])
-                        if node == nonpipe_end:
                             points.append(b)
-                            points.append(b-1)
                             visited_nodes.append(node)
+                        if nonpipe_type == 'valve':
+                            if processors[b - 1] != rank:
+                                points.append(b - 1)
+                                single_valves.append(ic['valve'].iloc(nonpipe.name))
+                                continue
                             continue
-                        if node == nonpipe_start:
-                            points.append(b)
-                            points.append(b+1)
-                            visited_nodes.append(node)
+                        if nonpipe_type == 'pump':
+                            if processors[b + 1] != rank:
+                                points.append(b + 1)
+                                single_pumps.append(ic['pump'].iloc(nonpipe.name))
+                                continue
+                            continue
                             continue
 
             start = sum(where.nodes['to_points',][:node])
