@@ -51,7 +51,11 @@ class Worker:
         nodes += list(self.ic['valve'].end_node[self.partition['single_valves']['global_idx']])
         nodes += list(self.ic['pump'].start_node[self.partition['single_pumps']['global_idx']])
         nodes += list(self.ic['pump'].end_node[self.partition['single_pumps']['global_idx']])
-        self.node_results = Table2D(NODE_RESULTS, len(nodes), self.time_steps, index = self.ic['node']._index_keys[nodes])
+        nodes = np.unique(nodes)
+
+        self.node_results = None
+        if len(nodes) > 0:
+            self.node_results = Table2D(NODE_RESULTS, len(nodes), self.time_steps, index = self.ic['node']._index_keys[nodes])
 
         ppoints_start = self.partition['points'][self.where.points['are_dboundaries']]
         ppoints_end = self.partition['points'][self.where.points['are_uboundaries']]
@@ -129,7 +133,7 @@ class Worker:
 
         self.point_properties.B[start:end] = self.ic['pipe'].wave_speed[pipe] / (G * self.ic['pipe'].area[pipe])
         self.point_properties.R[start:end] = self.ic['pipe'].ffactor[pipe] * self.ic['pipe'].dx[pipe] / \
-                (2 * G * self.ic['pipe'].diameter[pipe] * self.ic['pipe'].area[pipe] ** 2)
+            (2 * G * self.ic['pipe'].diameter[pipe] * self.ic['pipe'].area[pipe] ** 2)
         per_unit_hl = self.ic['pipe'].head_loss[pipe] / self.ic['pipe'].segments[pipe]
         self.mem_pool_points.head[start:end,0] = shead - per_unit_hl*npoints
 

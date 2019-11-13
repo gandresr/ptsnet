@@ -6,8 +6,8 @@ import wntr
 from phammer.simulation.sim import HammerSimulation
 from time import time
 
-duration = 200; time_step = 0.01
-inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet.inp'
+duration = 200; time_step = 1
+inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet_valve.inp'
 
 sim = HammerSimulation(
     inpfile,
@@ -27,3 +27,5 @@ valves = sim.wn.valve_name_list
 sim.assign_curve_to('V_BUTTERFLY', valves)
 sim.settings.num_processors = 4
 sim.initialize()
+points = sim.worker.partition['points']
+print("worker", sim.worker.rank, points)

@@ -7,7 +7,7 @@ from phammer.simulation.sim import HammerSimulation
 from time import time
 
 duration = 200; time_step = 1
-inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet.inp'
+inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet_valve.inp'
 
 sim = HammerSimulation(
     inpfile,
@@ -30,56 +30,56 @@ sim.assign_curve_to('V_BUTTERFLY', valves)
 
 sim.initialize()
 
-t = time()
-while not sim.is_over:
-    sim.run_step()
-print(time() - t)
+# t = time()
+# while not sim.is_over:
+#     sim.run_step()
+# print(time() - t)
 
-tt = np.linspace(0, duration, sim.settings.time_steps)
-plt.plot(tt, sim.pipe_results.inflow.T)
-# plt.legend(sim.pipe_results._index_keys)
-plt.title("Inflow in pipes")
-plt.xlabel("Time [s]")
-plt.ylabel("Flowrate $[m^3/s]$")
-plt.show()
-
-tt = np.linspace(0, duration, sim.settings.time_steps)
-plt.plot(tt, sim.pipe_results.outflow.T)
-# plt.legend(sim.pipe_results._index_keys)
-plt.title("Outflow in pipes")
-plt.xlabel("Time [s]")
-plt.ylabel("Flowrate $[m^3/s]$")
-plt.show()
-
-plt.plot(tt, sim.node_results.head.T)
-# plt.legend(sim.node_results._index_keys)
-plt.title("Head in nodes")
-plt.xlabel("Time [s]")
-plt.ylabel("Head $[m]$")
-plt.show()
-
-# plt.plot(tt, sim.node_results.head.T - sim.ic['node'].elevation)
-# plt.legend(sim.node_results._index_keys)
-# plt.title("Pressure in nodes")
+# tt = np.linspace(0, duration, sim.settings.time_steps)
+# plt.plot(tt, sim.pipe_results.inflow.T)
+# # plt.legend(sim.pipe_results._index_keys)
+# plt.title("Inflow in pipes")
 # plt.xlabel("Time [s]")
-# plt.ylabel("Pressure $[m]$")
+# plt.ylabel("Flowrate $[m^3/s]$")
 # plt.show()
 
-# plt.plot(tt, sim.node_results.leak_flow.T)
+# tt = np.linspace(0, duration, sim.settings.time_steps)
+# plt.plot(tt, sim.pipe_results.outflow.T)
+# # plt.legend(sim.pipe_results._index_keys)
+# plt.title("Outflow in pipes")
+# plt.xlabel("Time [s]")
+# plt.ylabel("Flowrate $[m^3/s]$")
+# plt.show()
+
+# plt.plot(tt, sim.node_results.head.T)
 # # plt.legend(sim.node_results._index_keys)
-# plt.title("Leak flow in nodes")
+# plt.title("Head in nodes")
 # plt.xlabel("Time [s]")
-# plt.ylabel("Leak flow $[m^3/s]$")
+# plt.ylabel("Head $[m]$")
 # plt.show()
 
-plt.plot(tt, sim.node_results.demand_flow.T)
-plt.legend(sim.node_results._index_keys)
-plt.title("Demand flow in nodes")
-plt.xlabel("Time [s]")
-plt.ylabel("Demand $[m^3/s]$")
-plt.show()
+# # plt.plot(tt, sim.node_results.head.T - sim.ic['node'].elevation)
+# # plt.legend(sim.node_results._index_keys)
+# # plt.title("Pressure in nodes")
+# # plt.xlabel("Time [s]")
+# # plt.ylabel("Pressure $[m]$")
+# # plt.show()
 
-# head = pd.DataFrame(sim.node_results.head.T, columns = sim.node_results._index_keys)
-# in_flow = pd.DataFrame(sim.pipe_results.inflow.T, columns = sim.pipe_results._index_keys)
-# wntr.graphics.network.network_animation(sim.wn, node_attribute = head, link_attribute = in_flow)
+# # plt.plot(tt, sim.node_results.leak_flow.T)
+# # # plt.legend(sim.node_results._index_keys)
+# # plt.title("Leak flow in nodes")
+# # plt.xlabel("Time [s]")
+# # plt.ylabel("Leak flow $[m^3/s]$")
+# # plt.show()
+
+# plt.plot(tt, sim.node_results.demand_flow.T)
+# plt.legend(sim.node_results._index_keys)
+# plt.title("Demand flow in nodes")
+# plt.xlabel("Time [s]")
+# plt.ylabel("Demand $[m^3/s]$")
 # plt.show()
+
+# # head = pd.DataFrame(sim.node_results.head.T, columns = sim.node_results._index_keys)
+# # in_flow = pd.DataFrame(sim.pipe_results.inflow.T, columns = sim.pipe_results._index_keys)
+# # wntr.graphics.network.network_animation(sim.wn, node_attribute = head, link_attribute = in_flow)
+# # plt.show()

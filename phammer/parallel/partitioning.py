@@ -137,7 +137,7 @@ def get_partition(processors, rank, where, ic, wn):
                         nonpipe_points = [nonpipe_start_point, nonpipe_end_point]
                         processor_in_charge = min(processors[nonpipe_points])
                         processors[nonpipe_points] = processor_in_charge
-                            points.append(b)
+                        points.append(b)
                         if processor_in_charge != rank:
                             visited_nodes.append(node)
                             continue
@@ -158,10 +158,10 @@ def get_partition(processors, rank, where, ic, wn):
                                 end_inline_pumps.append(nonpipe_end_point)
                             visited_nodes.append(node)
                             continue
-                            continue
+                        continue
                     else:
-                            points.append(b)
-                            visited_nodes.append(node)
+                        points.append(b)
+                        visited_nodes.append(node)
                         if nonpipe_type == 'valve':
                             if processors[b - 1] != rank:
                                 points.append(b - 1)
@@ -174,12 +174,13 @@ def get_partition(processors, rank, where, ic, wn):
                                 single_pumps.append(ic['pump'].iloc(nonpipe.name))
                                 continue
                             continue
-                            continue
+                        continue
 
             start = sum(where.nodes['to_points',][:node])
             end = start + where.nodes['to_points',][node]
             node_points = where.nodes['to_points'][start:end]
             processor_in_charge = min(processors[node_points])
+            processors[node_points] = processor_in_charge
 
             if processor_in_charge != rank:
                 points.append(b)
@@ -201,7 +202,6 @@ def get_partition(processors, rank, where, ic, wn):
             pad = 1 - 2*to_points_are_uboundaries
             slots[idx + pad] = node_points + pad
             points += list(slots)
-            processors[node_points] = processor_in_charge
             nodes.append(node)
             node_points_list += list(node_points)
             node_points_context.append(len(node_points))

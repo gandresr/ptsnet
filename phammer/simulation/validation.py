@@ -89,3 +89,5 @@ def check_compatibility(wn, ic):
     if demanded.any():
         raise ModelError("there are non-pipe elements connected to a node with demand\n%s" \
             % str(ic['node']._index_keys[all_non_pipe_nodes_nburst][demanded]))
+
+    # TODO: FLOW THE PIPE UPSTREAM AN END VALVE ALWAYS FLOWS TOWARDS END VALVE

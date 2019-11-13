@@ -13,6 +13,8 @@ from phammer.simulation.util import imerge
 
 from time import time
 
+# TODO: HANDLE EXTENDED PERIOD SIMULATIONS
+
 class Initializator:
 
     def __init__(self, inpfile, skip_compatibility_check = False, warnings_on = True, _super = None):
@@ -102,6 +104,8 @@ class Initializator:
         self.where.points['start_inline_' + object_type,][:] = self.where.points['start_inline_' + object_type,][last_order]
         self.where.points['end_inline_' + object_type] = np.sort(self.where.points['are_boundaries'][x2])
         self.where.points['end_inline_' + object_type,] = ordered_end[self.ic[object_type].is_inline[ordered_end]]
+        self.where.__dict__[object_type + 's']['are_inline'] = self.ic[object_type].is_inline
+        self.where.__dict__[object_type + 's']['are_inline',] = last_order
         last_order = np.argsort(self.where.points['end_inline_' + object_type,])
         self.where.points['end_inline_' + object_type][:] = self.where.points['end_inline_' + object_type][last_order]
         self.where.points['end_inline_' + object_type,][:] = self.where.points['end_inline_' + object_type,][last_order]
@@ -344,7 +348,6 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
 def _fix_zero_flow_convention(ltype, non_pipe_nodes, zf, wn, ic):
     # Define flow convention for zero flow pipes attached to
     zero_flow = np.where(np.isin(ic[ltype].start_node, zf))[0]
-
     for k in zero_flow:
         upipe = wn.get_links_for_node(ic['node'].ival(ic[ltype].start_node[k]))
         upipe.remove(ic[ltype]._index_keys[k])
@@ -354,13 +357,15 @@ def _fix_zero_flow_convention(ltype, non_pipe_nodes, zf, wn, ic):
         dpipe = ic['pipe'].iloc(dpipe[0])
 
         if ic['pipe'].end_node[upipe] != ic[ltype].start_node[k]:
-            ic['pipe'].direction[upipe] = -1
+            ic['pipe'].direction[upipe] = -1 if ic['pipe'].direction[upipe] != -1 else 1
             ic['pipe'].start_node[upipe], ic['pipe'].end_node[upipe] = ic['pipe'].end_node[upipe], ic['pipe'].start_node[upipe]
         else:
-            ic['pipe'].direction[upipe] = 1
+            if ic['pipe'].direction[upipe] == 0:
+                ic['pipe'].direction[upipe] = 1
 
         if ic['pipe'].start_node[dpipe] != ic[ltype].end_node[k]:
-            ic['pipe'].direction[dpipe] = -1
+            ic['pipe'].direction[dpipe] = -1 if ic['pipe'].direction[dpipe] != -1 else 1
             ic['pipe'].start_node[dpipe], ic['pipe'].end_node[dpipe] = ic['pipe'].end_node[dpipe], ic['pipe'].start_node[dpipe]
         else:
-            ic['pipe'].direction[dpipe] = 1
+            if ic['pipe'].direction[dpipe] == 0:
+                ic['pipe'].direction[dpipe] = 1
