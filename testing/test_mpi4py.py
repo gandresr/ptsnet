@@ -30,18 +30,23 @@ recv_queue = {
     8 : [],
 }
 
+next_rcv = 0
+next_send = 0
+
 data = np.zeros(9)
 
 t = time()
-while len(recv_queue[rank]) > 0 or len(send_queue[rank]) > 0:
+while next_rcv < len(recv_queue[rank]) or next_send < len(send_queue[rank]):
     if rank in recv_queue:
-        if len(recv_queue[rank]) > 0:
-            next = recv_queue[rank].pop(0)
+        if next_rcv < len(recv_queue[rank]):
+            next = recv_queue[rank][next_rcv]
             data[next] = comm.recv(source = next)
+            next_rcv += 1
     if rank in send_queue:
-        if len(send_queue[rank]) > 0:
-            send_to = send_queue[rank].pop(0)
+        if next_send < len(send_queue[rank]):
+            send_to = send_queue[rank][next_send]
             comm.send(rank, send_to)
+            next_send += 1
 
 
 print(time()-t, rank, sum(data), recv_queue[rank], send_queue[rank])
