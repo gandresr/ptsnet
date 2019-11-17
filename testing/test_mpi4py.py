@@ -48,5 +48,4 @@ while next_rcv < len(recv_queue[rank]) or next_send < len(send_queue[rank]):
             comm.send(rank, send_to)
             next_send += 1
 
-
 print(time()-t, rank, sum(data), recv_queue[rank], send_queue[rank])

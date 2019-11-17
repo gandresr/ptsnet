@@ -1,6 +1,6 @@
 import numpy as np
 
-from collections import deque
+from collections import defaultdict as ddict
 from phammer.simulation.init import Initializator
 from phammer.arrays.arrays import Table2D, Table, ObjArray
 from phammer.parallel.partitioning import even, get_partition
@@ -10,8 +10,8 @@ from phammer.arrays.selectors import SelectorSet
 from phammer.simulation.funcs import run_boundary_step, run_interior_step, run_pump_step, run_valve_step
 class Worker:
     def __init__(self, **kwargs):
-        self.send_queue = deque()
-        self.recv_queue = deque()
+        self.send_queue = None
+        self.recv_queue = None
         self.comm = kwargs['comm']
         self.rank = kwargs['rank']
         self.num_points = kwargs['num_points']
@@ -27,11 +27,9 @@ class Worker:
         self.node_results = None
         self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves', 'pumps'])
         self.processors = even(self.num_points, self.num_processors)
-        self.partition = None
-        self.receive_data = {}
-        self.send_data = {}
-        self._define_worker_partition()
+        self.partition = get_partition(self.processors, self.rank, self.global_where, self.ic, self.wn)
         self._create_selectors()
+        self._define_worker_comm_queues()
         self._allocate_memory()
         self._load_initial_conditions()
 
@@ -65,12 +63,36 @@ class Worker:
         self.pipe_start_results = Table2D(PIPE_START_RESULTS, len(ppoints_start), self.time_steps, index = self.ic['pipe']._index_keys[pipes_start])
         self.pipe_end_results = Table2D(PIPE_END_RESULTS, len(ppoints_end), self.time_steps, index = self.ic['pipe']._index_keys[pipes_end])
 
-    def _define_worker_partition(self):
-        self.partition, rcv = get_partition(self.processors, self.rank, self.global_where, self.ic, self.wn)
-        rcv_points = self.partition['points'][rcv]
-        rcv_processors = self.processors[rcv]
-        for k in np.unique(rcv_processors):
-            self.receive_data[k] = rcv_points[rcv_processors == k]
+    def _define_worker_comm_queues(self):
+        pp = self.processors[self.partition['points']]
+        pp_idx = np.where(pp != self.rank)[0]
+        ppoints = self.partition['points'][pp_idx]
+
+        # Define receive queue
+        self.recv_queue = ddict(list)
+        for i, p in enumerate(pp_idx):
+            self.recv_queue[pp[p]].append(ppoints[i])
+        # Define send queue
+        self.send_queue = ddict(list)
+        uboundaries = self.partition['points'][self.where.points['are_uboundaries']]
+        dboundaries = self.partition['points'][self.where.points['are_dboundaries']]
+        inner = self.partition['points'][self.where.points['are_inner']]
+
+        for p in self.recv_queue:
+            self.recv_queue[p] = np.sort(self.recv_queue[p])
+            urq = np.isin(self.recv_queue[p], uboundaries)
+            drq = np.isin(self.recv_queue[p], dboundaries)
+            irq = np.isin(self.recv_queue[p], inner)
+
+            extra_b = np.append(self.recv_queue[p][urq] - 1, self.recv_queue[p][drq] + 1)
+            extra_i = np.append(self.recv_queue[p][irq] - 1, self.recv_queue[p][irq] + 1)
+            extra = np.append(extra_b, extra_i)
+            reduced_extra = extra[np.isin(extra, self.partition['points'])]
+            real_extra = reduced_extra[self.processors[reduced_extra] == self.rank]
+            self.send_queue[p].extend(real_extra)
+
+        for p in self.send_queue:
+            self.send_queue[p] = np.sort(self.send_queue[p])
 
     def _create_selectors(self):
         points = self.partition['points']

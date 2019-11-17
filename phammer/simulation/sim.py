@@ -6,7 +6,6 @@ from phammer.simulation.constants import COEFF_TOL
 from phammer.epanet.util import EN
 from phammer.simulation.util import define_curve, is_iterable, run_shell
 from phammer.simulation.init import Initializator
-from phammer.parallel.comm import initialize_worker
 from pkg_resources import resource_filename
 from phammer.parallel.worker import Worker
 from mpi4py import MPI

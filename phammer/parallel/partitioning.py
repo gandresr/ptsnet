@@ -1,8 +1,9 @@
 import numpy as np
+from collections import defaultdict as ddict
 from phammer.simulation.util import imerge
 
 def even(num_points, num_processors):
-    p = np.ones(num_points)
+    p = np.ones(num_points, dtype = int)
     n = num_points // num_processors
     r = num_points % num_processors
     for i in range(num_processors):
@@ -15,12 +16,8 @@ def even(num_points, num_processors):
         p[start:end+1] = i
     return p
 
-def get_partition(processors, rank, where, ic, wn):
-
-    # List of points needs to be sorted
-    worker_points = np.where(processors == rank)[0]
+def _get_ghost_points(worker_points, worker_pipes):
     worker_points.sort()
-    worker_pipes = where.points['to_pipes'][worker_points]
     diff = np.where(np.diff(worker_pipes) > 0)[0]
     extradiff = []
 
@@ -35,25 +32,35 @@ def get_partition(processors, rank, where, ic, wn):
 
     # d is the list of indexes in worker_points that correspond to
     # ghost nodes that are assigned to the processor with id == rank
-    d = np.zeros(len(diff)*2 + len(extradiff), dtype=int)
+    ghosts = np.zeros(len(diff)*2 + len(extradiff), dtype=int)
 
     if len(extradiff) == 2:
-        d[1:-1] = imerge(diff, diff+1)
-        d[-1] = extradiff[-1]
+        ghosts[1:-1] = imerge(diff, diff+1)
+        ghosts[-1] = extradiff[-1]
     elif len(extradiff) == 1:
         if extradiff[0] == 0:
-            d[1:] = imerge(diff, diff+1)
+            ghosts[1:] = imerge(diff, diff+1)
         else:
-            d[0:-1] = imerge(diff, diff+1)
-            d[-1] = extradiff[-1]
+            ghosts[0:-1] = imerge(diff, diff+1)
+            ghosts[-1] = extradiff[-1]
     elif len(diff) > 0:
-        d[:] = imerge(diff, diff+1)
+        ghosts[:] = imerge(diff, diff+1)
     elif len(diff) == 0:
-        d[:] = extradiff
+        ghosts[:] = extradiff
 
+    return ghosts
+
+def get_partition(processors, rank, where, ic, wn):
+
+    # save a copy of processors for comparison
+    pre_processors = np.copy(processors)
+    # List of points needs to be sorted
+    worker_points = np.where(processors == rank)[0]
+    worker_pipes = where.points['to_pipes'][worker_points]
+    ghosts = _get_ghost_points(worker_points, worker_pipes)
     points_idx = np.ones_like(worker_points).astype(bool)
-    points_idx[d] = 0
-    dependent = worker_points[d]
+    points_idx[ghosts] = 0
+    dependent = worker_points[ghosts]
     # 1: uboundary, 0: dboundary
     dependent_type = np.isin(dependent, where.points['are_uboundaries'])
     points = list(worker_points[points_idx])
@@ -71,9 +78,9 @@ def get_partition(processors, rank, where, ic, wn):
     single_valves = []; single_valve_points = []
     single_pumps = []; single_pump_points = []
 
-    # Determine extra data for dependent points
     visited_nodes = []
 
+    # Determine extra data for dependent points
     for i, b in enumerate(dependent):
         if b in boundaries_to_nodes:
             # Boundary point
@@ -147,7 +154,7 @@ def get_partition(processors, rank, where, ic, wn):
                             if processors[nonpipe_start_point - 1] != rank:
                                 points.append(nonpipe_start_point-1)
                             if processors[nonpipe_end_point + 1] != rank:
-                                points.append(nonpipe_end_point-1)
+                                points.append(nonpipe_end_point+1)
                             if nonpipe_type == 'valve':
                                 inline_valves.append(ic['valve'].iloc(nonpipe.name))
                                 start_inline_valves.append(nonpipe_start_point)
@@ -222,8 +229,8 @@ def get_partition(processors, rank, where, ic, wn):
 
     points = np.unique(points)
     points.sort()
-    p = processors[points]
-    rcv = np.where(p != rank)
+
+    # update ghosts
 
     partition = {
         'points' : points,
@@ -260,4 +267,4 @@ def get_partition(processors, rank, where, ic, wn):
         }
     }
 
-    return partition, rcv
+    return partition

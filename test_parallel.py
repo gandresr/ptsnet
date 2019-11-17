@@ -27,5 +27,3 @@ valves = sim.wn.valve_name_list
 sim.assign_curve_to('V_BUTTERFLY', valves)
 sim.settings.num_processors = 4
 sim.initialize()
-points = sim.worker.partition['points']
-print("worker", sim.worker.rank, points)
