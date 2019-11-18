@@ -8,6 +8,7 @@ from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_START_RESULTS, PI
 from phammer.simulation.util import is_iterable
 from phammer.arrays.selectors import SelectorSet
 from phammer.simulation.funcs import run_boundary_step, run_interior_step, run_pump_step, run_valve_step
+from phammer.parallel.comm import exchange_point_data
 class Worker:
     def __init__(self, **kwargs):
         self.send_queue = None
@@ -244,6 +245,8 @@ class Worker:
             self.ic['pump'].Hs,
             self.ic['pump'].setting,
             self.where)
+        exchange_point_data(self.mem_pool_points.flowrate[:,t], self.rank, self.comm, self.send_queue, self.recv_queue)
+        exchange_point_data(self.mem_pool_points.head[:,t], self.rank, self.comm, self.send_queue, self.recv_queue)
         # self.pipe_results.inflow[:,t] = self.mem_pool_points.flowrate[self.where.points['jip_dboundaries'], t1]
         # self.pipe_results.outflow[:,t] = self.mem_pool_points.flowrate[self.where.points['jip_uboundaries'], t1]
         # self.node_results.head[self.where.nodes['to_points',], t] = self.mem_pool_points.head[self.where.nodes['to_points'], t1]
