@@ -142,7 +142,7 @@ class Table2D(Table):
 class ObjArray:
     def __init__(self):
         self.index = {}
-        self.name_list = []
+        self.keys = []
         self.values = []
 
     def __setitem__(self, name, value):
@@ -151,7 +151,7 @@ class ObjArray:
         else:
             self.index[name] = len(self)
             self.values.append(value)
-            self.name_list.append(name)
+            self.keys.append(name)
 
     def __getitem__(self, index):
         return self.values[self.index[index]]

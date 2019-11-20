@@ -8,12 +8,13 @@ from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_START_RESULTS, PI
 from phammer.simulation.util import is_iterable
 from phammer.arrays.selectors import SelectorSet
 from phammer.simulation.funcs import run_boundary_step, run_interior_step, run_pump_step, run_valve_step
-from phammer.parallel.comm import exchange_point_data
+
 class Worker:
     def __init__(self, **kwargs):
         self.send_queue = None
         self.recv_queue = None
-        self.comm = kwargs['comm']
+        self.global_comm = kwargs['comm']
+        self.comm = None
         self.rank = kwargs['rank']
         self.num_points = kwargs['num_points']
         self.num_processors = kwargs['num_processors']
@@ -31,12 +32,20 @@ class Worker:
         self.partition = get_partition(self.processors, self.rank, self.global_where, self.ic, self.wn)
         self._create_selectors()
         self._define_worker_comm_queues()
+        self._define_dist_graph_comm()
+        self._comm_buffer_head = []
+        self._recv_points = []
+        for r in self.recv_queue.values:
+            self._comm_buffer_head.append(np.zeros(len(r)))
+            self._recv_points.extend(r)
+        self._comm_buffer_flow = np.array(self._comm_buffer_head)
+        self._comm_buffer_head = np.array(self._comm_buffer_head)
         self._allocate_memory()
         self._load_initial_conditions()
 
     def _allocate_memory(self):
-        self.mem_pool_points = Table2D(MEM_POOL_POINTS, len(self.partition['points']), 2)
-        self.point_properties = Table(POINT_PROPERTIES, len(self.partition['points']))
+        self.mem_pool_points = Table2D(MEM_POOL_POINTS, len(self.partition['points']['global_idx']), 2)
+        self.point_properties = Table(POINT_PROPERTIES, len(self.partition['points']['global_idx']))
 
         nodes = []
         nodes += list(self.partition['nodes']['global_idx'])
@@ -55,31 +64,42 @@ class Worker:
         self.node_results = None
         if len(nodes) > 0:
             self.node_results = Table2D(NODE_RESULTS, len(nodes), self.time_steps, index = self.ic['node']._index_keys[nodes])
-
-        ppoints_start = self.partition['points'][self.where.points['are_dboundaries']]
-        ppoints_end = self.partition['points'][self.where.points['are_uboundaries']]
+        points = self.partition['points']['global_idx']
+        ppoints_start = points[self.where.points['are_dboundaries']]
+        ppoints_end = points[self.where.points['are_uboundaries']]
         pipes_start = self.global_where.points['to_pipes'][ppoints_start]
         pipes_end = self.global_where.points['to_pipes'][ppoints_end]
 
         self.pipe_start_results = Table2D(PIPE_START_RESULTS, len(ppoints_start), self.time_steps, index = self.ic['pipe']._index_keys[pipes_start])
         self.pipe_end_results = Table2D(PIPE_END_RESULTS, len(ppoints_end), self.time_steps, index = self.ic['pipe']._index_keys[pipes_end])
 
+    def _define_dist_graph_comm(self):
+        self.comm = self.global_comm.Create_dist_graph_adjacent(
+            sources = self.recv_queue.keys,
+            destinations = self.send_queue.keys,
+            sourceweights = list(map(len, self.recv_queue.values)),
+            destweights = list(map(len, self.send_queue.values)))
+
     def _define_worker_comm_queues(self):
-        pp = self.processors[self.partition['points']]
+        points = self.partition['points']['global_idx']
+        local_points = self.partition['points']['local_idx']
+        pp = self.processors[points]
         pp_idx = np.where(pp != self.rank)[0]
-        ppoints = self.partition['points'][pp_idx]
+        ppoints = points[pp_idx]
 
         # Define receive queue
-        self.recv_queue = ddict(list)
+        self.recv_queue = ObjArray()
         for i, p in enumerate(pp_idx):
+            if not pp[p] in self.recv_queue.index:
+                self.recv_queue[pp[p]] = []
             self.recv_queue[pp[p]].append(ppoints[i])
         # Define send queue
-        self.send_queue = ddict(list)
-        uboundaries = self.partition['points'][self.where.points['are_uboundaries']]
-        dboundaries = self.partition['points'][self.where.points['are_dboundaries']]
-        inner = self.partition['points'][self.where.points['are_inner']]
+        self.send_queue = ObjArray()
+        uboundaries = points[self.where.points['are_uboundaries']]
+        dboundaries = points[self.where.points['are_dboundaries']]
+        inner = points[self.where.points['are_inner']]
 
-        for p in self.recv_queue:
+        for p in self.recv_queue.keys:
             self.recv_queue[p] = np.sort(self.recv_queue[p])
             urq = np.isin(self.recv_queue[p], uboundaries)
             drq = np.isin(self.recv_queue[p], dboundaries)
@@ -88,15 +108,18 @@ class Worker:
             extra_b = np.append(self.recv_queue[p][urq] - 1, self.recv_queue[p][drq] + 1)
             extra_i = np.append(self.recv_queue[p][irq] - 1, self.recv_queue[p][irq] + 1)
             extra = np.append(extra_b, extra_i)
-            reduced_extra = extra[np.isin(extra, self.partition['points'])]
-            real_extra = reduced_extra[self.processors[reduced_extra] == self.rank]
-            self.send_queue[p].extend(real_extra)
+            reduced_extra = extra[np.isin(extra, points)]
+            real_extra = reduced_extra[self.processors[reduced_extra] == self.rank] # global idx
+            if not p in self.send_queue.index:
+                self.send_queue[p] = []
+            self.send_queue[p].extend([local_points[r] for r in real_extra])
+            self.recv_queue[p] = [local_points[r] for r in self.recv_queue[p]]
 
-        for p in self.send_queue:
+        for p in self.send_queue.keys:
             self.send_queue[p] = np.sort(self.send_queue[p])
 
     def _create_selectors(self):
-        points = self.partition['points']
+        points = self.partition['points']['global_idx']
         nodes = self.partition['nodes']['global_idx']
 
         sorter = np.arange(len(points))
@@ -161,7 +184,7 @@ class Worker:
         self.mem_pool_points.head[start:end,0] = shead - per_unit_hl*npoints
 
     def _load_initial_conditions(self):
-        points = self.partition['points']
+        points = self.partition['points']['global_idx']
         pipes = self.global_where.points['to_pipes'][points]
         diff = np.where(np.diff(pipes) >= 1)[0] + 1
         if len(diff) > 0:
@@ -192,6 +215,18 @@ class Worker:
         #     self.ic['node'].leak_coefficient * np.sqrt(self.ic['node'].pressure)
         # self.node_results.demand_flow[:, 0] = \
         #     self.ic['node'].demand_coefficient * np.sqrt(self.ic['node'].pressure)
+
+    def exchange_data(self, t):
+        t1 = t % 2
+        send_flow = []
+        send_head = []
+        for v in self.send_queue.values:
+            send_flow.append(self.mem_pool_points.flowrate[v,t1])
+            send_head.append(self.mem_pool_points.head[v,t1])
+        self._comm_buffer_flow = self.comm.neighbor_alltoall(send_flow)
+        self._comm_buffer_head = self.comm.neighbor_alltoall(send_head)
+        self.mem_pool_points.flowrate[self._recv_points, t1] = [item for sublist in self._comm_buffer_flow for item in sublist]
+        self.mem_pool_points.head[self._recv_points, t1] = [item for sublist in self._comm_buffer_head for item in sublist]
 
     def run_step(self, t):
         t1 = t % 2; t0 = 1 - t1
@@ -245,8 +280,3 @@ class Worker:
             self.ic['pump'].Hs,
             self.ic['pump'].setting,
             self.where)
-        exchange_point_data(self.mem_pool_points.flowrate[:,t], self.rank, self.comm, self.send_queue, self.recv_queue)
-        exchange_point_data(self.mem_pool_points.head[:,t], self.rank, self.comm, self.send_queue, self.recv_queue)
-        # self.pipe_results.inflow[:,t] = self.mem_pool_points.flowrate[self.where.points['jip_dboundaries'], t1]
-        # self.pipe_results.outflow[:,t] = self.mem_pool_points.flowrate[self.where.points['jip_uboundaries'], t1]
-        # self.node_results.head[self.where.nodes['to_points',], t] = self.mem_pool_points.head[self.where.nodes['to_points'], t1]

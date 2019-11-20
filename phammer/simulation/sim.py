@@ -1,4 +1,5 @@
 import numpy as np
+
 from time import time
 from collections import deque as dq
 from phammer.arrays.arrays import Table2D, Table, ObjArray
@@ -282,21 +283,9 @@ class HammerSimulation:
         if not self.settings.updated_settings:
             self._update_settings()
         self.worker.run_step(self.t)
-        self.t += 1
         self.comm.Barrier()
-
-    def _element_belongs_to_worker(self, type_, element_name):
-        pass
-        # TODO: MULTIPLE ELEMENTS
-        # pos = self.ic[type_].iloc(element_name)
-        # if type_ == 'valve':
-        #     if np.all(np.isin(pos, self.worker.partition['valves'])):
-        #         return False
-        # elif type_ in ('burst', 'demand'):
-        #     if not (pos in self.worker.partition['nodes']['global_idx'] or
-        #         pos in self.worker.partition['nodes']['global_idx']):
-        #         return False
-        # return True
+        self.worker.exchange_data(self.t)
+        self.t += 1
 
     def _set_element_setting(self, type_, element_name, value, step = None, check_warning = False):
         if self.t == 0:

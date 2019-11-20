@@ -52,8 +52,6 @@ def _get_ghost_points(worker_points, worker_pipes):
 
 def get_partition(processors, rank, where, ic, wn):
 
-    # save a copy of processors for comparison
-    pre_processors = np.copy(processors)
     # List of points needs to be sorted
     worker_points = np.where(processors == rank)[0]
     worker_pipes = where.points['to_pipes'][worker_points]
@@ -233,7 +231,10 @@ def get_partition(processors, rank, where, ic, wn):
     # update ghosts
 
     partition = {
-        'points' : points,
+        'points' : {
+            'global_idx' : points,
+            'local_idx' : {p : i for i, p in enumerate(points)}
+        },
         'nodes' : {
             'global_idx' : np.array(nodes, dtype = int),
             'points' : np.array(node_points_list, dtype = int),
