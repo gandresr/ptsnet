@@ -282,9 +282,10 @@ class HammerSimulation:
             raise NotImplementedError("it is necessary to initialize the simulation before running it")
         if not self.settings.updated_settings:
             self._update_settings()
+        self.worker.exchange_data(self.t)
+        self.worker.comm.Barrier()
         self.worker.run_step(self.t)
         self.comm.Barrier()
-        self.worker.exchange_data(self.t)
         self.t += 1
 
     def _set_element_setting(self, type_, element_name, value, step = None, check_warning = False):

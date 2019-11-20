@@ -28,5 +28,6 @@ valves = sim.wn.valve_name_list
 sim.assign_curve_to('V_BUTTERFLY', valves)
 sim.settings.num_processors = 4
 sim.initialize()
+print(sim.worker.rank, 's', sim.worker.send_queue.keys, sim.worker.send_queue.values)
+print(sim.worker.rank, 'r', sim.worker.recv_queue.keys, sim.worker.recv_queue.values)
 sim.run_step()
-print(sim.worker.rank, sim.worker.send_queue, sim.worker.recv_queue)

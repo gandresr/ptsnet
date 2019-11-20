@@ -109,11 +109,12 @@ class Worker:
             extra_i = np.append(self.recv_queue[p][irq] - 1, self.recv_queue[p][irq] + 1)
             extra = np.append(extra_b, extra_i)
             reduced_extra = extra[np.isin(extra, points)]
-            real_extra = reduced_extra[self.processors[reduced_extra] == self.rank] # global idx
-            if not p in self.send_queue.index:
-                self.send_queue[p] = []
-            self.send_queue[p].extend([local_points[r] for r in real_extra])
-            self.recv_queue[p] = [local_points[r] for r in self.recv_queue[p]]
+            real_extra = [local_points[r] for r in reduced_extra[self.processors[reduced_extra] == self.rank]] # local idx
+            if len(real_extra) > 0:
+                if not p in self.send_queue.index:
+                    self.send_queue[p] = []
+                self.send_queue[p].extend(real_extra)
+            self.recv_queue[p] = np.sort([local_points[r] for r in self.recv_queue[p]]) # convert to local idx
 
         for p in self.send_queue.keys:
             self.send_queue[p] = np.sort(self.send_queue[p])
@@ -217,16 +218,16 @@ class Worker:
         #     self.ic['node'].demand_coefficient * np.sqrt(self.ic['node'].pressure)
 
     def exchange_data(self, t):
-        t1 = t % 2
+        t1 = t % 2; t0 = 1 - t1
         send_flow = []
         send_head = []
         for v in self.send_queue.values:
-            send_flow.append(self.mem_pool_points.flowrate[v,t1])
-            send_head.append(self.mem_pool_points.head[v,t1])
+            send_flow.append(self.mem_pool_points.flowrate[v,t0])
+            send_head.append(self.mem_pool_points.head[v,t0])
         self._comm_buffer_flow = self.comm.neighbor_alltoall(send_flow)
         self._comm_buffer_head = self.comm.neighbor_alltoall(send_head)
-        self.mem_pool_points.flowrate[self._recv_points, t1] = [item for sublist in self._comm_buffer_flow for item in sublist]
-        self.mem_pool_points.head[self._recv_points, t1] = [item for sublist in self._comm_buffer_head for item in sublist]
+        self.mem_pool_points.flowrate[self._recv_points, t0] = [item for sublist in self._comm_buffer_flow for item in sublist]
+        self.mem_pool_points.head[self._recv_points, t0] = [item for sublist in self._comm_buffer_head for item in sublist]
 
     def run_step(self, t):
         t1 = t % 2; t0 = 1 - t1
