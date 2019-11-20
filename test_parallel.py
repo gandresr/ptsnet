@@ -5,9 +5,10 @@ import wntr
 
 from phammer.simulation.sim import HammerSimulation
 from time import time
+from os import getcwd
 
 duration = 200; time_step = 1
-inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet_valve.inp'
+inpfile = getcwd() + '/example_files/LoopedNet_valve.inp'
 
 sim = HammerSimulation(
     inpfile,
