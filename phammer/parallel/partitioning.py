@@ -59,8 +59,7 @@ def get_partition(processors, rank, where, ic, wn):
     points_idx = np.ones_like(worker_points).astype(bool)
     points_idx[ghosts] = 0
     dependent = worker_points[ghosts]
-    # 1: uboundary, 0: dboundary
-    dependent_type = np.isin(dependent, where.points['are_uboundaries'])
+    dependent_type = np.isin(dependent, where.points['are_uboundaries']) # 1: uboundary, 0: dboundary
     points = list(worker_points[points_idx])
 
     boundaries_to_nodes = {
@@ -80,8 +79,7 @@ def get_partition(processors, rank, where, ic, wn):
 
     # Determine extra data for dependent points
     for i, b in enumerate(dependent):
-        if b in boundaries_to_nodes:
-            # Boundary point
+        if b in boundaries_to_nodes: # Boundary point
             node = boundaries_to_nodes[b]
             degree = where.nodes['to_points',][node]
 
@@ -188,7 +186,12 @@ def get_partition(processors, rank, where, ic, wn):
             processors[node_points] = processor_in_charge
 
             if processor_in_charge != rank:
-                points.append(b)
+                if dependent_type[i] == 1: # uboundary
+                    if processors[b-1] == rank:
+                        points.append(b)
+                elif dependent_type[i] == 0: # dboundary
+                    if processors[b+1] == rank:
+                        points.append(b)
                 continue
 
             x = -1 if dependent_type[i] else 1
@@ -227,8 +230,6 @@ def get_partition(processors, rank, where, ic, wn):
 
     points = np.unique(points)
     points.sort()
-
-    # update ghosts
 
     partition = {
         'points' : {

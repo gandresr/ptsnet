@@ -222,12 +222,13 @@ class Worker:
         send_flow = []
         send_head = []
         for v in self.send_queue.values:
-            send_flow.append(self.mem_pool_points.flowrate[v,t0])
-            send_head.append(self.mem_pool_points.head[v,t0])
+            send_flow.append(self.mem_pool_points.flowrate[v,t1])
+            send_head.append(self.mem_pool_points.head[v,t1])
+        print(self.rank, send_flow, send_head, self._comm_buffer_flow)
         self._comm_buffer_flow = self.comm.neighbor_alltoall(send_flow)
         self._comm_buffer_head = self.comm.neighbor_alltoall(send_head)
-        self.mem_pool_points.flowrate[self._recv_points, t0] = [item for sublist in self._comm_buffer_flow for item in sublist]
-        self.mem_pool_points.head[self._recv_points, t0] = [item for sublist in self._comm_buffer_head for item in sublist]
+        self.mem_pool_points.flowrate[self._recv_points, t1] = [item for sublist in self._comm_buffer_flow for item in sublist]
+        self.mem_pool_points.head[self._recv_points, t1] = [item for sublist in self._comm_buffer_head for item in sublist]
 
     def run_step(self, t):
         t1 = t % 2; t0 = 1 - t1
