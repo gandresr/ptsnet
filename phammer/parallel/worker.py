@@ -61,9 +61,9 @@ class Worker:
         nodes += list(self.ic['pump'].end_node[self.partition['single_pumps']['global_idx']])
         nodes = np.unique(nodes)
 
-        self.node_results = None
         if len(nodes) > 0:
             self.node_results = Table2D(NODE_RESULTS, len(nodes), self.time_steps, index = self.ic['node']._index_keys[nodes])
+
         points = self.partition['points']['global_idx']
         ppoints_start = points[self.where.points['are_dboundaries']]
         ppoints_end = points[self.where.points['are_uboundaries']]
@@ -117,7 +117,7 @@ class Worker:
             self.recv_queue[p] = np.sort([local_points[r] for r in self.recv_queue[p]]) # convert to local idx
 
         for p in self.send_queue.keys:
-            self.send_queue[p] = np.sort(self.send_queue[p])
+            self.send_queue[p] = np.sort(np.unique(self.send_queue[p]))
 
     def _create_selectors(self):
         points = self.partition['points']['global_idx']
@@ -224,7 +224,6 @@ class Worker:
         for v in self.send_queue.values:
             send_flow.append(self.mem_pool_points.flowrate[v,t1])
             send_head.append(self.mem_pool_points.head[v,t1])
-        print(self.rank, send_flow, send_head, self._comm_buffer_flow)
         self._comm_buffer_flow = self.comm.neighbor_alltoall(send_flow)
         self._comm_buffer_head = self.comm.neighbor_alltoall(send_head)
         self.mem_pool_points.flowrate[self._recv_points, t1] = [item for sublist in self._comm_buffer_flow for item in sublist]
@@ -248,18 +247,19 @@ class Worker:
             self.point_properties.Bm,
             self.point_properties.has_plus,
             self.point_properties.has_minus)
-        run_boundary_step(
-            H0, Q1, H1,
-            self.node_results.leak_flow[:,t],
-            self.node_results.demand_flow[:,t],
-            self.point_properties.Cp,
-            self.point_properties.Bp,
-            self.point_properties.Cm,
-            self.point_properties.Bm,
-            self.ic['node'].leak_coefficient,
-            self.ic['node'].demand_coefficient,
-            self.ic['node'].elevation,
-            self.where)
+        if not self.node_results is None: # worker has junctions
+            run_boundary_step(
+                H0, Q1, H1,
+                self.node_results.leak_flow[:,t],
+                self.node_results.demand_flow[:,t],
+                self.point_properties.Cp,
+                self.point_properties.Bp,
+                self.point_properties.Cm,
+                self.point_properties.Bm,
+                self.ic['node'].leak_coefficient,
+                self.ic['node'].demand_coefficient,
+                self.ic['node'].elevation,
+                self.where)
         run_valve_step(
             Q1, H1,
             self.point_properties.Cp,
