@@ -179,6 +179,7 @@ class HammerSimulation:
         self.comm = MPI.COMM_WORLD
         if self.comm.size > self.num_points:
             raise ValueError("The number of cores is higher than the number of simulation points")
+        self.settings.num_processors = self.comm.size
         self.rank = self.comm.Get_rank()
         self.worker = None
 
@@ -283,9 +284,10 @@ class HammerSimulation:
         if not self.settings.updated_settings:
             self._update_settings()
         self.worker.run_step(self.t)
-        self.comm.Barrier()
-        self.worker.exchange_data(self.t)
-        self.worker.comm.Barrier()
+        if self.settings.num_processors > 1:
+            self.comm.Barrier()
+            self.worker.exchange_data(self.t)
+            self.worker.comm.Barrier()
         self.t += 1
 
     def _set_element_setting(self, type_, element_name, value, step = None, check_warning = False):

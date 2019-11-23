@@ -26,6 +26,9 @@ sim.add_curve('V_BUTTERFLY', 'valve',
 
 valves = sim.wn.valve_name_list
 sim.assign_curve_to('V_BUTTERFLY', valves)
-sim.settings.num_processors = 4
 sim.initialize()
-sim.run_step()
+
+t = time()
+while not sim.is_over:
+    sim.run_step()
+print('elapsed time [s]', time() - t, 's')
