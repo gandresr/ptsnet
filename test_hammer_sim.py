@@ -25,7 +25,7 @@ sim.add_curve('V_BUTTERFLY', 'valve',
 valves = sim.wn.valve_name_list
 sim.assign_curve_to('V_BUTTERFLY', valves)
 
-sim.define_valve_settings('TCV-1', np.linspace(0, 5, 50), np.linspace(1, 0, 50))
+sim.define_valve_settings('9', np.linspace(0, 5, 10), np.linspace(1, 1, 10))
 # sim.define_pump_settings('pump', np.linspace(0, 1, 50), np.linspace(1, 0, 50))
 
 sim.initialize()
@@ -36,8 +36,8 @@ while not sim.is_over:
 print(time() - t)
 
 tt = np.linspace(0, duration, sim.settings.time_steps)
-plt.plot(tt, sim.worker.pipe_start_results.flowrate.T)
-# plt.legend(sim.pipe_results._index_keys)
+plt.plot(tt, sim.worker.pipe_start_results.flowrate['8'])
+# plt.legend(sim.worker.pipe_start_results._index_keys)
 plt.title("Inflow in pipes")
 plt.xlabel("Time [s]")
 plt.ylabel("Flowrate $[m^3/s]$")

@@ -168,14 +168,14 @@ def get_partition(processors, rank, where, ic, wn):
                         if nonpipe_type == 'valve':
                             if processors[b - 1] != rank:
                                 points.append(b - 1)
-                                single_valves.append(ic['valve'].iloc(nonpipe.name))
-                                continue
+                            single_valves.append(ic['valve'].iloc(nonpipe.name))
+                            single_valve_points.append(b)
                             continue
                         if nonpipe_type == 'pump':
                             if processors[b + 1] != rank:
                                 points.append(b + 1)
-                                single_pumps.append(ic['pump'].iloc(nonpipe.name))
-                                continue
+                            single_pumps.append(ic['pump'].iloc(nonpipe.name))
+                            single_pump_points.append(b)
                             continue
                         continue
 
