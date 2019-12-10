@@ -6,7 +6,7 @@ import wntr
 from phammer.simulation.sim import HammerSimulation
 from time import time
 
-duration = 200; time_step = 1
+duration = 0.2; time_step = .1
 inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet.inp'
 
 sim = HammerSimulation(
@@ -15,6 +15,7 @@ sim = HammerSimulation(
         'time_step' : time_step,
         'duration' : duration,
         'skip_compatibility_check' : True,
+        'warnings_on' : False,
     },
     default_wave_speed = 1200)
 
@@ -25,19 +26,19 @@ sim.add_curve('V_BUTTERFLY', 'valve',
 valves = sim.wn.valve_name_list
 sim.assign_curve_to('V_BUTTERFLY', valves)
 
-sim.define_valve_settings('9', np.linspace(0, 5, 10), np.linspace(1, 1, 10))
+sim.define_valve_settings('9', np.linspace(0, 1, 10), np.linspace(1, 1, 10))
 # sim.define_pump_settings('pump', np.linspace(0, 1, 50), np.linspace(1, 0, 50))
 
 sim.initialize()
-
 t = time()
+
 while not sim.is_over:
     sim.run_step()
 print(time() - t)
 
 tt = np.linspace(0, duration, sim.settings.time_steps)
-plt.plot(tt, sim.worker.pipe_start_results.flowrate['8'])
-# plt.legend(sim.worker.pipe_start_results._index_keys)
+plt.plot(tt, sim.worker.pipe_start_results.flowrate.T)
+plt.legend(sim.worker.pipe_start_results._index_keys)
 plt.title("Inflow in pipes")
 plt.xlabel("Time [s]")
 plt.ylabel("Flowrate $[m^3/s]$")

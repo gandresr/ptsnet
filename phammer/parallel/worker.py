@@ -64,9 +64,11 @@ class Worker:
         if len(nodes) > 0:
             self.node_results = Table2D(NODE_RESULTS, len(nodes), self.time_steps, index = self.ic['node']._index_keys[nodes])
 
+        self.where.points['are_my_uboundaries'] =  self.where.points['are_uboundaries']
+            [self.processors[points[self.where.points['are_my_uboundaries']]] == rank]
         points = self.partition['points']['global_idx']
-        ppoints_start = points[self.where.points['are_dboundaries']]
-        ppoints_end = points[self.where.points['are_uboundaries']]
+        ppoints_start = points[self.where.points['are_my_dboundaries']]
+        ppoints_end = points[self.where.points['are_my_uboundaries']]
         pipes_start = self.global_where.points['to_pipes'][ppoints_start]
         pipes_end = self.global_where.points['to_pipes'][ppoints_end]
 
@@ -163,7 +165,6 @@ class Worker:
         self.where.points['start_inline_pump'] = sorter[np.searchsorted(points, self.partition['inline_pumps']['start_points'], sorter=sorter)]
         self.where.points['end_inline_pump'] = sorter[np.searchsorted(points, self.partition['inline_pumps']['end_points'], sorter=sorter)]
         self.where.points['start_inline_pump',] = self.partition['inline_pumps']['global_idx']
-        print(self.rank, points, self.partition['single_valves']['points'])
         self.where.points['are_single_valve'] = sorter[np.searchsorted(points, self.partition['single_valves']['points'], sorter=sorter)]
         self.where.points['are_single_valve',] = self.partition['single_valves']['global_idx']
         self.where.points['are_single_pump'] = sorter[np.searchsorted(points, self.partition['single_pumps']['points'], sorter=sorter)]
@@ -209,8 +210,8 @@ class Worker:
         self.point_properties.has_plus[self.where.points['are_inner']] = 1
         self.point_properties.has_minus[self.where.points['are_inner']] = 1
 
-        self.pipe_start_results.flowrate[:,0] = self.mem_pool_points.flowrate[self.where.points['are_dboundaries'], 0]
-        self.pipe_end_results.flowrate[:,0] = self.mem_pool_points.flowrate[self.where.points['are_uboundaries'], 0]
+        self.pipe_start_results.flowrate[:,0] = self.mem_pool_points.flowrate[self.where.points['are_my_dboundaries'], 0]
+        self.pipe_end_results.flowrate[:,0] = self.mem_pool_points.flowrate[self.where.points['are_my_uboundaries'], 0]
         # self.node_results.head[self.where.nodes['to_points',], 0] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
         # self.node_results.head[self.where.nodes['to_points',], 0] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
         # self.node_results.leak_flow[:, 0] = \
@@ -283,6 +284,5 @@ class Worker:
             self.ic['pump'].Hs,
             self.ic['pump'].setting,
             self.where)
-
-        self.pipe_start_results.flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_dboundaries'], t1]
-        self.pipe_end_results.flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_uboundaries'], t1]
+        self.pipe_start_results.flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_my_dboundaries'], t1]
+        self.pipe_end_results.flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_my_uboundaries'], t1]
