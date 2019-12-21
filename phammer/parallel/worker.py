@@ -27,9 +27,13 @@ class Worker:
         self.pipe_start_results = None
         self.pipe_end_results = None
         self.node_results = None
+        self.num_nodes = 0
+        self.num_start_pipes = 0
+        self.num_end_pipes = 0
         self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves', 'pumps'])
         self.processors = even(self.num_points, self.num_processors)
         self.partition = get_partition(self.processors, self.rank, self.global_where, self.ic, self.wn)
+        self.local_points = np.arange(len(self.partition['points']['global_idx']))
         self._create_selectors()
         self._define_worker_comm_queues()
         self._define_dist_graph_comm()
@@ -44,36 +48,34 @@ class Worker:
         self._load_initial_conditions()
 
     def _allocate_memory(self):
+        points = self.partition['points']['global_idx']
         self.mem_pool_points = Table2D(MEM_POOL_POINTS, len(self.partition['points']['global_idx']), 2)
         self.point_properties = Table(POINT_PROPERTIES, len(self.partition['points']['global_idx']))
 
-        nodes = []
-        nodes += list(self.partition['nodes']['global_idx'])
-        nodes += list(self.partition['tanks']['global_idx'])
-        nodes += list(self.partition['reservoirs']['global_idx'])
-        nodes += list(self.ic['valve'].start_node[self.partition['inline_valves']['global_idx']])
-        nodes += list(self.ic['valve'].end_node[self.partition['inline_valves']['global_idx']])
-        nodes += list(self.ic['pump'].start_node[self.partition['inline_pumps']['global_idx']])
-        nodes += list(self.ic['pump'].end_node[self.partition['inline_pumps']['global_idx']])
-        nodes += list(self.ic['valve'].start_node[self.partition['single_valves']['global_idx']])
-        nodes += list(self.ic['valve'].end_node[self.partition['single_valves']['global_idx']])
-        nodes += list(self.ic['pump'].start_node[self.partition['single_pumps']['global_idx']])
-        nodes += list(self.ic['pump'].end_node[self.partition['single_pumps']['global_idx']])
-        nodes = np.unique(nodes)
+        if self.num_nodes > 0:
+            self.node_results = Table2D(NODE_RESULTS, self.num_nodes, self.time_steps,
+                index = self.ic['node']._index_keys[self.where.nodes['all_to_points',]])
 
-        if len(nodes) > 0:
-            self.node_results = Table2D(NODE_RESULTS, len(nodes), self.time_steps, index = self.ic['node']._index_keys[nodes])
+        are_my_uboundaries = self.global_where.points['are_uboundaries'] \
+            [self.processors[self.global_where.points['are_uboundaries']] == self.rank]
+        self.where.points['are_my_uboundaries'] = self.local_points[np.isin(points, are_my_uboundaries)]
 
-        self.where.points['are_my_uboundaries'] =  self.where.points['are_uboundaries']
-            [self.processors[points[self.where.points['are_my_uboundaries']]] == rank]
-        points = self.partition['points']['global_idx']
+        are_my_dboundaries = self.global_where.points['are_dboundaries'] \
+            [self.processors[self.global_where.points['are_dboundaries']] == self.rank]
+        self.where.points['are_my_dboundaries'] = self.local_points[np.isin(points, are_my_dboundaries)]
+
         ppoints_start = points[self.where.points['are_my_dboundaries']]
         ppoints_end = points[self.where.points['are_my_uboundaries']]
         pipes_start = self.global_where.points['to_pipes'][ppoints_start]
         pipes_end = self.global_where.points['to_pipes'][ppoints_end]
 
-        self.pipe_start_results = Table2D(PIPE_START_RESULTS, len(ppoints_start), self.time_steps, index = self.ic['pipe']._index_keys[pipes_start])
-        self.pipe_end_results = Table2D(PIPE_END_RESULTS, len(ppoints_end), self.time_steps, index = self.ic['pipe']._index_keys[pipes_end])
+        self.num_start_pipes = len(ppoints_start)
+        self.num_end_pipes = len(ppoints_end)
+
+        if self.num_start_pipes > 0:
+            self.pipe_start_results = Table2D(PIPE_START_RESULTS, len(ppoints_start), self.time_steps, index = self.ic['pipe']._index_keys[pipes_start])
+        if self.num_end_pipes > 0:
+            self.pipe_end_results = Table2D(PIPE_END_RESULTS, len(ppoints_end), self.time_steps, index = self.ic['pipe']._index_keys[pipes_end])
 
     def _define_dist_graph_comm(self):
         self.comm = self.global_comm.Create_dist_graph_adjacent(
@@ -123,7 +125,7 @@ class Worker:
 
     def _create_selectors(self):
         points = self.partition['points']['global_idx']
-        nodes = self.partition['nodes']['global_idx']
+        jip_nodes = self.partition['nodes']['global_idx']
 
         sorter = np.arange(len(points))
         self.where.points['just_in_pipes'] = sorter[np.searchsorted(points, self.partition['nodes']['points'], sorter=sorter)]
@@ -155,9 +157,8 @@ class Worker:
         self.where.points['jip_uboundaries'] = np.where(np.isin(points, self.global_where.points['are_boundaries'][selector_uboundaries]))[0]
         self.where.points['jip_uboundaries',] = ppipes[selector_uboundaries]
         # ---------------------------
-        self.where.nodes['just_in_pipes'] = np.arange(len(nodes))
         diff = np.diff(njip)
-        self.where.points['just_in_pipes',] = np.array([i for i in range(len(nodes)) for j in range(diff[i])], dtype = int)
+        self.where.points['just_in_pipes',] = np.array([i for i in range(len(jip_nodes)) for j in range(diff[i])], dtype = int)
         # ---------------------------
         self.where.points['start_inline_valve'] = sorter[np.searchsorted(points, self.partition['inline_valves']['start_points'], sorter=sorter)]
         self.where.points['end_inline_valve'] = sorter[np.searchsorted(points, self.partition['inline_valves']['end_points'], sorter=sorter)]
@@ -169,6 +170,34 @@ class Worker:
         self.where.points['are_single_valve',] = self.partition['single_valves']['global_idx']
         self.where.points['are_single_pump'] = sorter[np.searchsorted(points, self.partition['single_pumps']['points'], sorter=sorter)]
         self.where.points['are_single_pump',] = self.partition['single_pumps']['global_idx']
+        # ---------------------------
+        nodes = []; node_points = []
+        nodes += list(self.partition['nodes']['global_idx'])
+        node_points += list(self.partition['nodes']['points'])
+        nodes += list(self.partition['tanks']['global_idx'])
+        node_points += list(self.partition['tanks']['points'])
+        nodes += list(self.partition['reservoirs']['global_idx'])
+        node_points += list(self.partition['reservoirs']['points'])
+        nodes += list(self.ic['valve'].start_node[self.partition['inline_valves']['global_idx']])
+        node_points += list(self.partition['inline_valves']['start_points'])
+        nodes += list(self.ic['valve'].end_node[self.partition['inline_valves']['global_idx']])
+        node_points += list(self.partition['inline_valves']['end_points'])
+        nodes += list(self.ic['pump'].start_node[self.partition['inline_pumps']['global_idx']])
+        node_points += list(self.partition['inline_pumps']['start_points'])
+        nodes += list(self.ic['pump'].end_node[self.partition['inline_pumps']['global_idx']])
+        node_points += list(self.partition['inline_pumps']['end_points'])
+        nodes += list(self.ic['valve'].start_node[self.partition['single_valves']['global_idx']])
+        node_points += list(self.partition['single_valves']['points'])
+        nodes += list(self.ic['pump'].end_node[self.partition['single_pumps']['global_idx']])
+        node_points += list(self.partition['single_pumps']['points'])
+        nodes, where_nodes_unique = np.unique(nodes, return_index = True)
+        node_points = np.array(node_points)
+        node_points = node_points[where_nodes_unique]
+        if len(nodes) > 0:
+            self.num_nodes = len(nodes)
+            self.where.nodes['all_to_points'] = self.local_points[np.isin(points, node_points)]
+            self.where.nodes['all_to_points',] = nodes
+            self.where.nodes['all_just_in_pipes'] = np.arange(len(self.partition['nodes']['global_idx']))
 
     def define_initial_conditions_for_points(self, points, pipe, start, end):
         q = self.ic['pipe'].flowrate[pipe]
@@ -210,14 +239,18 @@ class Worker:
         self.point_properties.has_plus[self.where.points['are_inner']] = 1
         self.point_properties.has_minus[self.where.points['are_inner']] = 1
 
-        self.pipe_start_results.flowrate[:,0] = self.mem_pool_points.flowrate[self.where.points['are_my_dboundaries'], 0]
-        self.pipe_end_results.flowrate[:,0] = self.mem_pool_points.flowrate[self.where.points['are_my_uboundaries'], 0]
-        # self.node_results.head[self.where.nodes['to_points',], 0] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
-        # self.node_results.head[self.where.nodes['to_points',], 0] = self.mem_pool_points.head[self.where.nodes['to_points'], 0]
-        # self.node_results.leak_flow[:, 0] = \
-        #     self.ic['node'].leak_coefficient * np.sqrt(self.ic['node'].pressure)
-        # self.node_results.demand_flow[:, 0] = \
-        #     self.ic['node'].demand_coefficient * np.sqrt(self.ic['node'].pressure)
+        if self.num_start_pipes > 0:
+            self.pipe_start_results.flowrate[:,0] = self.mem_pool_points.flowrate[self.where.points['are_my_dboundaries'], 0]
+        if self.num_end_pipes > 0:
+            self.pipe_end_results.flowrate[:,0] = self.mem_pool_points.flowrate[self.where.points['are_my_uboundaries'], 0]
+        if self.num_nodes > 0:
+            self.node_results.head[:, 0] = self.mem_pool_points.head[self.where.nodes['all_to_points'], 0]
+            self.node_results.leak_flow[:, 0] = \
+                self.ic['node'].leak_coefficient[self.where.nodes['all_to_points',]] * \
+                    np.sqrt(self.ic['node'].pressure[self.where.nodes['all_to_points',]])
+            self.node_results.demand_flow[:, 0] = \
+                self.ic['node'].demand_coefficient[self.where.nodes['all_to_points',]] * \
+                    np.sqrt(self.ic['node'].pressure[self.where.nodes['all_to_points',]])
 
     def exchange_data(self, t):
         t1 = t % 2; t0 = 1 - t1
@@ -258,9 +291,9 @@ class Worker:
                 self.point_properties.Bp,
                 self.point_properties.Cm,
                 self.point_properties.Bm,
-                self.ic['node'].leak_coefficient,
-                self.ic['node'].demand_coefficient,
-                self.ic['node'].elevation,
+                self.ic['node'].leak_coefficient[self.where.nodes['all_to_points',]],
+                self.ic['node'].demand_coefficient[self.where.nodes['all_to_points',]],
+                self.ic['node'].elevation[self.where.nodes['all_to_points',]],
                 self.where)
         run_valve_step(
             Q1, H1,
@@ -284,5 +317,9 @@ class Worker:
             self.ic['pump'].Hs,
             self.ic['pump'].setting,
             self.where)
-        self.pipe_start_results.flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_my_dboundaries'], t1]
-        self.pipe_end_results.flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_my_uboundaries'], t1]
+        if self.num_start_pipes > 0:
+            self.pipe_start_results.flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_my_dboundaries'], t1]
+        if self.num_end_pipes > 0:
+            self.pipe_end_results.flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_my_uboundaries'], t1]
+        if self.num_nodes > 0:
+            self.node_results.head[:, t] = self.mem_pool_points.head[self.where.nodes['all_to_points'], t1]

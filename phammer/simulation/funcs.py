@@ -55,8 +55,8 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
         np.add.reduceat(Bp[where.points['just_in_pipes']], where.nodes['just_in_pipes',])
 
     X =  sc / sb
-    K = ((Ke[where.nodes['just_in_pipes']] + Kd[where.nodes['just_in_pipes']])/sb)**2
-    HZ = X - Z[where.nodes['just_in_pipes']]
+    K = ((Ke[where.nodes['all_just_in_pipes']] + Kd[where.nodes['all_just_in_pipes']])/sb)**2
+    HZ = X - Z[where.nodes['all_just_in_pipes']]
     K[HZ < 0] = 0
     HH = ((2*X + K) - np.sqrt(K**2 + 4*K*HZ)) / 2
     H1[where.points['just_in_pipes']] = HH[where.points['just_in_pipes',]]
@@ -68,10 +68,10 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
         - H1[where.points['jip_uboundaries']] * Bp[where.points['jip_uboundaries']]
 
     # Get demand and leak flows
-    HH -= Z[where.nodes['just_in_pipes']]
+    HH -= Z[where.nodes['all_just_in_pipes']]
     HH[HH < 0] = 0 # No demand/leak flow with negative pressure
-    E1[where.nodes['just_in_pipes']] = Ke[where.nodes['just_in_pipes']] * np.sqrt(HH)
-    D1[where.nodes['just_in_pipes']] = Kd[where.nodes['just_in_pipes']] * np.sqrt(HH)
+    E1[where.nodes['all_just_in_pipes']] = Ke[where.nodes['all_just_in_pipes']] * np.sqrt(HH)
+    D1[where.nodes['all_just_in_pipes']] = Kd[where.nodes['all_just_in_pipes']] * np.sqrt(HH)
 
 # @jit(nopython = True, cache = True, parallel = PARALLEL)
 def run_valve_step(Q1, H1, Cp, Bp, Cm, Bm, setting, coeff, area, where):
