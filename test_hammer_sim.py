@@ -7,7 +7,7 @@ from phammer.simulation.sim import HammerSimulation
 from time import time
 
 duration = 200; time_step = 1
-inpfile = '/home/griano/Documents/Github/phammer/example_files/LoopedNet.inp'
+inpfile = '/home/griano/Documents/Github/phammer/example_files/LoopedNet_leak_us.inp'
 
 sim = HammerSimulation(
     inpfile,
@@ -65,12 +65,12 @@ plt.show()
 # # plt.ylabel("Pressure $[m]$")
 # # plt.show()
 
-# # plt.plot(tt, sim.node_results.leak_flow.T)
-# # # plt.legend(sim.node_results._index_keys)
-# # plt.title("Leak flow in nodes")
-# # plt.xlabel("Time [s]")
-# # plt.ylabel("Leak flow $[m^3/s]$")
-# # plt.show()
+plt.plot(tt, sim.worker.node_results.leak_flow.T)
+plt.legend(sim.worker.node_results._index_keys)
+plt.title("Leak flow in nodes")
+plt.xlabel("Time [s]")
+plt.ylabel("Leak flow $[m^3/s]$")
+plt.show()
 
 # plt.plot(tt, sim.node_results.demand_flow.T)
 # plt.legend(sim.node_results._index_keys)
