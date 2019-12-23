@@ -173,6 +173,8 @@ class HammerSimulation:
         self.curves = ObjArray()
         self.element_settings = {type_ : ElementSettings(self) for type_ in self.SETTING_TYPES}
         self.settings.defined_wave_speeds = self.initializator.set_wave_speeds(default_wave_speed, wave_speed_file, delimiter)
+        if self.settings.time_step > self.settings.duration:
+            raise ValueError("Duration has to be larger than time step")
         self.initializator.create_selectors()
         self.t = 0
         # ----------------------------------------
@@ -231,11 +233,15 @@ class HammerSimulation:
         self._define_element_setting(node_name, 'demand', X, Y)
 
     def add_curve(self, curve_name, type_, X, Y):
+        if len(self.ic[type_]._index_keys) == 0:
+            raise ValueError("There are not elements of type '" + type_ + "' in the model")
         self.curves[curve_name] = HammerCurve(X, Y, type_)
 
     def assign_curve_to(self, curve_name, elements):
         if type(elements) == str:
             elements = [elements]
+        if len(elements) == 0:
+            raise ValueError("No elements were specified")
         type_ = self.curves[curve_name].type
         for element in elements:
             if self.ic[type_].curve_index[element] == -1:

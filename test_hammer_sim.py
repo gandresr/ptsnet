@@ -2,44 +2,53 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import wntr
+import tsnet
 
 from phammer.simulation.sim import HammerSimulation
 from time import time
 
-duration = 1e-4; time_step = 1
-inpfile = '/home/griano/Documents/Github/phammer/example_files/Tnet2.inp'
+duration = 200; time_step = 1
+inpfile = '/home/griano/Documents/Github/phammer/example_files/simple_pump.inp'
 
 sim = HammerSimulation(
     inpfile,
     {
         'time_step' : time_step,
         'duration' : duration,
-        'skip_compatibility_check' : True,
+        'skip_compatibility_check' : False,
     },
     default_wave_speed = 1200)
 
-sim.add_curve('V_BUTTERFLY', 'valve',
-    [1, 0.8, 0.6, 0.4, 0.2, 0],
-    [0.0614, 0.044, 0.024, 0.011, 0.004, 0.   ])
+
+# sim.add_curve('V_BUTTERFLY', 'valve',
+#     [1, 0.8, 0.6, 0.4, 0.2, 0],
+#     [0.0014, 0.044, 0.024, 0.011, 0.004, 0.   ])
 
 valves = sim.wn.valve_name_list
-sim.assign_curve_to('V_BUTTERFLY', valves)
+# sim.assign_curve_to('V_BUTTERFLY', valves)
 
-sim.define_valve_settings(valves[0], np.linspace(0, 5, 10), np.linspace(1, 0, 10))
+# sim.define_valve_settings(valves[0], np.linspace(0, 5, 10), np.linspace(1, 0, 10))
 # sim.define_pump_settings('pump', np.linspace(0, 1, 50), np.linspace(1, 0, 50))
 
 sim.initialize()
 
+t1 = time()
 while not sim.is_over:
-    t1 = time()
     sim.run_step()
-    t2 = time()
-    print(t2 - t1)
+t2 = time()
+print(t2 - t1)
 
+tm = tsnet.network.TransientModel(inpfile)
+tm.set_wavespeed(1200.) # m/s
+tm.set_time(200)
+tm = tsnet.simulation.Initializer(tm, 0, 'DD')
+tm = tsnet.simulation.MOCSimulator(tm)
 
+p1 = tm.get_link('p1')
 tt = np.linspace(0, duration, sim.settings.time_steps)
-plt.plot(tt, sim.worker.pipe_start_results.flowrate.T)
-plt.legend(sim.worker.pipe_start_results._index_keys)
+plt.plot(tt, sim.worker.pipe_end_results.flowrate['p1'])
+plt.plot(tm.simulation_timestamps,p1.end_node_flowrate)
+# plt.legend(sim.worker.pipe_start_results._index_keys)
 plt.title("Inflow in pipes")
 plt.xlabel("Time [s]")
 plt.ylabel("Flowrate $[m^3/s]$")
@@ -54,7 +63,7 @@ plt.show()
 # # plt.show()
 
 # plt.plot(tt, sim.worker.node_results.head.T)
-# plt.legend(sim.worker.node_results._index_keys)
+# # plt.legend(sim.worker.node_results._index_keys)
 # plt.title("Head in nodes")
 # plt.xlabel("Time [s]")
 # plt.ylabel("Head $[m]$")
