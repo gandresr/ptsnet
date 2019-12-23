@@ -71,7 +71,6 @@ class Worker:
 
         self.num_start_pipes = len(ppoints_start)
         self.num_end_pipes = len(ppoints_end)
-
         if self.num_start_pipes > 0:
             self.pipe_start_results = Table2D(PIPE_START_RESULTS, len(ppoints_start), self.time_steps, index = self.ic['pipe']._index_keys[pipes_start])
         if self.num_end_pipes > 0:
@@ -173,7 +172,7 @@ class Worker:
         # ---------------------------
         nodes = []; node_points = []
         nodes += list(self.partition['nodes']['global_idx'])
-        node_points += list(self.partition['nodes']['points'])
+        node_points += list(self.partition['nodes']['points'][self.where.nodes['just_in_pipes',]])
         nodes += list(self.partition['tanks']['global_idx'])
         node_points += list(self.partition['tanks']['points'])
         nodes += list(self.partition['reservoirs']['global_idx'])
@@ -190,14 +189,16 @@ class Worker:
         node_points += list(self.partition['single_valves']['points'])
         nodes += list(self.ic['pump'].end_node[self.partition['single_pumps']['global_idx']])
         node_points += list(self.partition['single_pumps']['points'])
-        nodes, where_nodes_unique = np.unique(nodes, return_index = True)
+        nodes = np.array(nodes)
         node_points = np.array(node_points)
-        node_points = node_points[where_nodes_unique]
+        print(len(np.unique(node_points)), len(nodes))
         if len(nodes) > 0:
             self.num_nodes = len(nodes)
-            self.where.nodes['all_to_points'] = self.local_points[np.isin(points, node_points)]
-            self.where.nodes['all_to_points',] = nodes
-            self.where.nodes['all_just_in_pipes'] = np.arange(len(self.partition['nodes']['global_idx']))
+            order = np.argsort(node_points)
+            self.where.nodes['all_to_points'] = np.sort(self.local_points[np.isin(points, node_points)])
+            self.where.nodes['all_to_points',] = nodes[order]
+            self.where.nodes['all_just_in_pipes'] = np.where( \
+                np.isin(self.where.nodes['all_to_points'], self.partition['nodes']['points']))[0]
 
     def define_initial_conditions_for_points(self, points, pipe, start, end):
         q = self.ic['pipe'].flowrate[pipe]
@@ -240,6 +241,7 @@ class Worker:
         self.point_properties.has_minus[self.where.points['are_inner']] = 1
 
         if self.num_start_pipes > 0:
+            print(self.pipe_start_results.flowrate.shape)
             self.pipe_start_results.flowrate[:,0] = self.mem_pool_points.flowrate[self.where.points['are_my_dboundaries'], 0]
         if self.num_end_pipes > 0:
             self.pipe_end_results.flowrate[:,0] = self.mem_pool_points.flowrate[self.where.points['are_my_uboundaries'], 0]

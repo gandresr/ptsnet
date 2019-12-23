@@ -107,7 +107,6 @@ def run_valve_step(Q1, H1, Cp, Bp, Cm, Bm, setting, coeff, area, where):
         H1[where.points['end_inline_valve']] = CM + BM*Q1[where.points['start_inline_valve']]
 
 def run_pump_step(source_head, Q1, H1, Cp, Bp, Cm, Bm, a1, a2, Hs, setting, where):
-
     if len(where.points['are_single_pump']) > 0:
         CP = source_head[where.points['are_single_pump',]]
         BP = np.zeros(len(where.points['are_single_pump']))

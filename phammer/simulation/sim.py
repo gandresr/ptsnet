@@ -213,7 +213,10 @@ class HammerSimulation:
 
     def _define_element_setting(self, element, type_, X, Y):
         ic_type = self.SETTING_TYPES[type_]
-        self.element_settings[type_]._dump_settings(self.ic[ic_type].iloc(element), X, Y)
+        if X[0] == 0:
+            self.element_settings[type_]._dump_settings(self.ic[ic_type].iloc(element), X[1:], Y[1:])
+        else:
+            self.element_settings[type_]._dump_settings(self.ic[ic_type].iloc(element), X, Y)
 
     def define_valve_settings(self, valve_name, X, Y):
         self._define_element_setting(valve_name, 'valve', X, Y)
