@@ -126,8 +126,7 @@ class Worker:
         points = self.partition['points']['global_idx']
         jip_nodes = self.partition['nodes']['global_idx']
 
-        sorter = np.arange(len(points))
-        self.where.points['just_in_pipes'] = sorter[np.searchsorted(points, self.partition['nodes']['points'], sorter=sorter)]
+        self.where.points['just_in_pipes'] = self.partition['nodes']['points']
         self.where.points['are_tanks'] = np.where(np.isin(points, self.partition['tanks']['points']))[0]
         self.where.points['are_reservoirs'] = np.where(np.isin(points, self.partition['reservoirs']['points']))[0]
         njip = np.cumsum(self.partition['nodes']['context'])
@@ -159,6 +158,7 @@ class Worker:
         diff = np.diff(njip)
         self.where.points['just_in_pipes',] = np.array([i for i in range(len(jip_nodes)) for j in range(diff[i])], dtype = int)
         # ---------------------------
+        sorter = np.arange(len(points))
         self.where.points['start_inline_valve'] = sorter[np.searchsorted(points, self.partition['inline_valves']['start_points'], sorter=sorter)]
         self.where.points['end_inline_valve'] = sorter[np.searchsorted(points, self.partition['inline_valves']['end_points'], sorter=sorter)]
         self.where.points['start_inline_valve',] = self.partition['inline_valves']['global_idx']
@@ -191,14 +191,12 @@ class Worker:
         node_points += list(self.partition['single_pumps']['points'])
         nodes = np.array(nodes)
         node_points = np.array(node_points)
-        print(len(np.unique(node_points)), len(nodes))
         if len(nodes) > 0:
             self.num_nodes = len(nodes)
             order = np.argsort(node_points)
             self.where.nodes['all_to_points'] = np.sort(self.local_points[np.isin(points, node_points)])
             self.where.nodes['all_to_points',] = nodes[order]
-            self.where.nodes['all_just_in_pipes'] = np.where( \
-                np.isin(self.where.nodes['all_to_points'], self.partition['nodes']['points']))[0]
+            self.where.nodes['all_just_in_pipes'] = self.partition['nodes']['global_idx']
 
     def define_initial_conditions_for_points(self, points, pipe, start, end):
         q = self.ic['pipe'].flowrate[pipe]
@@ -209,7 +207,6 @@ class Worker:
         npoints = points - start_point # normalized
 
         shead = self.ic['node'].head[start_node]
-
         self.point_properties.B[start:end] = self.ic['pipe'].wave_speed[pipe] / (G * self.ic['pipe'].area[pipe])
         self.point_properties.R[start:end] = self.ic['pipe'].ffactor[pipe] * self.ic['pipe'].dx[pipe] / \
             (2 * G * self.ic['pipe'].diameter[pipe] * self.ic['pipe'].area[pipe] ** 2)
@@ -293,9 +290,9 @@ class Worker:
                 self.point_properties.Bp,
                 self.point_properties.Cm,
                 self.point_properties.Bm,
-                self.ic['node'].leak_coefficient[self.where.nodes['all_to_points',]],
-                self.ic['node'].demand_coefficient[self.where.nodes['all_to_points',]],
-                self.ic['node'].elevation[self.where.nodes['all_to_points',]],
+                self.ic['node'].leak_coefficient,
+                self.ic['node'].demand_coefficient,
+                self.ic['node'].elevation,
                 self.where)
         run_valve_step(
             Q1, H1,

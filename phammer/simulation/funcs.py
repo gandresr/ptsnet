@@ -58,6 +58,7 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
     K = ((Ke[where.nodes['all_just_in_pipes']] + Kd[where.nodes['all_just_in_pipes']])/sb)**2
     HZ = X - Z[where.nodes['all_just_in_pipes']]
     K[HZ < 0] = 0
+
     HH = ((2*X + K) - np.sqrt(K**2 + 4*K*HZ)) / 2
     H1[where.points['just_in_pipes']] = HH[where.points['just_in_pipes',]]
     H1[where.points['are_reservoirs']] = H0[where.points['are_reservoirs']]

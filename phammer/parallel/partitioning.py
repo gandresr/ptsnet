@@ -108,11 +108,6 @@ def get_partition(processors, rank, where, ic, wn):
                         tanks.append(node); tanks_points_list.append(b); continue
                     if nnode.node_type == 'Reservoir':
                         reservoirs.append(node); reservoirs_points_list.append(b); continue
-                    if nnode.node_type == 'Junction':
-                        nodes.append(node)
-                        node_points_list.append(b)
-                        node_points_context.append(1)
-                        visited_nodes.append(node)
 
                 elif len(links) > 1:
                     l1 = wn.get_link(links[0])
@@ -203,10 +198,6 @@ def get_partition(processors, rank, where, ic, wn):
 
             if processors[b+x] != rank: # extra point needed
                 points.append(b+x)
-            if where.nodes['to_points',][node] == 1:
-                points.append(b)
-                visited_nodes.append(node)
-                continue
 
             to_points_are_uboundaries = where.nodes['to_points_are_uboundaries'][start:end]
             slots = np.arange(len(node_points)*2)
