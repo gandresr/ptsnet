@@ -3,28 +3,28 @@
 
 [JUNCTIONS]
 ;ID              	Elev        	Demand      	Pattern         
- 1               	0           	0           	                	;
- 2               	0           	0           	                	;
- END             	0           	1           	                	;
+ 2               	0           	0          	                	;
+ 3               	0           	0          	                	;
+ 4               	0           	50           	                	;
 
 [RESERVOIRS]
 ;ID              	Head        	Pattern         
- T               	100         	                	;
+ 1               	750         	                	;
 
 [TANKS]
 ;ID              	Elevation   	InitLevel   	MinLevel    	MaxLevel    	Diameter    	MinVol      	VolCurve
 
 [PIPES]
 ;ID              	Node1           	Node2           	Length      	Diameter    	Roughness   	MinorLoss   	Status
- p1              	T               	1               	1000        	600         	100         	0           	Open  	;
- p2              	2               	END             	1000        	600         	100         	0           	Open  	;
+ 1               	1               	2               	1200        	600         	0.02        	0           	Open  	;
+ 2               	2               	3               	1200         	1200        	0.02        	0           	Open  	;
 
 [PUMPS]
 ;ID              	Node1           	Node2           	Parameters
- pump            	1               	2               	HEAD 1	;
 
 [VALVES]
 ;ID              	Node1           	Node2           	Diameter    	Type	Setting     	MinorLoss   
+ 3               	3               	4               	158         	PRV 	100000      	0           	;
 
 [TAGS]
 
@@ -33,20 +33,21 @@
 
 [STATUS]
 ;ID              	Status/Setting
+ 3               	Open
 
 [PATTERNS]
 ;ID              	Multipliers
 
 [CURVES]
 ;ID              	X-Value     	Y-Value
-;PUMP: 
- 1               	0           	133         
- 1               	200         	100         
- 1               	400         	2           
 
 [CONTROLS]
 
+
+
 [RULES]
+
+
 
 [ENERGY]
  Global Efficiency  	75
@@ -79,15 +80,15 @@
 ;Tank            	Model
 
 [TIMES]
- Duration           	0
- Hydraulic Timestep 	1:00
- Quality Timestep   	0:05
- Pattern Timestep   	1:00
- Pattern Start      	0:00
- Report Timestep    	1:00
- Report Start       	0:00
+ Duration           	0:00 
+ Hydraulic Timestep 	1:00 
+ Quality Timestep   	0:05 
+ Pattern Timestep   	1:00 
+ Pattern Start      	0:00 
+ Report Timestep    	1:00 
+ Report Start       	0:00 
  Start ClockTime    	12 am
- Statistic          	None
+ Statistic          	NONE
 
 [REPORT]
  Status             	No
@@ -96,7 +97,7 @@
 
 [OPTIONS]
  Units              	LPS
- Headloss           	H-W
+ Headloss           	D-W
  Specific Gravity   	1
  Viscosity          	1
  Trials             	40
@@ -114,16 +115,22 @@
 
 [COORDINATES]
 ;Node            	X-Coord         	Y-Coord
- 1               	1583.33         	5000.00         
- 2               	3416.67         	5037.04         
- END             	5435.19         	5000.00         
- T               	-435.19         	5074.07         
+ 2               	-1167.70        	8919.75         
+ 3               	293.21          	8919.75         
+ 4               	704.78          	8886.13         
+ 1               	-2319.96        	8909.47         
 
 [VERTICES]
 ;Link            	X-Coord         	Y-Coord
 
 [LABELS]
 ;X-Coord           Y-Coord          Label & Anchor Node
+ -2423.20         9069.59          "Reservoir"                 
+ -1705.20         8870.76          "Pipe1"                 
+ -468.04          8881.81          "Pipe2"                 
+ -1208.13         9043.82          "Junc2"                 
+ 231.48           9053.50          "Junc3"                 
+ 612.95           9040.58          "Junc4"                 
 
 [BACKDROP]
  DIMENSIONS     	0.00            	0.00            	10000.00        	10000.00        

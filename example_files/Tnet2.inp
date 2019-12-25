@@ -273,19 +273,19 @@ Date: 6/26/2019 2:45:30 PM
 
 [CURVES]
 ;ID              	X-Value     	Y-Value
-;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP:
+;PUMP: PUMP: PUMP: PUMP: PUMP:
  335             	0           	200         
  335             	8000        	138         
  335             	14000       	86          
-;PUMP: PUMP: PUMP: PUMP: PUMP: EFFICIENCY:
+;PUMP: PUMP: PUMP: PUMP: EFFICIENCY:
  335E            	0           	75          
  335E            	8000        	75          
  335E            	14000       	75          
-;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP:
+;PUMP: PUMP: PUMP: PUMP: PUMP:
  10              	0           	104         
  10              	2000        	92          
  10              	4000        	63          
-;PUMP: PUMP: PUMP: PUMP: PUMP: EFFICIENCY:
+;PUMP: PUMP: PUMP: PUMP: EFFICIENCY:
  10E             	0           	75          
  10E             	2000        	75          
  10E             	4000        	75          
@@ -295,9 +295,7 @@ Date: 6/26/2019 2:45:30 PM
 
 
 
-
 [RULES]
-
 
 
 
@@ -460,7 +458,7 @@ Date: 6/26/2019 2:45:30 PM
  305-A           	25.08           	22.31           
  305-B           	25.82           	22.10           
  River           	24.15           	31.06           
- Lake            	7.21            	27.26           
+ Lake            	8.00            	27.53           
  3               	29.41           	27.27           
  2               	32.99           	3.45            
  1               	27.46           	9.84            

@@ -48,7 +48,8 @@
 
 [STATUS]
 ;ID              	Status/Setting
- 11              	Closed
+ 10              	Open
+ 11              	Open
 
 [PATTERNS]
 ;ID              	Multipliers
@@ -60,7 +61,9 @@
 
 
 
+
 [RULES]
+
 
 
 

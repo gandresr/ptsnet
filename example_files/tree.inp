@@ -3,8 +3,8 @@
 
 [JUNCTIONS]
 ;ID              	Elev        	Demand      	Pattern         
- 3               	0           	0           	                	;
- 4               	0           	0           	                	;
+ 3               	0           	0.01        	                	;
+ 4               	0           	0.02112     	                	;
  5               	0           	0.003       	                	;
  6               	0           	0.001       	                	;
  7               	0           	0           	                	;
@@ -62,7 +62,9 @@
 
 [CONTROLS]
 
+
 [RULES]
+
 
 [ENERGY]
  Global Efficiency  	75
@@ -95,15 +97,15 @@
 ;Tank            	Model
 
 [TIMES]
- Duration           	0
- Hydraulic Timestep 	1:00
- Quality Timestep   	0:05
- Pattern Timestep   	1:00
- Pattern Start      	0:00
- Report Timestep    	1:00
- Report Start       	0:00
+ Duration           	0:00 
+ Hydraulic Timestep 	1:00 
+ Quality Timestep   	0:05 
+ Pattern Timestep   	1:00 
+ Pattern Start      	0:00 
+ Report Timestep    	1:00 
+ Report Start       	0:00 
  Start ClockTime    	12 am
- Statistic          	None
+ Statistic          	NONE
 
 [REPORT]
  Status             	No

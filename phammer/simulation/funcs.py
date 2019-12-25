@@ -97,6 +97,7 @@ def run_valve_step(Q1, H1, Cp, Bp, Cm, Bm, setting, coeff, area, where):
         CP = Cp[where.points['start_inline_valve']]
         BP = Bp[where.points['start_inline_valve']]
 
+        print(CM, BM, CP, BP)
         S = np.sign(CP - CM)
         CV = 2 * G * (setting[where.points['start_inline_valve',]] \
             * coeff[where.points['start_inline_valve',]] \

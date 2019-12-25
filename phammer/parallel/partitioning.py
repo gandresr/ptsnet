@@ -82,7 +82,6 @@ def get_partition(processors, rank, where, ic, wn):
         if b in boundaries_to_nodes: # Boundary point
             node = boundaries_to_nodes[b]
             degree = where.nodes['to_points',][node]
-
             if node in visited_nodes:
                 continue
 
@@ -92,12 +91,13 @@ def get_partition(processors, rank, where, ic, wn):
 
                 if len(links) == 1:
                     l = wn.get_link(links[0])
-                    snode = l.start_node
-                    enode = l.end_node
-                    if ic['pipe'].direction[l.name] < 0:
-                        snode, enode = enode, snode
+                    snode = ic['pipe'].start_node[l.name]
+                    enode = ic['pipe'].end_node[l.name]
 
-                    if nnode.node_type in ('Reservoir', 'Tank'):
+                    in_reservoirs = node in reservoirs
+                    in_tanks = node in tanks
+                    if (nnode.node_type == 'Reservoir' and not in_reservoirs) or \
+                        (nnode.node_type == 'Tank' and not in_tanks):
                         if snode == node:
                             points.append(b+1)
                         elif enode == node:
@@ -105,9 +105,15 @@ def get_partition(processors, rank, where, ic, wn):
                         visited_nodes.append(node)
                         points.append(b)
                     if nnode.node_type == 'Tank':
-                        tanks.append(node); tanks_points_list.append(b); continue
+                        if not in_tanks:
+                            tanks.append(node)
+                            tanks_points_list.append(b)
+                        continue
                     if nnode.node_type == 'Reservoir':
-                        reservoirs.append(node); reservoirs_points_list.append(b); continue
+                        if not in_reservoirs:
+                            reservoirs.append(node)
+                            reservoirs_points_list.append(b)
+                        continue
 
                 elif len(links) > 1:
                     l1 = wn.get_link(links[0])
@@ -126,16 +132,23 @@ def get_partition(processors, rank, where, ic, wn):
 
                     # Get upstream and downstream pipes
                     if start_deg == 2:
-                        start_links = wn.get_links_for_node(nonpipe.start_node.name)
+                        start_links = wn.get_links_for_node(ic['node'].ival(nonpipe_start))
                         start_links.remove(nonpipe.name)
                         start_pipe_idx = ic['pipe'].iloc(start_links[0])
-                        nonpipe_start_point = where.points['are_boundaries'][2*start_pipe_idx+1]
+                        if nonpipe_start == ic['pipe'].start_node[start_pipe_idx]:
+                            npipe_spoint = 2*start_pipe_idx
+                        elif nonpipe_start == ic['pipe'].end_node[start_pipe_idx]:
+                            npipe_spoint = 2*start_pipe_idx + 1
+                        nonpipe_start_point = where.points['are_boundaries'][npipe_spoint]
                     if end_deg == 2:
-                        end_links = wn.get_links_for_node(nonpipe.end_node.name)
+                        end_links = wn.get_links_for_node(ic['node'].ival(nonpipe_end))
                         end_links.remove(nonpipe.name)
                         end_pipe_idx = ic['pipe'].iloc(end_links[0])
-                        nonpipe_end_point = where.points['are_boundaries'][2*end_pipe_idx]
-
+                        if nonpipe_end == ic['pipe'].start_node[end_pipe_idx]:
+                            npipe_epoint = 2*end_pipe_idx
+                        elif nonpipe_end == ic['pipe'].end_node[end_pipe_idx]:
+                            npipe_epoint = 2*end_pipe_idx + 1
+                        nonpipe_end_point = where.points['are_boundaries'][npipe_epoint]
                     if is_inline:
                         nonpipe_points = [nonpipe_start_point, nonpipe_end_point]
                         processor_in_charge = min(processors[nonpipe_points])
@@ -152,13 +165,17 @@ def get_partition(processors, rank, where, ic, wn):
                             if processors[nonpipe_end_point + 1] != rank:
                                 points.append(nonpipe_end_point+1)
                             if nonpipe_type == 'valve':
-                                inline_valves.append(ic['valve'].iloc(nonpipe.name))
-                                start_inline_valves.append(nonpipe_start_point)
-                                end_inline_valves.append(nonpipe_end_point)
+                                loc = ic['valve'].iloc(nonpipe.name)
+                                if not loc in inline_valves:
+                                    inline_valves.append(loc)
+                                    start_inline_valves.append(nonpipe_start_point)
+                                    end_inline_valves.append(nonpipe_end_point)
                             elif nonpipe_type == 'pump':
-                                inline_pumps.append(ic['pump'].iloc(nonpipe.name))
-                                start_inline_pumps.append(nonpipe_start_point)
-                                end_inline_pumps.append(nonpipe_end_point)
+                                loc = ic['pump'].iloc(nonpipe.name)
+                                if not loc in inline_pumps:
+                                    inline_pumps.append(loc)
+                                    start_inline_pumps.append(nonpipe_start_point)
+                                    end_inline_pumps.append(nonpipe_end_point)
                             visited_nodes.append(node)
                             continue
                         continue
@@ -235,7 +252,7 @@ def get_partition(processors, rank, where, ic, wn):
         'nodes' : {
             'global_idx' : np.array(nodes).astype(int),
             'points' : np.array(node_points_list).astype(int),
-            'context' : np.array(node_points_context, dtype = int),
+            'context' : np.array(node_points_context).astype(int),
         },
         'tanks' : {
             'global_idx' : np.unique(tanks).astype(int),
