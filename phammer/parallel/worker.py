@@ -109,7 +109,7 @@ class Worker:
             extra_b = np.append(self.recv_queue[p][urq] - 1, self.recv_queue[p][drq] + 1)
             extra_i = np.append(self.recv_queue[p][irq] - 1, self.recv_queue[p][irq] + 1)
             extra = np.append(extra_b, extra_i)
-            reduced_extra = extra[np.isin(extra, points)]
+            reduced_extra = extra[np.isin(extra, self.points)]
             real_extra = [local_points[r] for r in reduced_extra[self.processors[reduced_extra] == self.rank]] # local idx
             if len(real_extra) > 0:
                 if not p in self.send_queue.index:
@@ -169,28 +169,20 @@ class Worker:
         nodes = []; node_points = []
         nodes += list(self.partition['nodes']['global_idx'])
         node_points += list(self.partition['nodes']['points'][self.where.nodes['just_in_pipes',]])
-        # print(len(node_points), len(nodes))
         nodes += list(self.partition['tanks']['global_idx'])
         node_points += list(self.partition['tanks']['points'])
-        # print(len(node_points), len(nodes))
         nodes += list(self.partition['reservoirs']['global_idx'])
         node_points += list(self.partition['reservoirs']['points'])
-        # print(len(node_points), len(nodes))
         nodes += list(self.ic['valve'].start_node[self.partition['inline_valves']['global_idx']])
         node_points += list(self.partition['inline_valves']['start_points'])
-        # print(len(node_points), len(nodes))
         nodes += list(self.ic['valve'].end_node[self.partition['inline_valves']['global_idx']])
         node_points += list(self.partition['inline_valves']['end_points'])
-        # print(len(node_points), len(nodes))
         nodes += list(self.ic['pump'].start_node[self.partition['inline_pumps']['global_idx']])
         node_points += list(self.partition['inline_pumps']['start_points'])
-        # print(len(node_points), len(nodes))
         nodes += list(self.ic['pump'].end_node[self.partition['inline_pumps']['global_idx']])
         node_points += list(self.partition['inline_pumps']['end_points'])
-        # print(len(node_points), len(nodes))
         nodes += list(self.ic['valve'].start_node[self.partition['single_valves']['global_idx']])
         node_points += list(self.partition['single_valves']['points'])
-        # print(len(node_points), len(nodes))
         nodes += list(self.ic['pump'].end_node[self.partition['single_pumps']['global_idx']])
         node_points += list(self.partition['single_pumps']['points'])
         nodes = np.array(nodes)
@@ -198,7 +190,7 @@ class Worker:
         if len(nodes) > 0:
             self.num_nodes = len(nodes)
             order = np.argsort(node_points)
-            self.where.nodes['all_to_points'] = node_points[order]
+            self.where.nodes['all_to_points'] = np.sort(self.local_points[np.isin(self.points, node_points)])
             self.where.nodes['all_to_points',] = nodes[order]
             self.where.nodes['all_just_in_pipes'] = self.partition['nodes']['global_idx']
 
