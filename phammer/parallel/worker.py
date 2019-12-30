@@ -1,7 +1,6 @@
 import numpy as np
 
 from collections import defaultdict as ddict
-from phammer.simulation.init import Initializator
 from phammer.arrays import Table2D, Table, ObjArray
 from phammer.parallel.partitioning import even, get_partition
 from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_START_RESULTS, PIPE_END_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G, COEFF_TOL

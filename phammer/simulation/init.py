@@ -13,14 +13,12 @@ from phammer.simulation.util import imerge
 
 from time import time
 
-# TODO: HANDLE EXTENDED PERIOD SIMULATIONS
-
 class Initializator:
 
-    def __init__(self, inpfile, skip_compatibility_check = False, warnings_on = True, _super = None):
+    def __init__(self, inpfile, period = 0, skip_compatibility_check = False, warnings_on = True, _super = None):
         self.wn = get_water_network(inpfile)
         self.ng = self.wn.get_graph()
-        self.ic = get_initial_conditions(inpfile, wn = self.wn)
+        self.ic = get_initial_conditions(inpfile, period = period, wn = self.wn)
         self.num_points = 0
         self.num_segments = 0
         self.where = None

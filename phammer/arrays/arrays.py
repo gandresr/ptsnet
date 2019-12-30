@@ -5,7 +5,7 @@ from phammer.simulation.util import is_iterable
 from functools import lru_cache
 
 class Row(np.ndarray):
-    def __new__(subtype, shape, dtype=float, _super=None):
+    def __new__(subtype, shape, dtype=float, desc = None, _super=None):
         obj = super(Row, subtype).__new__(subtype, shape, dtype)
         obj._super = _super
         obj.fill(0)
@@ -69,12 +69,13 @@ class Table:
 
         return sliced_table
 
+    def __repr__(self):
+        return "<Table properties: %d, size: %d>" % self.shape
+
     @property
     def shape(self):
         return self.__dict__['shape']
 
-    def __repr__(self):
-        return "<Table properties: %d, size: %d>" % self.shape
 
     def setindex(self, index, size=None):
         self._setindex(index, size, '_index')

@@ -161,14 +161,15 @@ class HammerSimulation:
         'demand' : 'node',
     }
 
-    def __init__(self, inpfile, settings, default_wave_speed = None, wave_speed_file = None, delimiter=','):
+    def __init__(self, inpfile, settings, period = 0, default_wave_speed = None, wave_speed_file = None, delimiter=','):
         if type(settings) != dict:
             raise TypeError("'settings' are not properly defined, use dict object")
         self.settings = HammerSettings(**settings, _super=self)
         self.initializator = Initializator(
             inpfile,
-            self.settings.skip_compatibility_check,
-            self.settings.warnings_on,
+            period = period,
+            skip_compatibility_check = self.settings.skip_compatibility_check,
+            warnings_on = self.settings.warnings_on,
             _super = self)
         self.curves = ObjArray()
         self.element_settings = {type_ : ElementSettings(self) for type_ in self.SETTING_TYPES}
