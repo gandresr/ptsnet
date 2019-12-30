@@ -2,7 +2,7 @@ import numpy as np
 
 from time import time
 from collections import deque as dq
-from phammer.arrays.arrays import Table2D, Table, ObjArray
+from phammer.arrays import Table2D, Table, ObjArray
 from phammer.simulation.constants import COEFF_TOL
 from phammer.epanet.util import EN
 from phammer.simulation.util import define_curve, is_iterable, run_shell

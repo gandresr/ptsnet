@@ -2,7 +2,7 @@ import numpy as np
 
 from collections import defaultdict as ddict
 from phammer.simulation.init import Initializator
-from phammer.arrays.arrays import Table2D, Table, ObjArray
+from phammer.arrays import Table2D, Table, ObjArray
 from phammer.parallel.partitioning import even, get_partition
 from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_START_RESULTS, PIPE_END_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G, COEFF_TOL
 from phammer.simulation.util import is_iterable
@@ -207,6 +207,7 @@ class Worker:
         self.point_properties.R[start:end] = self.ic['pipe'].ffactor[pipe] * self.ic['pipe'].dx[pipe] / \
             (2 * G * self.ic['pipe'].diameter[pipe] * self.ic['pipe'].area[pipe] ** 2)
         per_unit_hl = self.ic['pipe'].head_loss[pipe] / self.ic['pipe'].segments[pipe]
+        print(start, end, shead, per_unit_hl*npoints)
         self.mem_pool_points.head[start:end,0] = shead - per_unit_hl*npoints
 
     def _load_initial_conditions(self):
@@ -224,6 +225,7 @@ class Worker:
                 else:
                     start = diff[i-1]
                     end = diff[i]
+                print(start, end)
                 self.define_initial_conditions_for_points(points[start:end], pipes[start], start, end)
         else:
             self.define_initial_conditions_for_points(points, pipes[0], 0, None)

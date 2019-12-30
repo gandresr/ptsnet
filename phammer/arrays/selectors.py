@@ -1,11 +1,14 @@
 import numpy as np
 
-from phammer.arrays.arrays import Row
+from phammer.arrays import Row
 
 class SelectorList:
     def __init__(self):
         self.__dict__['_selectors'] = {}
         self.__dict__['_contexts'] = {}
+
+    def __len__(self):
+        return len(self.__dict__['_selectors'])
 
     def __setattr__(self, name, value):
         raise TypeError("Attribute assignment is not suported for SelectorList")
@@ -64,3 +67,9 @@ class SelectorSet:
 
     def append(self, category):
         self.__dict__[category] = SelectorList()
+
+    def __repr__(self):
+        rep = 'Sets of selectors: \n\n'
+        for category in self.categories:
+            rep += '[{n}] '.format(n = len(self.__dict__[category])) + category + '\n'
+        return rep

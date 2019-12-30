@@ -2,7 +2,7 @@ import os
 import numpy as np
 
 from wntr.epanet.io import InpFile
-from phammer.arrays.arrays import Table
+from phammer.arrays import Table
 from phammer.epanet.toolkit import ENepanet
 from phammer.epanet.util import EN, FlowUnits, HydParam, to_si
 from phammer.simulation.constants import G, TOL, FLOOR_FFACTOR, CEIL_FFACTOR, DEFAULT_FFACTOR

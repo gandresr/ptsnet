@@ -103,6 +103,7 @@ def run_valve_step(Q1, H1, Cp, Bp, Cm, Bm, setting, coeff, area, where):
                 * area[where.points['start_inline_valve',]]) ** 2
         X = CV * (BP + BM)
         Q1[where.points['start_inline_valve']] = (-S*X + S*np.sqrt(X**2 + S*4*CV*(CP - CM)))/2
+        print(X[0], X[1], CV[1], CP[1], CM, where.points['end_inline_valve'])
         Q1[where.points['end_inline_valve']] = Q1[where.points['start_inline_valve']]
         H1[where.points['start_inline_valve']] = CP - BP*Q1[where.points['start_inline_valve']]
         H1[where.points['end_inline_valve']] = CM + BM*Q1[where.points['start_inline_valve']]
