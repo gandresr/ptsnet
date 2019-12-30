@@ -257,7 +257,7 @@ class HammerSimulation:
                         self.ic[type_].adjustment[element] = Kv / Kc
                         if diff > COEFF_TOL:
                             if self.settings.warnings_on:
-                                print("Warning: the steady state coefficient of valve '%s' is not in the curve, the curve will be adjusted" % element)
+                                print("Warning: the loss coefficient of valve '%s' is not in the curve, the curve will be adjusted" % element)
                 N = len(self.curves[curve_name])
                 self.ic[type_].curve_index[element] = N
                 element_index = self.ic[type_].iloc(element)

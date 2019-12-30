@@ -28,6 +28,7 @@ class Worker:
         self.num_nodes = 0
         self.num_start_pipes = 0
         self.num_end_pipes = 0
+        self.num_jip_nodes = 0
         self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves', 'pumps'])
         self.processors = even(kwargs['num_points'], self.num_processors)
         self.partition = get_partition(self.processors, self.rank, self.global_where, self.ic, self.wn)
@@ -121,8 +122,9 @@ class Worker:
 
     def _create_selectors(self):
         jip_nodes = self.partition['nodes']['global_idx']
+        lpoints = self.partition['points']['local_idx']
 
-        self.where.points['just_in_pipes'] = self.local_points[np.searchsorted(self.points, self.partition['nodes']['points'], sorter=self.local_points)]
+        self.where.points['just_in_pipes'] = np.array([lpoints[np] for np in self.partition['nodes']['points']]).astype(int)
         self.where.points['are_tanks'] = np.where(np.isin(self.points, self.partition['tanks']['points']))[0]
         self.where.points['are_reservoirs'] = np.where(np.isin(self.points, self.partition['reservoirs']['points']))[0]
         njip = np.cumsum(self.partition['nodes']['context'])
@@ -154,15 +156,15 @@ class Worker:
         diff = np.diff(njip)
         self.where.points['just_in_pipes',] = np.array([i for i in range(len(jip_nodes)) for j in range(diff[i])], dtype = int)
         # ---------------------------
-        self.where.points['start_inline_valve'] = self.local_points[np.searchsorted(self.points, self.partition['inline_valves']['start_points'], sorter=self.local_points)]
-        self.where.points['end_inline_valve'] = self.local_points[np.searchsorted(self.points, self.partition['inline_valves']['end_points'], sorter=self.local_points)]
+        self.where.points['start_inline_valve'] = np.array([lpoints[spv] for spv in self.partition['inline_valves']['start_points']]).astype(int)
+        self.where.points['end_inline_valve'] = np.array([lpoints[epv] for epv in self.partition['inline_valves']['end_points']]).astype(int)
         self.where.points['start_inline_valve',] = self.partition['inline_valves']['global_idx']
-        self.where.points['start_inline_pump'] = self.local_points[np.searchsorted(self.points, self.partition['inline_pumps']['start_points'], sorter=self.local_points)]
-        self.where.points['end_inline_pump'] = self.local_points[np.searchsorted(self.points, self.partition['inline_pumps']['end_points'], sorter=self.local_points)]
+        self.where.points['start_inline_pump'] = np.array([lpoints[spp] for spp in self.partition['inline_pumps']['start_points']]).astype(int)
+        self.where.points['end_inline_pump'] = np.array([lpoints[epv] for epv in self.partition['inline_pumps']['end_points']]).astype(int)
         self.where.points['start_inline_pump',] = self.partition['inline_pumps']['global_idx']
-        self.where.points['are_single_valve'] = self.local_points[np.searchsorted(self.points, self.partition['single_valves']['points'], sorter=self.local_points)]
+        self.where.points['are_single_valve'] = np.array([lpoints[svp] for svp in self.partition['single_valves']['points']]).astype(int)
         self.where.points['are_single_valve',] = self.partition['single_valves']['global_idx']
-        self.where.points['are_single_pump'] = self.local_points[np.searchsorted(self.points, self.partition['single_pumps']['points'], sorter=self.local_points)]
+        self.where.points['are_single_pump'] = np.array([lpoints[spp] for spp in self.partition['single_pumps']['points']]).astype(int)
         self.where.points['are_single_pump',] = self.partition['single_pumps']['global_idx']
         # ---------------------------
         nodes = []; node_points = []
@@ -188,10 +190,10 @@ class Worker:
         node_points = np.array(node_points)
         if len(nodes) > 0:
             self.num_nodes = len(nodes)
-            order = np.argsort(node_points)
-            self.where.nodes['all_to_points'] = np.sort(self.local_points[np.isin(self.points, node_points)])
-            self.where.nodes['all_to_points',] = nodes[order]
+            self.where.nodes['all_to_points'] = np.array([lpoints[npoint] for npoint in node_points]).astype(int)
+            self.where.nodes['all_to_points',] = nodes
             self.where.nodes['all_just_in_pipes'] = self.partition['nodes']['global_idx']
+            self.num_jip_nodes = len(self.where.nodes['all_just_in_pipes'])
 
     def define_initial_conditions_for_points(self, points, pipe, start, end):
         q = self.ic['pipe'].flowrate[pipe]
@@ -206,7 +208,6 @@ class Worker:
         self.point_properties.R[start:end] = self.ic['pipe'].ffactor[pipe] * self.ic['pipe'].dx[pipe] / \
             (2 * G * self.ic['pipe'].diameter[pipe] * self.ic['pipe'].area[pipe] ** 2)
         per_unit_hl = self.ic['pipe'].head_loss[pipe] / self.ic['pipe'].segments[pipe]
-        print(start, end, shead, per_unit_hl*npoints)
         self.mem_pool_points.head[start:end,0] = shead - per_unit_hl*npoints
 
     def _load_initial_conditions(self):
@@ -224,7 +225,6 @@ class Worker:
                 else:
                     start = diff[i-1]
                     end = diff[i]
-                print(start, end)
                 self.define_initial_conditions_for_points(points[start:end], pipes[start], start, end)
         else:
             self.define_initial_conditions_for_points(points, pipes[0], 0, None)
@@ -280,8 +280,8 @@ class Worker:
         if not self.node_results is None: # worker has junctions
             run_boundary_step(
                 H0, Q1, H1,
-                self.node_results.leak_flow[:,t],
-                self.node_results.demand_flow[:,t],
+                self.node_results.leak_flow[:self.num_jip_nodes,t],
+                self.node_results.demand_flow[:self.num_jip_nodes,t],
                 self.point_properties.Cp,
                 self.point_properties.Bp,
                 self.point_properties.Cm,

@@ -87,6 +87,13 @@ class Initializator:
         self.num_points = self.num_segments + self.wn.num_pipes
 
     def _create_nonpipe_selectors(self, object_type):
+        '''
+
+        Notes:
+
+        - Non-pipe selectors
+        '''
+
         x1 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].start_node[self.ic[object_type].is_inline])
         x2 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].end_node[self.ic[object_type].is_inline])
         if object_type == 'valve':
@@ -119,8 +126,48 @@ class Initializator:
         self.where.points['are_' + object_type].sort()
 
     def create_selectors(self):
-        # ---------------------- USED SELECTORS ----------------------
+        '''
+        .points
+            ['to_pipes']
+                
+            ['are_uboundaries']
 
+            ['are_dboundaries']
+
+            ['are_boundaries']
+
+            ['start_inline_valve']
+
+            ['end_inline_valve']
+
+            ['are_single_valve']
+
+            ['are_valve']
+
+            ['start_inline_pump']
+
+            ['end_inline_pump']
+
+            ['are_single_pump']
+
+            ['are_pump']
+
+        .pipes
+            ['to_nodes']
+
+        .nodes
+            ['not_in_pipes']
+
+            ['in_pipes']
+
+            ['to_points']
+
+            ['to_points_are_uboundaries']
+
+        .valves
+            ['are_inline']
+
+        '''
         self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves', 'pumps'])
 
         self.where.pipes['to_nodes'] = imerge(self.ic['pipe'].start_node, self.ic['pipe'].end_node)
@@ -154,9 +201,6 @@ class Initializator:
 
         # # Pump selectors
         self._create_nonpipe_selectors('pump')
-
-        # ---------------------- (END) ----------------------
-
 
 def get_water_network(inpfile):
     ENFile = InpFile()

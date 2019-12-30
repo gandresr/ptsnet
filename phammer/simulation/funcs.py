@@ -71,8 +71,8 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
     # Get demand and leak flows
     HH -= Z[where.nodes['all_just_in_pipes']]
     HH[HH < 0] = 0 # No demand/leak flow with negative pressure
-    E1[where.nodes['all_just_in_pipes']] = Ke[where.nodes['all_just_in_pipes']] * np.sqrt(HH)
-    D1[where.nodes['all_just_in_pipes']] = Kd[where.nodes['all_just_in_pipes']] * np.sqrt(HH)
+    E1 = Ke[where.nodes['all_just_in_pipes']] * np.sqrt(HH)
+    D1 = Kd[where.nodes['all_just_in_pipes']] * np.sqrt(HH)
 
 # @jit(nopython = True, cache = True, parallel = PARALLEL)
 def run_valve_step(Q1, H1, Cp, Bp, Cm, Bm, setting, coeff, area, where):
@@ -103,7 +103,6 @@ def run_valve_step(Q1, H1, Cp, Bp, Cm, Bm, setting, coeff, area, where):
                 * area[where.points['start_inline_valve',]]) ** 2
         X = CV * (BP + BM)
         Q1[where.points['start_inline_valve']] = (-S*X + S*np.sqrt(X**2 + S*4*CV*(CP - CM)))/2
-        print(X[0], X[1], CV[1], CP[1], CM, where.points['end_inline_valve'])
         Q1[where.points['end_inline_valve']] = Q1[where.points['start_inline_valve']]
         H1[where.points['start_inline_valve']] = CP - BP*Q1[where.points['start_inline_valve']]
         H1[where.points['end_inline_valve']] = CM + BM*Q1[where.points['start_inline_valve']]

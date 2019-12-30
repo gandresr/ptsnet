@@ -118,7 +118,6 @@ def get_partition(processors, rank, where, ic, wn):
                 elif len(links) > 1:
                     l1 = wn.get_link(links[0])
                     l2 = wn.get_link(links[1])
-
                     nonpipe = l1 if l1.link_type.lower() != 'pipe' else l2
                     nonpipe_type = nonpipe.link_type.lower()
                     non_pipe_idx = ic[nonpipe_type].iloc(nonpipe.name)
@@ -255,30 +254,30 @@ def get_partition(processors, rank, where, ic, wn):
             'context' : np.array(node_points_context).astype(int),
         },
         'tanks' : {
-            'global_idx' : np.unique(tanks).astype(int),
-            'points' : np.unique(tanks_points_list).astype(int),
+            'global_idx' : np.array(tanks).astype(int),
+            'points' : np.array(tanks_points_list).astype(int),
         },
         'reservoirs' : {
-            'global_idx' : np.unique(reservoirs).astype(int),
-            'points' : np.unique(reservoirs_points_list).astype(int),
+            'global_idx' : np.array(reservoirs).astype(int),
+            'points' : np.array(reservoirs_points_list).astype(int),
         },
         'inline_valves' : {
-            'global_idx' : np.unique(inline_valves).astype(int),
-            'start_points' : np.unique(start_inline_valves).astype(int),
-            'end_points' : np.unique(end_inline_valves).astype(int),
+            'global_idx' : np.array(inline_valves).astype(int),
+            'start_points' : np.array(start_inline_valves).astype(int),
+            'end_points' : np.array(end_inline_valves).astype(int),
         },
         'inline_pumps' : {
-            'global_idx' : np.unique(inline_pumps).astype(int),
-            'start_points' : np.unique(start_inline_pumps).astype(int),
-            'end_points' : np.unique(end_inline_pumps).astype(int),
+            'global_idx' : np.array(inline_pumps).astype(int),
+            'start_points' : np.array(start_inline_pumps).astype(int),
+            'end_points' : np.array(end_inline_pumps).astype(int),
         },
         'single_valves' : {
-            'global_idx' : np.unique(single_valves).astype(int),
-            'points' : np.unique(single_valve_points).astype(int),
+            'global_idx' : np.array(single_valves).astype(int),
+            'points' : np.array(single_valve_points).astype(int),
         },
         'single_pumps' : {
-            'global_idx' : np.unique(single_pumps).astype(int),
-            'points' : np.unique(single_pump_points).astype(int),
+            'global_idx' : np.array(single_pumps).astype(int),
+            'points' : np.array(single_pump_points).astype(int),
         }
     }
     return partition
