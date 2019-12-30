@@ -1,6 +1,6 @@
 import numpy as np
 
-from phammer.arrays.arrays import Table, Table2D
+from phammer.arrays import Table, Table2D
 
 time_steps = 20
 num_points = 10
