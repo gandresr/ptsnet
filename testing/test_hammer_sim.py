@@ -7,8 +7,8 @@ import tsnet
 from phammer.simulation.sim import HammerSimulation
 from time import time
 
-duration = 20; time_step = 1
-inpfile = '/home/griano/Documents/Github/phammer/example_files/Tnet3.inp'
+duration = 0.00048259999999999997*5; time_step = 1
+inpfile = '/home/griano/Documents/Github/phammer/example_files/BWSN1.inp'
 
 sim = HammerSimulation(
     inpfile,
@@ -31,7 +31,8 @@ sim.assign_curve_to('V_BUTTERFLY', valves)
 # sim.define_pump_settings('pump', np.linspace(0, 1, 50), np.linspace(1, 0, 50))
 
 sim.initialize()
-sim.run_step()
+print(sim.worker.num_points)
+# sim.run_step()
 
 # ppoint = np.argmax(sim.worker.mem_pool_points.head[:,0]-sim.worker.mem_pool_points.head[:,1])
 # ppoint_diff = np.max(sim.worker.mem_pool_points.head[:,0]-sim.worker.mem_pool_points.head[:,1])
@@ -43,6 +44,7 @@ sim.run_step()
 # print(sim.worker.point_properties.Bm[2070])
 # print(sim.worker.point_properties.Cp[ppoint])
 # print(sim.worker.point_properties.Bp[ppoint])
+
 while not sim.is_over:
     sim.run_step()
 
@@ -60,7 +62,7 @@ tt = np.linspace(0, duration, sim.settings.time_steps)
 # plt.plot(tm.simulation_timestamps, n.head)
 # plt.show()
 plt.plot(tt, sim.worker.node_results.head.T, '-.')
-plt.legend(sim.worker.node_results._index_keys)
+# plt.legend(sim.worker.node_results._index_keys)
 plt.title("Inflow in pipes")
 plt.xlabel("Time [s]")
 plt.ylabel("Flowrate $[m^3/s]$")
