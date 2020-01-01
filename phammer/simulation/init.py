@@ -300,8 +300,8 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
         if abs(flow) < TOL:
             ic[ltype].direction[k] = 0
             ic[ltype].flowrate[k] = 0
-            if link.link_type == 'Pipe':
-                ic[ltype].ffactor[k] = DEFAULT_FFACTOR
+            # if link.link_type == 'Pipe':
+            #     ic[ltype].ffactor[k] = DEFAULT_FFACTOR
         elif flow > TOL:
             ic[ltype].direction[k] = 1
         else:
@@ -363,8 +363,8 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
         (2*G*ic['pipe'].diameter[idx] * ic['pipe'].head_loss[idx]) \
             / (ic['pipe'].length[idx] * ic['pipe'].velocity[idx]**2)
 
-    ic['pipe'].ffactor[ic['pipe'].ffactor >= CEIL_FFACTOR] = DEFAULT_FFACTOR
-    ic['pipe'].ffactor[ic['pipe'].ffactor <= FLOOR_FFACTOR] = DEFAULT_FFACTOR
+    # ic['pipe'].ffactor[ic['pipe'].ffactor >= CEIL_FFACTOR] = CEIL_FFACTOR
+    # ic['pipe'].ffactor[ic['pipe'].ffactor <= FLOOR_FFACTOR] = FLOOR_FFACTOR
 
     ic['valve'].curve_index.fill(-1)
     ic['pump'].curve_index.fill(-1)

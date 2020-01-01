@@ -280,8 +280,8 @@ class Worker:
         if not self.node_results is None: # worker has junctions
             run_boundary_step(
                 H0, Q1, H1,
-                self.node_results.leak_flow[:self.num_jip_nodes,t],
-                self.node_results.demand_flow[:self.num_jip_nodes,t],
+                self.node_results.leak_flow[:,t],
+                self.node_results.demand_flow[:,t],
                 self.point_properties.Cp,
                 self.point_properties.Bp,
                 self.point_properties.Cm,
