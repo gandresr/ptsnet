@@ -7,8 +7,8 @@ import tsnet
 from phammer.simulation.sim import HammerSimulation
 from time import time
 
-duration = 0.00048259999999999997*5; time_step = 1
-inpfile = '/home/griano/Documents/Github/phammer/example_files/BWSN1.inp'
+duration = 20; time_step = 1
+inpfile = '/home/griano/Documents/Github/phammer/example_files/Tnet3.inp'
 
 sim = HammerSimulation(
     inpfile,
@@ -31,7 +31,7 @@ sim.assign_curve_to('V_BUTTERFLY', valves)
 # sim.define_pump_settings('pump', np.linspace(0, 1, 50), np.linspace(1, 0, 50))
 
 sim.initialize()
-print(sim.worker.num_points)
+# print(sim.worker.num_points)
 # sim.run_step()
 
 # ppoint = np.argmax(sim.worker.mem_pool_points.head[:,0]-sim.worker.mem_pool_points.head[:,1])
@@ -61,27 +61,27 @@ tt = np.linspace(0, duration, sim.settings.time_steps)
 # plt.plot(tt, sim.worker.node_results.head.T, '-.')
 # plt.plot(tm.simulation_timestamps, n.head)
 # plt.show()
-plt.plot(tt, sim.worker.node_results.head.T, '-.')
+# plt.plot(tt, sim.worker.node_results.head.T, '-.')
 # plt.legend(sim.worker.node_results._index_keys)
-plt.title("Inflow in pipes")
-plt.xlabel("Time [s]")
-plt.ylabel("Flowrate $[m^3/s]$")
-plt.show()
-
-# tt = np.linspace(0, duration, sim.settings.time_steps)
-# plt.plot(tt, sim.worker.pipe_start_results.flowrate.T)
-# plt.legend(sim.worker.pipe_start_results._index_keys)
-# plt.title("Outflow in pipes")
+# plt.title("Inflow in pipes")
 # plt.xlabel("Time [s]")
 # plt.ylabel("Flowrate $[m^3/s]$")
 # plt.show()
 
-# # # # plt.plot(tt, sim.worker.node_results.head.T)
-# # # # # plt.legend(sim.worker.node_results._index_keys)
-# # # # plt.title("Head in nodes")
-# # # # plt.xlabel("Time [s]")
-# # # # plt.ylabel("Head $[m]$")
-# # # # plt.show()
+tt = np.linspace(0, duration, sim.settings.time_steps)
+plt.plot(tt, sim.worker.pipe_start_results.flowrate.T)
+# plt.legend(sim.worker.pipe_start_results._index_keys)
+plt.title("Outflow in pipes")
+plt.xlabel("Time [s]")
+plt.ylabel("Flowrate $[m^3/s]$")
+plt.show()
+
+plt.plot(tt, sim.worker.node_results.head.T)
+# plt.legend(sim.worker.node_results._index_keys)
+plt.title("Head in nodes")
+plt.xlabel("Time [s]")
+plt.ylabel("Head $[m]$")
+plt.show()
 
 # # # # # # plt.plot(tt, sim.node_results.head.T - sim.ic['node'].elevation)
 # # # # # # plt.legend(sim.node_results._index_keys)

@@ -43,7 +43,6 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
     Arguments:
         TODO: UPDATE ARGUMENTS
     """
-    # print(Cm[2070], Cp[131])
     Cm[where.points['jip_dboundaries']] /= Bm[where.points['jip_dboundaries']]
     Cp[where.points['jip_uboundaries']] /= Bp[where.points['jip_uboundaries']]
     Bm[where.points['jip_dboundaries']] = 1 / Bm[where.points['jip_dboundaries']]
@@ -70,7 +69,6 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
 
     # Get demand and leak flows
     HH -= Z[where.nodes['all_just_in_pipes']]
-    # print(X[5], H1[13], H1[104], H0[13], H0[104])
     HH[HH < 0] = 0 # No demand/leak flow with negative pressure
     num_jip = len(where.nodes['all_just_in_pipes'])
     E1[:num_jip] = Ke[where.nodes['all_just_in_pipes']] * np.sqrt(HH)
@@ -83,7 +81,6 @@ def run_valve_step(Q1, H1, Cp, Bp, Cm, Bm, setting, coeff, area, where):
         K0 = setting[where.points['are_single_valve',]] \
             * coeff[where.points['are_single_valve',]] \
                 * area[where.points['are_single_valve',]]
-
         K = 2*G*(Bp[where.points['are_single_valve']] * K0)**2
         Cp_end = Cp[where.points['are_single_valve']]
 
