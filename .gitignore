@@ -6,7 +6,6 @@ __pycache__
 *.sh
 *.graph
 *.pyc
-*.csv
 *.ipynb
 *.mesh
 *.png
