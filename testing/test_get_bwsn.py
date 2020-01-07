@@ -2,13 +2,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import wntr
-import tsnet
+#import tsnet
 
 from phammer.simulation.sim import HammerSimulation
 from time import time
 
 duration = 0.00048259999999999997*3; time_step = 1
-inpfile = '/home/watsup/Documents/Github/phammer/example_files/BWSN1.inp'
+inpfile = '/home/gr24269/Documents/Github/phammer/example_files/BWSN1.inp'
 
 sim = HammerSimulation(
     inpfile,
@@ -31,7 +31,7 @@ sim.initialize()
 
 idx = np.cumsum(sim.ic['pipe'].segments+1).astype(int)
 
-with open('pipe_processors_r.csv' % sim.worker.rank, 'w') as f:
+with open('pipe_processors_%d.csv' % sim.worker.rank, 'w') as f:
     for i, pipe in enumerate(sim.wn.pipe_name_list):
         print(i, len(sim.wn.pipe_name_list))
         if i > 0:
