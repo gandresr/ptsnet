@@ -300,8 +300,8 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
         if abs(flow) < TOL:
             ic[ltype].direction[k] = 0
             ic[ltype].flowrate[k] = 0
-            # if link.link_type == 'Pipe':
-            #     ic[ltype].ffactor[k] = DEFAULT_FFACTOR
+            if link.link_type == 'Pipe':
+                ic[ltype].ffactor[k] = DEFAULT_FFACTOR
         elif flow > TOL:
             ic[ltype].direction[k] = 1
         else:

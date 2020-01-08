@@ -7,8 +7,8 @@ import tsnet
 from phammer.simulation.sim import HammerSimulation
 from time import time
 
-duration = 20; time_step = 1
-inpfile = '/home/griano/Documents/Github/phammer/example_files/Tnet3.inp'
+duration = 0.004*3; time_step = 1
+inpfile = '/home/griano/Documents/Github/phammer/example_files/BWSN_F.inp'
 
 sim = HammerSimulation(
     inpfile,
@@ -17,7 +17,7 @@ sim = HammerSimulation(
         'duration' : duration,
         'skip_compatibility_check' : False,
     },
-    period = 0,
+    period = 219,
     default_wave_speed = 1200)
 
 sim.add_curve('V_BUTTERFLY', 'valve',
@@ -27,13 +27,14 @@ sim.add_curve('V_BUTTERFLY', 'valve',
 valves = sim.wn.valve_name_list
 sim.assign_curve_to('V_BUTTERFLY', valves)
 
-# sim.define_valve_settings(valves[0], np.linspace(0, 5, 10), np.linspace(1, 0, 10))
+# sim.define_valve_settings(valves[0], np.linspace(0, 5, 10), np.linspace(0, 1, 10))
 # sim.define_pump_settings('pump', np.linspace(0, 1, 50), np.linspace(1, 0, 50))
 
 sim.initialize()
 # print(sim.worker.num_points)
 # sim.run_step()
 
+# print(sim.worker.processors, sim.worker.rank)
 # ppoint = np.argmax(sim.worker.mem_pool_points.head[:,0]-sim.worker.mem_pool_points.head[:,1])
 # ppoint_diff = np.max(sim.worker.mem_pool_points.head[:,0]-sim.worker.mem_pool_points.head[:,1])
 # locp = np.where(sim.where.points['are_boundaries'] == ppoint)[0]
@@ -61,20 +62,21 @@ tt = np.linspace(0, duration, sim.settings.time_steps)
 # plt.plot(tt, sim.worker.node_results.head.T, '-.')
 # plt.plot(tm.simulation_timestamps, n.head)
 # plt.show()
-# plt.plot(tt, sim.worker.node_results.head.T, '-.')
-# plt.legend(sim.worker.node_results._index_keys)
-# plt.title("Inflow in pipes")
+# plt.plot(tt, sim.worker.node_results.head['8'])
+# plt.plot(tt, sim.worker.node_results.head['9'])
+# plt.legend(['8','9'])
+# plt.title("Head")
+# plt.xlabel("Time [s]")
+# plt.ylabel("Head [m]$")
+# plt.show()
+
+# tt = np.linspace(0, duration, sim.settings.time_steps)
+# plt.plot(tt, sim.worker.pipe_start_results.flowrate.T)
+# # plt.legend(sim.worker.pipe_start_results._index_keys)
+# plt.title("Outflow in pipes")
 # plt.xlabel("Time [s]")
 # plt.ylabel("Flowrate $[m^3/s]$")
 # plt.show()
-
-tt = np.linspace(0, duration, sim.settings.time_steps)
-plt.plot(tt, sim.worker.pipe_start_results.flowrate.T)
-# plt.legend(sim.worker.pipe_start_results._index_keys)
-plt.title("Outflow in pipes")
-plt.xlabel("Time [s]")
-plt.ylabel("Flowrate $[m^3/s]$")
-plt.show()
 
 plt.plot(tt, sim.worker.node_results.head.T)
 # plt.legend(sim.worker.node_results._index_keys)
