@@ -90,4 +90,10 @@ def check_compatibility(wn, ic):
         raise ModelError("there are non-pipe elements connected to a node with demand\n%s" \
             % str(ic['node']._index_keys[all_non_pipe_nodes_nburst][demanded]))
 
+    # Demands cannot be negative
+    negative_demands = ic['node']._index_keys[np.where(ic['node'].demand < 0)[0]]
+    negative_demands = negative_demands[np.where(~np.isin(negative_demands, wn.reservoir_name_list + wn.tank_name_list))[0]]
+    if len(negative_demands) > 0:
+        raise ModelError("nodes ['" + "', '".join(negative_demands) + "'] have negative demands")
+
     # TODO: FLOW THE PIPE UPSTREAM AN END VALVE ALWAYS FLOWS TOWARDS END VALVE

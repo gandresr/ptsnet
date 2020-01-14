@@ -7,6 +7,7 @@ from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_START_RESULTS, PI
 from phammer.simulation.util import is_iterable
 from phammer.arrays.selectors import SelectorSet
 from phammer.simulation.funcs import run_boundary_step, run_interior_step, run_pump_step, run_valve_step
+from time import time
 
 class Worker:
     def __init__(self, **kwargs):
@@ -31,13 +32,23 @@ class Worker:
         self.num_jip_nodes = 0
         self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves', 'pumps'])
         self.processors = even(kwargs['num_points'], self.num_processors)
-        self.partition = get_partition(self.processors, self.rank, self.global_where, self.ic, self.wn)
+        t1 = time()
+        self.partition = get_partition(
+            self.processors, self.rank, self.global_where, self.ic,
+            self.wn, self.num_processors, kwargs['inpfile'])
+        print(time()-t1, 'define partitioning')
         self.points = self.partition['points']['global_idx']
         self.num_points = len(self.points) # ponts assigned to the worker
         self.local_points = np.arange(self.num_points)
+        t1 = time()
         self._create_selectors()
+        print(time()-t1, 'create selectors')
+        t1 = time()
         self._define_worker_comm_queues()
+        print(time()-t1, 'define comm queues')
+        t1 = time()
         self._define_dist_graph_comm()
+        print(time()-t1, 'define comm graph')
         self._comm_buffer_head = []
         self._recv_points = []
         for r in self.recv_queue.values:
@@ -45,8 +56,12 @@ class Worker:
             self._recv_points.extend(r)
         self._comm_buffer_flow = np.array(self._comm_buffer_head)
         self._comm_buffer_head = np.array(self._comm_buffer_head)
+        t1 = time()
         self._allocate_memory()
+        print(time()-t1, 'memory allocation')
+        t1 = time()
         self._load_initial_conditions()
+        print(time()-t1, 'initial conditions')
 
     def _allocate_memory(self):
         self.mem_pool_points = Table2D(MEM_POOL_POINTS, self.num_points, 2)
@@ -189,9 +204,12 @@ class Worker:
         nodes = np.array(nodes)
         node_points = np.array(node_points)
         if len(nodes) > 0:
-            self.num_nodes = len(nodes)
-            self.where.nodes['all_to_points'] = np.array([lpoints[npoint] for npoint in node_points]).astype(int)
-            self.where.nodes['all_to_points',] = nodes
+            atp = np.array([lpoints[npoint] for npoint in node_points]).astype(int)
+            _, idx_unique = np.unique(nodes, return_index=True)
+            sorted_idx = np.sort(idx_unique)
+            self.where.nodes['all_to_points'] = atp[sorted_idx]
+            self.where.nodes['all_to_points',] = nodes[sorted_idx]
+            self.num_nodes = len(self.where.nodes['all_to_points',])
             self.where.nodes['all_just_in_pipes'] = self.partition['nodes']['global_idx']
             self.num_jip_nodes = len(self.where.nodes['all_just_in_pipes'])
 

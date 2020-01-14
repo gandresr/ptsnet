@@ -129,7 +129,7 @@ class Initializator:
         '''
         .points
             ['to_pipes']
-                
+
             ['are_uboundaries']
 
             ['are_dboundaries']
@@ -324,8 +324,8 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
             ic[ltype].head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
         elif link.link_type == 'Pump':
             pump_ids.append(link.name)
-            ic[ltype].setting[k] = EPANET.ENgetlinkvalue(i, EN.SETTING)
             ic[ltype].initial_status[k] = link.initial_status
+            ic[ltype].setting[k] = ic[ltype].initial_status[k]
             # Pump curve parameters
             qp, hp = list(zip(*link.get_pump_curve().points)); qp = list(qp); hp = list(hp)
             qpp = to_si(flow_units, float(ic[ltype].flowrate[k]), HydParam.Flow)

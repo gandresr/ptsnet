@@ -178,6 +178,7 @@ class HammerSimulation:
             raise ValueError("Duration has to be larger than time step")
         self.initializator.create_selectors()
         self.t = 0
+        self.inpfile = inpfile
         # ----------------------------------------
         self.comm = MPI.COMM_WORLD
         if self.comm.size > self.num_points:
@@ -286,7 +287,8 @@ class HammerSimulation:
             where = self.where,
             wn = self.wn,
             ic = self.ic,
-            time_steps = self.settings.time_steps)
+            time_steps = self.settings.time_steps,
+            inpfile = self.inpfile)
 
     def run_step(self):
         if not self.settings.is_initialized:

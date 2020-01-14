@@ -2,12 +2,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import wntr
-import tsnet
 
 from phammer.simulation.sim import HammerSimulation
 from time import time
 
-duration = 4e-5*10; time_step = 4e-5
+duration = 4e-4*10; time_step = 1
 inpfile = '/home/griano/Documents/Github/phammer/example_files/BWSN_F.inp'
 
 sim = HammerSimulation(
@@ -49,7 +48,7 @@ sim.initialize()
 while not sim.is_over:
     t1 = time()
     sim.run_step()
-    print(t1-time(), 'step', sim.rank)
+    print(t1-time())
 
 # tm = tsnet.network.TransientModel(inpfile)
 # tm.set_wavespeed(1200.) # m/s

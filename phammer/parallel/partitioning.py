@@ -1,6 +1,8 @@
 import numpy as np
+import pickle, os
 from collections import defaultdict as ddict
 from phammer.simulation.util import imerge
+from pkg_resources import resource_filename
 
 def even(num_points, num_processors):
     p = np.ones(num_points, dtype = int)
@@ -50,7 +52,7 @@ def _get_ghost_points(worker_points, worker_pipes):
 
     return ghosts
 
-def get_partition(processors, rank, where, ic, wn):
+def get_partition(processors, rank, where, ic, wn, num_processors, inpfile, save_pickle = True):
 
     # List of points needs to be sorted
     worker_points = np.where(processors == rank)[0]
@@ -82,40 +84,34 @@ def get_partition(processors, rank, where, ic, wn):
         if b in boundaries_to_nodes: # Boundary point
             node = boundaries_to_nodes[b]
             degree = where.nodes['to_points',][node]
+
+            nnode = wn.get_node(ic['node'].ival(node))
+            l = wn.get_link(ic['pipe'].ival(where.points['to_pipes'][b]))
+            snode = ic['pipe'].start_node[l.name]
+            enode = ic['pipe'].end_node[l.name]
+
+            if nnode.node_type in ('Tank', 'Reservoir'):
+                if snode == node:
+                    points.append(b+1)
+                elif enode == node:
+                    points.append(b-1)
+                visited_nodes.append(node)
+                points.append(b)
+            if nnode.node_type == 'Tank':
+                tanks.append(node)
+                tanks_points_list.append(b)
+                continue
+            if nnode.node_type == 'Reservoir':
+                reservoirs.append(node)
+                reservoirs_points_list.append(b)
+                continue
+
             if node in visited_nodes:
                 continue
 
             if degree == 1:
-                nnode = wn.get_node(ic['node'].ival(node))
-                links = wn.get_links_for_node(ic['node'].ival(node))
-
-                if len(links) == 1:
-                    l = wn.get_link(links[0])
-                    snode = ic['pipe'].start_node[l.name]
-                    enode = ic['pipe'].end_node[l.name]
-
-                    in_reservoirs = node in reservoirs
-                    in_tanks = node in tanks
-                    if (nnode.node_type == 'Reservoir' and not in_reservoirs) or \
-                        (nnode.node_type == 'Tank' and not in_tanks):
-                        if snode == node:
-                            points.append(b+1)
-                        elif enode == node:
-                            points.append(b-1)
-                        visited_nodes.append(node)
-                        points.append(b)
-                    if nnode.node_type == 'Tank':
-                        if not in_tanks:
-                            tanks.append(node)
-                            tanks_points_list.append(b)
-                        continue
-                    if nnode.node_type == 'Reservoir':
-                        if not in_reservoirs:
-                            reservoirs.append(node)
-                            reservoirs_points_list.append(b)
-                        continue
-
-                elif len(links) > 1:
+                links = wn.get_links_for_node(nnode.name)
+                if len(links) > 1:
                     l1 = wn.get_link(links[0])
                     l2 = wn.get_link(links[1])
                     nonpipe = l1 if l1.link_type.lower() != 'pipe' else l2
@@ -280,4 +276,12 @@ def get_partition(processors, rank, where, ic, wn):
             'points' : np.array(single_pump_points).astype(int),
         }
     }
+
+    pickle_dir = 'phammer' + os.sep + 'parallel'+ os.sep + 'tmp'
+    os.makedirs(resource_filename(__name__, pickle_dir), exist_ok=True)
+    pickle_path = resource_filename(__name__,
+        pickle_dir + os.sep + '{inpfile}_{cores}_{rank}.tmp'.format(
+            inpfile = inpfile, cores = num_processors, rank = rank))
+
+    # pickle.dump(partition)
     return partition
