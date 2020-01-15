@@ -1,5 +1,5 @@
 import numpy as np
-import pickle, os
+import pickle, os, ntpath
 from collections import defaultdict as ddict
 from phammer.simulation.util import imerge
 from pkg_resources import resource_filename
@@ -78,6 +78,8 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile, save
     single_pumps = []; single_pump_points = []
 
     visited_nodes = []
+
+    start_points = np.cumsum(where.nodes['to_points',])
 
     # Determine extra data for dependent points
     for i, b in enumerate(dependent):
@@ -191,7 +193,7 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile, save
                             continue
                         continue
 
-            start = sum(where.nodes['to_points',][:node])
+            start = 0 if node == 0 else start_points[node-1]
             end = start + where.nodes['to_points',][node]
             node_points = where.nodes['to_points'][start:end]
             processor_in_charge = min(processors[node_points])
@@ -230,7 +232,7 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile, save
             if b+1 in boundaries_to_nodes:
                 node = boundaries_to_nodes[b+1]
             if not node is None:
-                start = sum(where.nodes['to_points',][:node])
+                start = 0 if node == 0 else start_points[node-1]
                 end = start + where.nodes['to_points',][node]
                 node_points = where.nodes['to_points'][start:end]
                 processors[node_points] = min(processors[node_points])
