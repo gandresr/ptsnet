@@ -279,11 +279,11 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile, save
         }
     }
 
-    pickle_dir = 'phammer' + os.sep + 'parallel'+ os.sep + 'tmp'
-    os.makedirs(resource_filename(__name__, pickle_dir), exist_ok=True)
+    os.makedirs(resource_filename(__name__, 'tmp'), exist_ok=True)
     pickle_path = resource_filename(__name__,
-        pickle_dir + os.sep + '{inpfile}_{cores}_{rank}.tmp'.format(
-            inpfile = inpfile, cores = num_processors, rank = rank))
+        'tmp' + os.sep + '{inpfile}_{cores}_{rank}.tmp'.format(
+            inpfile = os.path.splitext(ntpath.basename(inpfile))[0], cores = num_processors, rank = rank))
 
-    # pickle.dump(partition)
+    with open(pickle_path, 'wb') as handle:
+        pickle.dump(partition, handle)
     return partition
