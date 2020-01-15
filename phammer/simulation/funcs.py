@@ -1,10 +1,8 @@
-from numba import jit, vectorize
-from phammer.simulation.constants import G, PARALLEL
+from phammer.simulation.constants import G
 import numpy as np
 
 # ------------------ SIM STEPS ------------------
 
-@jit(nopython = True, parallel = PARALLEL)
 def run_interior_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm,
     has_plus, has_minus):
     """Solves flow and head for interior points
@@ -21,18 +19,16 @@ def run_interior_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm,
     Bm[0] = B[0] + R[0]*abs(Q0[1])
     Bp[-1] = B[-2] + R[-2]*abs(Q0[-2])
 
-    for i in range(1, len(Q0)-1):
         # The first and last nodes are skipped in the  loop considering
         # that they are boundary nodes (every interior node requires an
         # upstream and a downstream neighbor)
-        Cm[i] = (H0[i+1] - B[i]*Q0[i+1]) * has_minus[i]
-        Bm[i] = (B[i] + R[i]*abs(Q0[i+1])) * has_minus[i]
-        Cp[i] = (H0[i-1] + B[i]*Q0[i-1]) * has_plus[i]
-        Bp[i] = (B[i] + R[i]*abs(Q0[i-1])) * has_plus[i]
-        H1[i] = (Cp[i]*Bm[i] + Cm[i]*Bp[i]) / (Bp[i] + Bm[i])
-        Q1[i] = (Cp[i] - Cm[i]) / (Bp[i] + Bm[i])
+    Cm[1:len(Q0)-1] = (H0[1+1:len(Q0)] - B[1:len(Q0)-1]*Q0[1+1:len(Q0)]) * has_minus[1:len(Q0)-1]
+    Bm[1:len(Q0)-1] = (B[1:len(Q0)-1] + R[1:len(Q0)-1]*abs(Q0[1+1:len(Q0)])) * has_minus[1:len(Q0)-1]
+    Cp[1:len(Q0)-1] = (H0[0:len(Q0)-2] + B[1:len(Q0)-1]*Q0[0:len(Q0)-2]) * has_plus[1:len(Q0)-1]
+    Bp[1:len(Q0)-1] = (B[1:len(Q0)-1] + R[1:len(Q0)-1]*abs(Q0[0:len(Q0)-2])) * has_plus[1:len(Q0)-1]
+    H1[1:len(Q0)-1] = (Cp[1:len(Q0)-1]*Bm[1:len(Q0)-1] + Cm[1:len(Q0)-1]*Bp[1:len(Q0)-1]) / (Bp[1:len(Q0)-1] + Bm[1:len(Q0)-1])
+    Q1[1:len(Q0)-1] = (Cp[1:len(Q0)-1] - Cm[1:len(Q0)-1]) / (Bp[1:len(Q0)-1] + Bm[1:len(Q0)-1])
 
-# @jit(nopython = False, cache = True, nogil=True, parallel=True)
 def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
     """Solves flow and head for boundary points attached to nodes
 
@@ -74,7 +70,6 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
     E1[:num_jip] = Ke[where.nodes['all_just_in_pipes']] * np.sqrt(HH)
     D1[:num_jip] = Kd[where.nodes['all_just_in_pipes']] * np.sqrt(HH)
 
-# @jit(nopython = True, cache = True, parallel = PARALLEL)
 def run_valve_step(Q1, H1, Cp, Bp, Cm, Bm, setting, coeff, area, where):
     # --- End valves
     if len(where.points['are_single_valve',]) > 0:
