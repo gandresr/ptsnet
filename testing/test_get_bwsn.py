@@ -17,7 +17,7 @@ sim = HammerSimulation(
         'duration' : duration,
         'skip_compatibility_check' : False,
     },
-    period = 0,
+    period = 219,
     default_wave_speed = 1200)
 
 sim.add_curve('V_BUTTERFLY', 'valve',

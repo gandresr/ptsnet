@@ -285,6 +285,7 @@ class Worker:
         Q1 = self.mem_pool_points.flowrate[:,t1]
         H1 = self.mem_pool_points.head[:,t1]
 
+        ttt = time()
         run_interior_step(
             Q0, H0, Q1, H1,
             self.point_properties.B,
@@ -295,6 +296,8 @@ class Worker:
             self.point_properties.Bm,
             self.point_properties.has_plus,
             self.point_properties.has_minus)
+        print(time()-ttt, 'run_interior_step', self.rank)
+        ttt = time()
         if not self.node_results is None: # worker has junctions
             run_boundary_step(
                 H0, Q1, H1,
@@ -308,6 +311,8 @@ class Worker:
                 self.ic['node'].demand_coefficient,
                 self.ic['node'].elevation,
                 self.where)
+        print(time()-ttt, 'run_boundary_step', self.rank)
+        ttt = time()
         run_valve_step(
             Q1, H1,
             self.point_properties.Cp,
@@ -318,6 +323,8 @@ class Worker:
             self.ic['valve'].K,
             self.ic['valve'].area,
             self.where)
+        print(time()-ttt, 'run_valve_step', self.rank)
+        ttt = time()
         run_pump_step(
             self.ic['pump'].source_head,
             Q1, H1,
@@ -330,9 +337,12 @@ class Worker:
             self.ic['pump'].Hs,
             self.ic['pump'].setting,
             self.where)
+        print(time()-ttt, 'run_pump_step', self.rank)
+        ttt = time()
         if self.num_start_pipes > 0:
             self.pipe_start_results.flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_my_dboundaries'], t1]
         if self.num_end_pipes > 0:
             self.pipe_end_results.flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_my_uboundaries'], t1]
         if self.num_nodes > 0:
             self.node_results.head[:, t] = self.mem_pool_points.head[self.where.nodes['all_to_points'], t1]
+        print(time()-ttt, 'storing_results', self.rank)

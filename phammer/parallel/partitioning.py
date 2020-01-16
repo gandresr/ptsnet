@@ -1,5 +1,6 @@
 import numpy as np
 import pickle, os, ntpath
+from time import time
 from collections import defaultdict as ddict
 from phammer.simulation.util import imerge
 from pkg_resources import resource_filename

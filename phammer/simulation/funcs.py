@@ -1,5 +1,6 @@
 from phammer.simulation.constants import G
 import numpy as np
+from time import time
 
 # ------------------ SIM STEPS ------------------
 
@@ -19,10 +20,12 @@ def run_interior_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm,
     Bm[0] = B[0] + R[0]*abs(Q0[1])
     Bp[-1] = B[-2] + R[-2]*abs(Q0[-2])
 
-        # The first and last nodes are skipped in the  loop considering
-        # that they are boundary nodes (every interior node requires an
-        # upstream and a downstream neighbor)
+    # The first and last nodes are skipped in the  loop considering
+    # that they are boundary nodes (every interior node requires an
+    # upstream and a downstream neighbor)
+    ttt = time()
     Cm[1:len(Q0)-1] = (H0[1+1:len(Q0)] - B[1:len(Q0)-1]*Q0[1+1:len(Q0)]) * has_minus[1:len(Q0)-1]
+    print(time() - ttt, 'CM')
     Bm[1:len(Q0)-1] = (B[1:len(Q0)-1] + R[1:len(Q0)-1]*abs(Q0[1+1:len(Q0)])) * has_minus[1:len(Q0)-1]
     Cp[1:len(Q0)-1] = (H0[0:len(Q0)-2] + B[1:len(Q0)-1]*Q0[0:len(Q0)-2]) * has_plus[1:len(Q0)-1]
     Bp[1:len(Q0)-1] = (B[1:len(Q0)-1] + R[1:len(Q0)-1]*abs(Q0[0:len(Q0)-2])) * has_plus[1:len(Q0)-1]

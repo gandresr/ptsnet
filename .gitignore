@@ -12,3 +12,4 @@ __pycache__
 *.egg-info
 *.sim
 *temp
+*.tmp

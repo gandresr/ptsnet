@@ -7,8 +7,8 @@ import tsnet
 from phammer.simulation.sim import HammerSimulation
 from time import time
 
-duration = 4e-5*10; time_step = 4e-5
-inpfile = '/home/griano/Documents/Github/phammer/example_files/BWSN_F.inp'
+duration = 4e-4*10; time_step = 1
+inpfile = '/home/watsup/Documents/Github/phammer/example_files/BWSN_F.inp'
 
 sim = HammerSimulation(
     inpfile,
@@ -17,8 +17,8 @@ sim = HammerSimulation(
         'duration' : duration,
         'skip_compatibility_check' : False,
     },
-    period = 0,
-    default_wave_speed = 1200)
+    period = 219,
+    default_wave_speed = 1000)
 
 sim.add_curve('V_BUTTERFLY', 'valve',
     [1, 0.8, 0.6, 0.4, 0.2, 0],
@@ -46,6 +46,7 @@ sim.initialize()
 # print(sim.worker.point_properties.Cp[ppoint])
 # print(sim.worker.point_properties.Bp[ppoint])
 
+print(sim.worker.num_points - sim.num_points/4, 'EXTRA POINTS')
 while not sim.is_over:
     t1 = time()
     sim.run_step()
