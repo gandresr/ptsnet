@@ -32,11 +32,18 @@ class Worker:
         self.num_jip_nodes = 0
         self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves', 'pumps'])
         self.processors = even(kwargs['num_points'], self.num_processors)
+        self.is_innactive = False
+        innactive_processors = np.empty(self.global_comm.size, dtype=bool)
         t1 = time()
         self.partition = get_partition(
             self.processors, self.rank, self.global_where, self.ic,
             self.wn, self.num_processors, kwargs['inpfile'])
-        print(time()-t1, 'define partitioning')
+        if self.partition is None:
+            self.is_innactive = True
+        self.global_comm.Alltoall(np.ones(self.global_comm.size, dtype=bool)*self.is_innactive, innactive_processors)
+        if np.any(innactive_processors):
+            self.is_innactive = True
+            raise SystemError(" Partitioning is innecficient due to unused processor(s), try executing the parallel routine with less processors")
         self.points = self.partition['points']['global_idx']
         self.num_points = len(self.points) # ponts assigned to the worker
         self.local_points = np.arange(self.num_points)

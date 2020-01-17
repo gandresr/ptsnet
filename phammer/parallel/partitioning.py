@@ -244,46 +244,49 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile, save
                 processors[node_points] = processor_in_charge
             points.append(b-1); points.append(b); points.append(b+1)
 
-    points = np.unique(points) #; print(points, rank, np.where(processors == rank)[0])
+    points = np.unique(points)
     points.sort()
 
-    partition = {
-        'points' : {
-            'global_idx' : points,
-            'local_idx' : {p : i for i, p in enumerate(points)}
-        },
-        'nodes' : {
-            'global_idx' : np.array(nodes).astype(int),
-            'points' : np.array(node_points_list).astype(int),
-            'context' : np.array(node_points_context).astype(int),
-        },
-        'tanks' : {
-            'global_idx' : np.array(tanks).astype(int),
-            'points' : np.array(tanks_points_list).astype(int),
-        },
-        'reservoirs' : {
-            'global_idx' : np.array(reservoirs).astype(int),
-            'points' : np.array(reservoirs_points_list).astype(int),
-        },
-        'inline_valves' : {
-            'global_idx' : np.array(inline_valves).astype(int),
-            'start_points' : np.array(start_inline_valves).astype(int),
-            'end_points' : np.array(end_inline_valves).astype(int),
-        },
-        'inline_pumps' : {
-            'global_idx' : np.array(inline_pumps).astype(int),
-            'start_points' : np.array(start_inline_pumps).astype(int),
-            'end_points' : np.array(end_inline_pumps).astype(int),
-        },
-        'single_valves' : {
-            'global_idx' : np.array(single_valves).astype(int),
-            'points' : np.array(single_valve_points).astype(int),
-        },
-        'single_pumps' : {
-            'global_idx' : np.array(single_pumps).astype(int),
-            'points' : np.array(single_pump_points).astype(int),
+    if len(points) == 0:
+        partition = None
+    else:
+        partition = {
+            'points' : {
+                'global_idx' : points,
+                'local_idx' : {p : i for i, p in enumerate(points)}
+            },
+            'nodes' : {
+                'global_idx' : np.array(nodes).astype(int),
+                'points' : np.array(node_points_list).astype(int),
+                'context' : np.array(node_points_context).astype(int),
+            },
+            'tanks' : {
+                'global_idx' : np.array(tanks).astype(int),
+                'points' : np.array(tanks_points_list).astype(int),
+            },
+            'reservoirs' : {
+                'global_idx' : np.array(reservoirs).astype(int),
+                'points' : np.array(reservoirs_points_list).astype(int),
+            },
+            'inline_valves' : {
+                'global_idx' : np.array(inline_valves).astype(int),
+                'start_points' : np.array(start_inline_valves).astype(int),
+                'end_points' : np.array(end_inline_valves).astype(int),
+            },
+            'inline_pumps' : {
+                'global_idx' : np.array(inline_pumps).astype(int),
+                'start_points' : np.array(start_inline_pumps).astype(int),
+                'end_points' : np.array(end_inline_pumps).astype(int),
+            },
+            'single_valves' : {
+                'global_idx' : np.array(single_valves).astype(int),
+                'points' : np.array(single_valve_points).astype(int),
+            },
+            'single_pumps' : {
+                'global_idx' : np.array(single_pumps).astype(int),
+                'points' : np.array(single_pump_points).astype(int),
+            }
         }
-    }
 
     os.makedirs(resource_filename(__name__, 'tmp'), exist_ok=True)
     pickle_path = resource_filename(__name__,
@@ -292,4 +295,5 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile, save
 
     with open(pickle_path, 'wb') as handle:
         pickle.dump(partition, handle)
+
     return partition
