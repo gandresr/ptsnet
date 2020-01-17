@@ -230,16 +230,21 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile, save
             node = None
             if b-1 in boundaries_to_nodes:
                 node = boundaries_to_nodes[b-1]
-            if b+1 in boundaries_to_nodes:
-                node = boundaries_to_nodes[b+1]
-            if not node is None:
                 start = 0 if node == 0 else start_points[node-1]
                 end = start + where.nodes['to_points',][node]
                 node_points = where.nodes['to_points'][start:end]
-                processors[node_points] = min(processors[node_points])
+                processor_in_charge = min(processors[node_points])
+                processors[node_points] = processor_in_charge
+            if b+1 in boundaries_to_nodes:
+                node = boundaries_to_nodes[b+1]
+                start = 0 if node == 0 else start_points[node-1]
+                end = start + where.nodes['to_points',][node]
+                node_points = where.nodes['to_points'][start:end]
+                processor_in_charge = min(processors[node_points])
+                processors[node_points] = processor_in_charge
             points.append(b-1); points.append(b); points.append(b+1)
 
-    points = np.unique(points)
+    points = np.unique(points) #; print(points, rank, np.where(processors == rank)[0])
     points.sort()
 
     partition = {
