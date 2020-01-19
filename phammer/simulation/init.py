@@ -72,7 +72,6 @@ class Initializator:
 
         # Maximum time_step in the system to capture waves in all pipes
         max_dt = min(self.ic['pipe'].segments) / 2 # at least 2 segments in critical pipe
-        print(self.ic['pipe'].ival(np.argmin(self.ic['pipe'].segments)))
         self._super.settings.time_step = min(self._super.settings.time_step, max_dt)
 
         # The number of segments is defined

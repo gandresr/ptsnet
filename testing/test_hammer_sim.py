@@ -2,13 +2,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import wntr
-import tsnet
+import os
 
 from phammer.simulation.sim import HammerSimulation
 from time import time
 
-duration = 4e-4*10; time_step = 1
-inpfile = '/home/watsup/Documents/Github/phammer/example_files/BWSN_F.inp'
+duration = 5; time_step = 1e-3
+inpfile = os.getcwd() + '../example_files/Tnet3.inp'
 
 sim = HammerSimulation(
     inpfile,
@@ -16,8 +16,9 @@ sim = HammerSimulation(
         'time_step' : time_step,
         'duration' : duration,
         'skip_compatibility_check' : False,
+        'warnings_on' : False
     },
-    period = 219,
+    period = 0,
     default_wave_speed = 1000)
 
 sim.add_curve('V_BUTTERFLY', 'valve',
@@ -31,7 +32,8 @@ sim.assign_curve_to('V_BUTTERFLY', valves)
 # sim.define_pump_settings('pump', np.linspace(0, 1, 50), np.linspace(1, 0, 50))
 
 sim.initialize()
-# print(sim.worker.num_points)
+# print(sim.worker.points)
+# print(sim.rank, sim.worker.send_queue, sim.worker.recv_queue)
 # sim.run_step()
 
 # print(sim.worker.processors, sim.worker.rank)
@@ -47,11 +49,14 @@ sim.initialize()
 # print(sim.worker.point_properties.Bp[ppoint])
 
 print(sim.worker.num_points - sim.num_points/4, 'EXTRA POINTS')
+ttt = time()
 while not sim.is_over:
     t1 = time()
     sim.run_step()
-    print(t1-time(), 'step', sim.rank)
-
+    # print(t1-time(), 'step', sim.rank)
+print('TOTAL TIME', sim.rank, time()-ttt)
+print('global_barrier', np.mean(sim.worker.profiler.jobs['global_barrier'].durations), sim.rank)
+print('local_barrier', np.mean(sim.worker.profiler.jobs['local_barrier'].durations), sim.rank)
 # tm = tsnet.network.TransientModel(inpfile)
 # tm.set_wavespeed(1200.) # m/s
 # tm.set_time(duration)

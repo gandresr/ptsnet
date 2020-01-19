@@ -295,15 +295,31 @@ class HammerSimulation:
             raise NotImplementedError("it is necessary to initialize the simulation before running it")
         if not self.settings.updated_settings:
             self._update_settings()
-        ttt = time()
+
+        ###
+        self.worker.profiler.start('run_step')
         self.worker.run_step(self.t)
-        # print(time()-ttt, 'run_step worker', self.worker.rank)
-        ttt = time()
+        self.worker.profiler.stop('run_step')
+        ###
+
         if self.settings.num_processors > 1:
+            ###
+            self.worker.profiler.start('global_barrier')
             self.comm.Barrier()
+            self.worker.profiler.stop('global_barrier')
+            ###
+
+            ###
+            self.worker.profiler.start('exchange_data')
             self.worker.exchange_data(self.t)
+            self.worker.profiler.stop('exchange_data')
+            ###
+
+            ###
+            self.worker.profiler.start('local_barrier')
             self.worker.comm.Barrier()
-        print(time()-ttt, 'exchange_data worker', self.worker.rank)
+            self.worker.profiler.stop('local_barrier')
+            ###
         self.t += 1
 
     def _set_element_setting(self, type_, element_name, value, step = None, check_warning = False):

@@ -7,7 +7,7 @@ from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_START_RESULTS, PI
 from phammer.simulation.util import is_iterable
 from phammer.arrays.selectors import SelectorSet
 from phammer.simulation.funcs import run_boundary_step, run_interior_step, run_pump_step, run_valve_step
-from time import time
+from phammer.profiler import Profiler
 
 class Worker:
     def __init__(self, **kwargs):
@@ -34,28 +34,52 @@ class Worker:
         self.processors = even(kwargs['num_points'], self.num_processors)
         self.is_innactive = False
         innactive_processors = np.empty(self.global_comm.size, dtype=bool)
-        t1 = time()
+        self.profiler = Profiler(self.rank)
+
+        ###
+        self.profiler.start('get_partition')
         self.partition = get_partition(
             self.processors, self.rank, self.global_where, self.ic,
             self.wn, self.num_processors, kwargs['inpfile'])
+        self.profiler.stop('get_partition')
+        ###
+
+        ###
+        self.profiler.start('check_processor_innactivity')
         if self.partition is None:
             self.is_innactive = True
         self.global_comm.Alltoall(np.ones(self.global_comm.size, dtype=bool)*self.is_innactive, innactive_processors)
         if np.any(innactive_processors):
             self.is_innactive = True
+
+            self.profiler.stop('check_processor_innactivity')
+            ###
             raise SystemError(" Partitioning is innecficient due to unused processor(s), try executing the parallel routine with less processors")
+        self.profiler.stop('check_processor_innactivity')
+        ###
+
         self.points = self.partition['points']['global_idx']
         self.num_points = len(self.points) # ponts assigned to the worker
         self.local_points = np.arange(self.num_points)
-        t1 = time()
+
+        ###
+        self.profiler.start('_create_selectors')
         self._create_selectors()
-        print(time()-t1, 'create selectors')
-        t1 = time()
+        self.profiler.stop('_create_selectors')
+        ###
+
+        ###
+        self.profiler.start('_define_worker_comm_queues')
         self._define_worker_comm_queues()
-        print(time()-t1, 'define comm queues')
-        t1 = time()
+        self.profiler.stop('_define_worker_comm_queues')
+        ###
+
+        ###
+        self.profiler.start('_define_dist_graph_comm')
         self._define_dist_graph_comm()
-        print(time()-t1, 'define comm graph')
+        self.profiler.stop('_define_dist_graph_comm')
+        ###
+
         self._comm_buffer_head = []
         self._recv_points = []
         for r in self.recv_queue.values:
@@ -63,12 +87,18 @@ class Worker:
             self._recv_points.extend(r)
         self._comm_buffer_flow = np.array(self._comm_buffer_head)
         self._comm_buffer_head = np.array(self._comm_buffer_head)
-        t1 = time()
+
+        ###
+        self.profiler.start('_allocate_memory')
         self._allocate_memory()
-        print(time()-t1, 'memory allocation')
-        t1 = time()
+        self.profiler.stop('_allocate_memory')
+        ###
+
+        ###
+        self.profiler.start('_load_initial_conditions')
         self._load_initial_conditions()
-        print(time()-t1, 'initial conditions')
+        self.profiler.stop('_load_initial_conditions')
+        ###
 
     def _allocate_memory(self):
         self.mem_pool_points = Table2D(MEM_POOL_POINTS, self.num_points, 2)
@@ -109,13 +139,13 @@ class Worker:
         pp = self.processors[self.points]
         pp_idx = np.where(pp != self.rank)[0]
         ppoints = self.points[pp_idx]
-
         # Define receive queue
         self.recv_queue = ObjArray()
         for i, p in enumerate(pp_idx):
             if not pp[p] in self.recv_queue.index:
                 self.recv_queue[pp[p]] = []
             self.recv_queue[pp[p]].append(ppoints[i])
+
         # Define send queue
         self.send_queue = ObjArray()
         uboundaries = self.points[self.where.points['are_uboundaries']]
@@ -292,7 +322,8 @@ class Worker:
         Q1 = self.mem_pool_points.flowrate[:,t1]
         H1 = self.mem_pool_points.head[:,t1]
 
-        ttt = time()
+        ###
+        self.profiler.start('run_interior_step')
         run_interior_step(
             Q0, H0, Q1, H1,
             self.point_properties.B,
@@ -303,8 +334,11 @@ class Worker:
             self.point_properties.Bm,
             self.point_properties.has_plus,
             self.point_properties.has_minus)
-        print(time()-ttt, 'run_interior_step', self.rank)
-        ttt = time()
+        self.profiler.stop('run_interior_step')
+        ###
+
+        ###
+        self.profiler.start('run_boundary_step')
         if not self.node_results is None: # worker has junctions
             run_boundary_step(
                 H0, Q1, H1,
@@ -318,8 +352,11 @@ class Worker:
                 self.ic['node'].demand_coefficient,
                 self.ic['node'].elevation,
                 self.where)
-        print(time()-ttt, 'run_boundary_step', self.rank)
-        ttt = time()
+        self.profiler.stop('run_boundary_step')
+        ###
+
+        ###
+        self.profiler.start('run_valve_step')
         run_valve_step(
             Q1, H1,
             self.point_properties.Cp,
@@ -330,8 +367,11 @@ class Worker:
             self.ic['valve'].K,
             self.ic['valve'].area,
             self.where)
-        print(time()-ttt, 'run_valve_step', self.rank)
-        ttt = time()
+        self.profiler.stop('run_valve_step')
+        ###
+
+        ###
+        self.profiler.start('run_pump_step')
         run_pump_step(
             self.ic['pump'].source_head,
             Q1, H1,
@@ -344,12 +384,16 @@ class Worker:
             self.ic['pump'].Hs,
             self.ic['pump'].setting,
             self.where)
-        print(time()-ttt, 'run_pump_step', self.rank)
-        ttt = time()
+        self.profiler.stop('run_pump_step')
+        ###
+
+        ###
+        self.profiler.start('store_results')
         if self.num_start_pipes > 0:
             self.pipe_start_results.flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_my_dboundaries'], t1]
         if self.num_end_pipes > 0:
             self.pipe_end_results.flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_my_uboundaries'], t1]
         if self.num_nodes > 0:
             self.node_results.head[:, t] = self.mem_pool_points.head[self.where.nodes['all_to_points'], t1]
-        print(time()-ttt, 'storing_results', self.rank)
+        self.profiler.stop('store_results')
+        ###
