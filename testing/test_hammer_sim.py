@@ -8,7 +8,7 @@ from phammer.simulation.sim import HammerSimulation
 from time import time
 
 duration = 5; time_step = 1e-3
-inpfile = os.getcwd() + '../example_files/Tnet3.inp'
+inpfile = os.getcwd() + '/../example_files/Tnet3.inp'
 
 sim = HammerSimulation(
     inpfile,
