@@ -8,7 +8,7 @@ folders = os.listdir()
 
 for folder in folders:
     print(folder)
-    if '.py' in folder or '.sh' in folder or '.dat' in folder: continue
+    if '.' in folder: continue
     files = os.listdir(folder)
     full_data = ddict(list)
     for file in files:
