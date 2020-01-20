@@ -13,3 +13,4 @@ __pycache__
 *.sim
 *temp
 *.tmp
+*.pickle
