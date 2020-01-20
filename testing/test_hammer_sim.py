@@ -1,6 +1,6 @@
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+# import pandas as pd
 import wntr
 import os
 import pickle
@@ -8,7 +8,7 @@ import pickle
 from phammer.simulation.sim import HammerSimulation
 from time import time
 
-duration = 10; time_step = 1
+duration = 5; time_step = 1
 inpfile = os.getcwd() + '/../example_files/BWSN_F.inp'
 
 sim = HammerSimulation(
