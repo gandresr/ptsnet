@@ -72,11 +72,6 @@ class Table:
     def __repr__(self):
         return "<Table properties: %d, size: %d>" % self.shape
 
-    @property
-    def shape(self):
-        return self.__dict__['shape']
-
-
     def setindex(self, index, size=None):
         self._setindex(index, size, '_index')
 
