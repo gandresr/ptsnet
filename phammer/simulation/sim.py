@@ -304,9 +304,9 @@ class HammerSimulation:
 
         if self.settings.num_processors > 1:
             ###
-            self.worker.profiler.start('barrier')
+            self.worker.profiler.start('barrier1')
             self.worker.comm.Barrier()
-            self.worker.profiler.stop('barrier')
+            self.worker.profiler.stop('barrier1')
             ###
 
             ###
@@ -316,9 +316,9 @@ class HammerSimulation:
             ###
 
             ###
-            self.worker.profiler.start('barrier')
+            self.worker.profiler.start('barrier2')
             self.worker.comm.Barrier()
-            self.worker.profiler.stop('barrier')
+            self.worker.profiler.stop('barrier2')
             ###
         self.t += 1
 
