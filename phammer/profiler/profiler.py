@@ -7,19 +7,24 @@ class Job:
         self.restart()
         self.end_time = None
         self.label = label
-        self.durations = []
+        self.time_stamps = []
 
     def restart(self):
         self.start_time = time()
+        if len(self.time_stamps) % 2 != 0:
+            self.time_stamps[-1] = self.start_time
+        else:
+            self.time_stamps.append(self.start_time)
 
     def stop(self):
-        self.end_time = time()
-        self.durations.append(self.end_time - self.start_time)
+        if len(self.time_stamps) % 2 != 0:
+            self.end_time = time()
+            self.time_stamps.append(self.end_time)
 
     @property
     def duration(self):
-        if self.durations:
-            return self.durations[-1]
+        if len(self.time_stamps) >= 2:
+            return self.time_stamps[-1] - self.time_stamps[-2]
         else:
             return None
 
