@@ -4,10 +4,10 @@ from time import time
 
 class Job:
     def __init__(self, label):
+        self.time_stamps = []
         self.restart()
         self.end_time = None
         self.label = label
-        self.time_stamps = []
 
     def restart(self):
         self.start_time = time()
