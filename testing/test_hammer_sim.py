@@ -23,7 +23,9 @@ sim = HammerSimulation(
         'warnings_on' : False
     },
     period = 219,
-    default_wave_speed = 100)
+    default_wave_speed = 1000)
+
+print(sim.settings, sim)
 
 sim.add_curve('V_BUTTERFLY', 'valve',
     [1, 0.8, 0.6, 0.4, 0.2, 0],
@@ -52,9 +54,8 @@ os.makedirs(ROOT + 'testing/results/{fname}_{time_steps}/rank_{comm_size}'.forma
     comm_size = str(sim.comm.size),
     time_steps = sim.settings.time_steps), exist_ok = True)
 tt = np.linspace(0, duration, sim.settings.time_steps)
-print('PRINTING:', ROOT + 'testing/results/BWSN_F/rank_{comm_size}/data_{rank}.pickle')
-with open(ROOT + 'testing/results/BWSN_F/rank_{comm_size}/data_{rank}.pickle'.format(
-    comm_size = str(sim.comm.size), rank = str(sim.rank)), 'wb') as f:
+with open(ROOT + 'testing/results/BWSN_F_{num_steps}/rank_{comm_size}/{rank}.pickle'.format(
+    comm_size = str(sim.comm.size), rank = str(sim.rank), num_steps = sim.settings.time_steps), 'wb') as f:
     pickle.dump({
         'num_points_global' : sim.num_points,
         'num_points_worker' : sim.worker.num_points,
