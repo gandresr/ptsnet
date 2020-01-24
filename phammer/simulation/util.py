@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import subprocess
 
@@ -33,3 +34,9 @@ def imerge(A, B):
 
 def run_shell(command):
     subprocess.run(command.split(' '))
+
+def get_root_path():
+    rpath = os.getcwd()
+    token = 'phammer/'
+    idx = rpath.find(token)
+    return rpath[:idx+len(token)]
