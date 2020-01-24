@@ -38,13 +38,9 @@ for pump in pumps:
 
 sim.initialize()
 
-print(sim.worker.num_points - sim.num_points/sim.comm.size, 'EXTRA POINTS')
-print(sim.settings, sim)
 sim.worker.profiler.start('total_sim_time')
 while not sim.is_over:
-    tt = time()
     sim.run_step()
-    print('run_step', time()-tt)
 sim.worker.profiler.stop('total_sim_time')
 
 fname = ntpath.basename(inpfile)
@@ -57,6 +53,9 @@ tt = np.linspace(0, duration, sim.settings.time_steps)
 with open('results/BWSN_F/rank_{comm_size}/{rank}.pickle'.format(
     comm_size = str(sim.comm.size), rank = str(sim.rank)), 'wb') as f:
     pickle.dump({
+        'num_points_global' : sim.num_points,
+        'num_points_worker' : sim.worker.num_points,
+        'wave_speeds' : sim.ic['pipe'].wave_speed,
         'duration' : duration,
         'time_step' : sim.settings.time_step,
         'time_steps' : sim.settings.time_steps,
