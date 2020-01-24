@@ -1,0 +1,103 @@
+TACC:  Starting up job 5093093 
+TACC:  Starting parallel tasks... 
+130.14999999999418 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+0.14999999999417923 EXTRA POINTS
+67.14999999999418 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+132.14999999999418 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+217.14999999999418 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+162.14999999999418 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+188.14999999999418 EXTRA POINTS
+274.1499999999942 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+450.1499999999942 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+414.1499999999942 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+132.14999999999418 EXTRA POINTS
+450.1499999999942 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+628.1499999999942 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+308.1499999999942 EXTRA POINTS
+812.1499999999942 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+874.1499999999942 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+474.1499999999942 EXTRA POINTS
+1218.1499999999942 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+1368.1499999999942 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+1549.1499999999942 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+TACC:  Shutdown complete. Exiting. 

@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "test_hammer_sim.py", line 4, in <module>
+    import wntr
+  File "/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/__init__.py", line 1, in <module>
+    from wntr import epanet
+  File "/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/__init__.py", line 4, in <module>
+    from .io import InpFile  #, BinFile, HydFile, RptFile
+  File "/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py", line 25, in <module>
+    import pandas as pd
+ModuleNotFoundError: No module named 'pandas'

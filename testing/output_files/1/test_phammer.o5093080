@@ -1,0 +1,28 @@
+TACC:  Starting up job 5093080 
+TACC:  Starting parallel tasks... 
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+0.5999999999767169 EXTRA POINTS
+367.5999999999767 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+1231.5999999999767 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+1808.5999999999767 EXTRA POINTS
+3849.5999999999767 EXTRA POINTS
+/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
+
+Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/testing/../example_files/BWSN_F.inp"; added with type None, units conversion left to user
+
+TACC:  Shutdown complete. Exiting. 
