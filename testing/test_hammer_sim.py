@@ -4,7 +4,8 @@ import numpy as np
 import wntr
 import os
 import pickle
-
+import matplotlib.pyplot as plt
+import ntpath
 from phammer.simulation.sim import HammerSimulation
 from time import time
 
@@ -31,21 +32,29 @@ pumps = sim.wn.pump_name_list
 sim.assign_curve_to('V_BUTTERFLY', valves)
 
 for valve in valves:
-    sim.define_valve_settings(valve, np.linspace(0, 5, 10), np.linspace(0, 1, 10))
+    sim.define_valve_settings(valve, np.linspace(0, 5, 10), np.linspace(1, 0, 10))
 for pump in pumps:
     sim.define_pump_settings(pump, np.linspace(0, 1, 50), np.linspace(1, 0, 50))
 
 sim.initialize()
 
 print(sim.worker.num_points - sim.num_points/sim.comm.size, 'EXTRA POINTS')
+print(sim.settings, sim)
 sim.worker.profiler.start('total_sim_time')
 while not sim.is_over:
+    tt = time()
     sim.run_step()
+    print('run_step', time()-tt)
 sim.worker.profiler.stop('total_sim_time')
 
-os.makedirs('results/BWSN_F/rank_{comm_size}'.format(comm_size = str(sim.comm.size)), exist_ok = True)
+fname = ntpath.basename(inpfile)
+fname = fname[:fname.find('.')]
+os.makedirs('results/{fname}_{time_steps}/rank_{comm_size}'.format(
+    fname = fname,
+    comm_size = str(sim.comm.size),
+    time_steps = sim.settings.time_steps), exist_ok = True)
 tt = np.linspace(0, duration, sim.settings.time_steps)
-with open('results/BWSN_F/rank_{comm_size}/BWSN_F_{rank}.pickle'.format(
+with open('results/BWSN_F/rank_{comm_size}/{rank}.pickle'.format(
     comm_size = str(sim.comm.size), rank = str(sim.rank)), 'wb') as f:
     pickle.dump({
         'duration' : duration,
