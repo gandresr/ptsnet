@@ -52,7 +52,8 @@ os.makedirs(ROOT + 'testing/results/{fname}_{time_steps}/rank_{comm_size}'.forma
     comm_size = str(sim.comm.size),
     time_steps = sim.settings.time_steps), exist_ok = True)
 tt = np.linspace(0, duration, sim.settings.time_steps)
-with open(ROOT + 'testing/results/BWSN_F/rank_{comm_size}/{rank}.pickle'.format(
+print('PRINTING:', ROOT + 'testing/results/BWSN_F/rank_{comm_size}/data_{rank}.pickle')
+with open(ROOT + 'testing/results/BWSN_F/rank_{comm_size}/data_{rank}.pickle'.format(
     comm_size = str(sim.comm.size), rank = str(sim.rank)), 'wb') as f:
     pickle.dump({
         'num_points_global' : sim.num_points,

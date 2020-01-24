@@ -43,7 +43,7 @@ for folder in folders:
     profiler_end_times = Table(PROFILER_INIT_DATA, num_processors)
 
     for r in np.arange(1,num_processors+1):
-        with open(folder + '/' + str(r) + '.pickle', 'rb') as f:
+        with open(folder + '/data_' + str(r) + '.pickle', 'rb') as f:
             data = pk.load(f)
         jobs = data['sim_times'].jobs
         step_data.run_step[r][:] = data['run_step'].time_stamps
