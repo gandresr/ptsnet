@@ -10,8 +10,9 @@ from phammer.simulation.sim import HammerSimulation
 from time import time
 from phammer.simulation.util import get_root_path
 
+ROOT = get_root_path()
 duration = 5; time_step = 1
-inpfile = get_root_path() + 'example_files/BWSN_F.inp'
+inpfile = ROOT + 'example_files/BWSN_F.inp'
 
 sim = HammerSimulation(
     inpfile,
@@ -46,12 +47,12 @@ sim.worker.profiler.stop('total_sim_time')
 
 fname = ntpath.basename(inpfile)
 fname = fname[:fname.find('.')]
-os.makedirs('results/{fname}_{time_steps}/rank_{comm_size}'.format(
+os.makedirs(ROOT + 'testing/results/{fname}_{time_steps}/rank_{comm_size}'.format(
     fname = fname,
     comm_size = str(sim.comm.size),
     time_steps = sim.settings.time_steps), exist_ok = True)
 tt = np.linspace(0, duration, sim.settings.time_steps)
-with open('results/BWSN_F/rank_{comm_size}/{rank}.pickle'.format(
+with open(ROOT + 'testing/results/BWSN_F/rank_{comm_size}/{rank}.pickle'.format(
     comm_size = str(sim.comm.size), rank = str(sim.rank)), 'wb') as f:
     pickle.dump({
         'num_points_global' : sim.num_points,
