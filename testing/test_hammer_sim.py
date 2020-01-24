@@ -8,9 +8,10 @@ import matplotlib.pyplot as plt
 import ntpath
 from phammer.simulation.sim import HammerSimulation
 from time import time
+from phammer.simulation.util import get_root_path
 
 duration = 5; time_step = 1
-inpfile = os.getcwd() + '/../example_files/BWSN_F.inp'
+inpfile = get_root_path() + 'example_files/BWSN_F.inp'
 
 sim = HammerSimulation(
     inpfile,
