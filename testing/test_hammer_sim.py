@@ -35,10 +35,12 @@ valves = sim.wn.valve_name_list
 pumps = sim.wn.pump_name_list
 sim.assign_curve_to('V_BUTTERFLY', valves)
 
+SR = int(1//sim.settings.time_step)
 for valve in valves:
-    sim.define_valve_settings(valve, np.linspace(0, 5, 10), np.linspace(1, 0, 10))
+    sim.define_valve_settings(valve, np.linspace(0, 1, SR), np.linspace(1, 0, SR))
+
 for pump in pumps:
-    sim.define_pump_settings(pump, np.linspace(0, 1, 50), np.linspace(1, 0, 50))
+    sim.define_pump_settings(pump, np.linspace(0, 1, SR), np.linspace(1, 0, SR))
 
 sim.initialize()
 
