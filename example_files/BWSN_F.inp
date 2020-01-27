@@ -27383,10 +27383,11 @@
 
 [STATUS]
 ;ID              	Status/Setting
- VALVE-14826     	Closed
+ VALVE-14826     	Open
  VALVE-14827     	Open
- VALVE-14828     	Closed
+ VALVE-14828     	Open
  VALVE-14829     	Open
+ VALVE-14830     	Open
 
 [PATTERNS]
 ;ID              	Multipliers
@@ -28023,15 +28024,15 @@
 
 [CURVES]
 ;ID              	X-Value     	Y-Value
-;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
+;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
  CURVE-0         	0.000000    	110.000000  
  CURVE-0         	500.000000  	90.000000   
  CURVE-0         	1000.000000 	40.000000   
-;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
+;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
  CURVE-1         	0.000000    	45.000000   
  CURVE-1         	500.000000  	35.000000   
  CURVE-1         	1000.000000 	15.000000   
-;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
+;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
  CURVE-2         	0           	189         
  CURVE-2         	200         	188.99      
  CURVE-2         	400         	188.72      
@@ -28039,7 +28040,7 @@
  CURVE-2         	800         	179         
  CURVE-2         	1000        	165.74      
  CURVE-2         	1200        	146.88      
-;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
+;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
  CURVE-3         	0           	255.89      
  CURVE-3         	603         	253.16      
  CURVE-3         	843.4       	251.73      
@@ -28049,7 +28050,7 @@
  CURVE-3         	1804.8      	200.2       
  CURVE-3         	2045.2      	173.89      
  CURVE-3         	2285.6      	142.73      
-;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
+;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
  CURVE-4         	0           	46.7        
  CURVE-4         	200         	40.2        
  CURVE-4         	353         	33.0        
@@ -28836,7 +28837,9 @@ LINK VALVE-14826 1432.6233 AT TIME 934:35:39
 
 
 
+
 [RULES]
+
 
 
 
