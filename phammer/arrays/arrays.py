@@ -1,4 +1,5 @@
 import numpy as np
+import zarr
 
 from collections import namedtuple
 from phammer.utils.data import is_array
@@ -94,8 +95,8 @@ class Table:
         if dim == 1:
             size = self.shape[1]
         elif dim == 2:
-                size = self.shape[0]
-            else:
+            size = self.shape[0]
+        else:
             raise ValueError('dimension not supported')
 
         if not labels is None:
@@ -106,7 +107,7 @@ class Table:
             for i in range(size):
                 if not labels[i] in self.indexes:
                     self.indexes[labels[i]] = i
-        else:
+                else:
                     raise ValueError("index values have to be unique, '%s' is repeated" % str(labels[i]))
 
 class Table2D(Table):
@@ -176,5 +177,24 @@ class ObjArray:
         return self.indexes[label]
 
 
-    def iloc(self, index):
-        return self.index[index]
+class ZarrArray:
+    def __init__(self, full_path, indexes = None, labels = None):
+        self.z = zarr.open(full_path)
+        self.indexes = indexes
+        if not indexes is None:
+            if labels is None:
+                self.labels = {j : i for i, j in indexes.items()}
+            else:
+                self.labels = labels
+
+    def __getitem__(self, index):
+        if type(index) == str:
+            return self.z[self.indexes[index]]
+        else:
+            return self.z[index]
+
+    def lloc(self, label):
+        return self.indexes[label]
+
+    def ival(self, index):
+        return self.labels[index]

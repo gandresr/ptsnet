@@ -1,6 +1,6 @@
 import numpy as np
 
-from time import time
+from tqdm import tqdm
 from collections import deque as dq
 from collections import namedtuple
 from pkg_resources import resource_filename
@@ -10,9 +10,10 @@ from phammer.epanet.util import EN
 from phammer.utils.data import define_curve, is_array
 from phammer.utils.io import run_shell
 from phammer.simulation.init import Initializator
-from pkg_resources import resource_filename
+from phammer.parallel.comm import CommManager
 from phammer.parallel.worker import Worker
-from mpi4py import MPI
+from phammer.results.storage import StorageManager
+from phammer.simulation.constants import NODE_RESULTS, PIPE_END_RESULTS, PIPE_START_RESULTS
 
 class HammerSettings:
     def __init__(self,
@@ -22,8 +23,11 @@ class HammerSettings:
         parallel : bool = False,
         gpu : bool = False,
         skip_compatibility_check : bool = False,
+        show_progress = False,
+        store_data = True,
         _super = None):
 
+        self._super = _super
         self.settingsOK = False
         self.time_step = time_step
         self.duration = duration
@@ -32,9 +36,12 @@ class HammerSettings:
         self.parallel = parallel
         self.gpu = gpu
         self.skip_compatibility_check = skip_compatibility_check
+        self.show_progress = show_progress
+        self.store_data = store_data
         self.defined_wave_speeds = False
+        self.active_zarr = False
+        self.blocked = False
         self.set_default()
-        self._super = _super
         self.settingsOK = True
 
     def __repr__(self):
@@ -62,9 +69,10 @@ class HammerSettings:
                 elif name == 'time_step':
                     if self.defined_wave_speeds:
                         raise ValueError("'%s' can not be modified since wave speeds have been defined" % name)
-                    lens = sum([len(self._super.element_settings[stype]) for stype in self._super.SETTING_TYPES])
-                    if lens > 0:
-                        raise ValueError("'%s' can not be modified since settings have been defined" % name)
+                    if self._super != None:
+                        lens = sum([len(self._super.element_settings[stype]) for stype in self._super.SETTING_TYPES])
+                        if lens > 0:
+                            raise ValueError("'%s' can not be modified since settings have been defined" % name)
                     self.time_steps = int(round(self.duration/value))
 
         object.__setattr__(self, name, value)
@@ -72,6 +80,14 @@ class HammerSettings:
     def set_default(self):
         self.is_initialized = False
         self.updated_settings = False
+
+    def to_dict(self):
+        l = {}
+        for setting, val in self.__dict__.items():
+            if setting == '_super':
+                continue
+            l[setting] = val
+        return l
 
 class HammerCurve:
     CURVE_TYPES = ('valve', 'pump',)
@@ -88,7 +104,7 @@ class HammerCurve:
         self.fun = define_curve(self.X, self.Y)
 
     def _add_element(self, element):
-        if is_iterable(element):
+        if is_array(element):
             for e in element:
                 if not element in self.elements:
                     self.elements.append(e)
@@ -164,7 +180,15 @@ class HammerSimulation:
         'demand' : 'node',
     }
 
-    def __init__(self, inpfile, settings, period = 0, default_wave_speed = None, wave_speed_file = None, delimiter=','):
+    def __init__(self, inpfile = None, settings = None, period = 0, default_wave_speed = None, wave_speed_file = None, delimiter=','):
+        if inpfile == None:
+            self.router = CommManager()
+            self.storer = StorageManager(self.router)
+            self.settings = HammerSettings()
+            self.settings.active_zarr = True
+            self.results = {}
+            self.load()
+            return
         if type(settings) != dict:
             raise TypeError("'settings' are not properly defined, use dict object")
         self.settings = HammerSettings(**settings, _super=self)
@@ -183,16 +207,30 @@ class HammerSimulation:
         self.t = 0
         self.inpfile = inpfile
         # ----------------------------------------
-        self.comm = MPI.COMM_WORLD
-        if self.comm.size > self.num_points:
+        self.router = CommManager()
+        if self.router['main'].size > self.num_points:
             raise ValueError("The number of cores is higher than the number of simulation points")
-        self.settings.num_processors = self.comm.size
-        self.rank = self.comm.Get_rank()
+        self.settings.num_processors = self.router['main'].size
         self.worker = None
+        self.results = None
+        if self.router['main'].size > 1:
+            self.storer = StorageManager(self.router)
+        else:
+            self.storer = StorageManager()
+        # ----------------------------------------
+        if (not self.settings.warnings_on) and (self.router['main'].rank == 0) and self.settings.show_progress:
+            self.progress = tqdm(total = self.settings.time_steps)
+            self.progress.update(1)
 
     def __repr__(self):
         return "HammerSimulation <duration = %d [s] | time_steps = %d | num_points = %s>" % \
             (self.settings.duration, self.settings.time_steps, format(self.initializator.num_points, ',d'))
+
+    def __getitem__(self, index):
+        keys = self.results.keys()
+        if not index in keys:
+            raise ValueError("not valid label. Use one of the following: %s" % keys)
+        return self.results[index]
 
     @property
     def wn(self):
@@ -221,9 +259,9 @@ class HammerSimulation:
     def _define_element_setting(self, element, type_, X, Y):
         ic_type = self.SETTING_TYPES[type_]
         if X[0] == 0:
-            self.element_settings[type_]._dump_settings(self.ic[ic_type].iloc(element), X[1:], Y[1:])
+            self.element_settings[type_]._dump_settings(self.ic[ic_type].lloc(element), X[1:], Y[1:])
         else:
-            self.element_settings[type_]._dump_settings(self.ic[ic_type].iloc(element), X, Y)
+            self.element_settings[type_]._dump_settings(self.ic[ic_type].lloc(element), X, Y)
 
     def define_valve_settings(self, valve_name, X, Y):
         self._define_element_setting(valve_name, 'valve', X, Y)
@@ -238,7 +276,7 @@ class HammerSimulation:
         self._define_element_setting(node_name, 'demand', X, Y)
 
     def add_curve(self, curve_name, type_, X, Y):
-        if len(self.ic[type_]._index_keys) == 0:
+        if len(self.ic[type_].labels) == 0:
             raise ValueError("There are not elements of type '" + type_ + "' in the model")
         self.curves[curve_name] = HammerCurve(X, Y, type_)
 
@@ -264,7 +302,7 @@ class HammerSimulation:
                                 print("Warning: the loss coefficient of valve '%s' is not in the curve, the curve will be adjusted" % element)
                 N = len(self.curves[curve_name])
                 self.ic[type_].curve_index[element] = N
-                element_index = self.ic[type_].iloc(element)
+                element_index = self.ic[type_].lloc(element)
                 self.curves[curve_name]._add_element(element_index)
 
     def initialize(self):
@@ -274,7 +312,7 @@ class HammerSimulation:
             self.element_settings[stype]._sort()
         non_assigned_valves = self.ic['valve'].curve_index == -1
         if non_assigned_valves.any():
-            raise NotImplementedError("it is necessary to assign curves for valves:\n%s" % str(self.ic['valve']._index_keys[non_assigned_valves]))
+            raise NotImplementedError("it is necessary to assign curves for valves:\n%s" % str(self.ic['valve'].labels[non_assigned_valves]))
         self.settings.set_default()
         self.t = 0
         self._distribute_work()
@@ -283,15 +321,28 @@ class HammerSimulation:
 
     def _distribute_work(self):
         self.worker = Worker(
-            rank = self.rank,
-            comm = self.comm,
+            router = self.router,
             num_points = self.num_points,
-            num_processors = self.comm.size,
             where = self.where,
             wn = self.wn,
             ic = self.ic,
             time_steps = self.settings.time_steps,
             inpfile = self.inpfile)
+        self.results = self.worker.results
+
+        # Adding extra communicators
+        color_pipe_start = 1 if self.worker.num_start_pipes > 0 else 0
+        color_pipe_end = 1 if self.worker.num_end_pipes > 0 else 0
+        color_node = 1 if self.worker.num_nodes > 0 else 0
+        splitter1 = self.router['main'].Split(color_pipe_start)
+        splitter2 = self.router['main'].Split(color_pipe_end)
+        splitter3 = self.router['main'].Split(color_node)
+        if color_pipe_start:
+            self.router.add_communicator('pipe.start', splitter1)
+        if color_pipe_end:
+            self.router.add_communicator('pipe.end', splitter2)
+        if color_node:
+            self.router.add_communicator('node', splitter3)
 
     def run_step(self):
         if not self.settings.is_initialized:
@@ -308,7 +359,7 @@ class HammerSimulation:
         if self.settings.num_processors > 1:
             ###
             self.worker.profiler.start('barrier1')
-            self.worker.comm.Barrier()
+            self.router['local'].Barrier()
             self.worker.profiler.stop('barrier1')
             ###
 
@@ -320,10 +371,17 @@ class HammerSimulation:
 
             ###
             self.worker.profiler.start('barrier2')
-            self.worker.comm.Barrier()
+            self.router['local'].Barrier()
             self.worker.profiler.stop('barrier2')
             ###
         self.t += 1
+        if (not self.settings.warnings_on) and (self.router['main'].rank == 0) and self.settings.show_progress:
+            self.progress.update(1)
+            if self.is_over:
+                self.progress.close()
+        if self.settings.store_data:
+            if self.is_over:
+                self.save()
 
     def _set_element_setting(self, type_, element_name, value, step = None, check_warning = False):
         if self.t == 0:
@@ -331,14 +389,14 @@ class HammerSimulation:
         if not step is None:
             if not self.can_be_operated(step, check_warning):
                 return
-        if not is_iterable(element_name):
+        if not is_array(element_name):
             if type(element_name) is str:
                 element_name = (element_name,)
                 value = [value]
             else:
                 raise ValueError("'element_name' should be iterable or str")
         else:
-            if not is_iterable(value):
+            if not is_array(value):
                 value = np.ones(len(element_name)) * value
             elif len(element_name) != len(value):
                 raise ValueError("len of 'element_name' array does not match len of 'value' array")
@@ -364,7 +422,7 @@ class HammerSimulation:
         else:
             if type(element_name) != tuple:
                 element_name = tuple(element_name)
-            self.ic[ic_type].setting[self.ic[ic_type].iloc(element_name)] = value
+            self.ic[ic_type].setting[self.ic[ic_type].lloc(element_name)] = value
 
     def _update_settings(self):
         if not self.settings.updated_settings:
@@ -423,3 +481,128 @@ class HammerSimulation:
             if check_warning:
                 print("Warning: operating at time time %f" % check_time)
             return True
+
+    def save(self):
+        if self.router['main'].rank == 0:
+            self.storer.flush_tmp()
+            self.storer.create_tmp_folders()
+        self.router['main'].Barrier()
+
+        if 'pipe.start' in self.router.intra_communicators:
+            self.storer.save_data(
+                'pipe.start.labels',
+                self['pipe.start'].labels,
+                zarr_shape = (self.wn.num_pipes,),
+                comm = 'pipe.start') # 2
+            self.router['pipe.start'].Barrier()
+
+            self.storer.save_data(
+                'pipe.start.flowrate',
+                self['pipe.start'].flowrate,
+                zarr_shape = (self.wn.num_pipes, self.settings.time_steps),
+                comm = 'pipe.start') # 3
+            self.router['pipe.start'].Barrier()
+
+        if 'pipe.end' in self.router.intra_communicators:
+            self.storer.save_data(
+                'pipe.end.labels',
+                self['pipe.end'].labels,
+                zarr_shape = (self.wn.num_pipes,),
+                comm = 'pipe.end') # 4
+            self.router['pipe.end'].Barrier()
+
+            self.storer.save_data(
+                'pipe.end.flowrate',
+                self['pipe.end'].flowrate,
+                zarr_shape = (self.wn.num_pipes, self.settings.time_steps),
+                comm = 'pipe.end') # 5
+            self.router['pipe.end'].Barrier()
+
+        len_nodes = np.sum(self.where.nodes['to_points',] > 0)
+        if 'node' in self.router.intra_communicators:
+            if self.worker.num_nodes > 0:
+                self.storer.save_data(
+                    'node.labels',
+                    self['node'].labels,
+                    zarr_shape = (len_nodes,),
+                    comm = 'node') # 6
+                self.router['node'].Barrier()
+
+                self.storer.save_data(
+                    'node.head',
+                    self['node'].head,
+                    zarr_shape = (len_nodes, self.settings.time_steps), # 7
+                    comm = 'node')
+                self.router['node'].Barrier()
+
+                self.storer.save_data(
+                    'node.demand_flow',
+                    self['node'].demand_flow,
+                    zarr_shape = (len_nodes, self.settings.time_steps), # 8
+                    comm = 'node')
+                self.router['node'].Barrier()
+
+                self.storer.save_data(
+                    'node.leak_flow',
+                    self['node'].leak_flow,
+                    zarr_shape = (len_nodes, self.settings.time_steps), # 9
+                    comm = 'node')
+                self.router['node'].Barrier()
+
+        if self.router['main'].rank == 0:
+            self.storer.save_data('inpfile', self.inpfile) # 1
+            self.storer.save_data('profiler', self.worker.profiler) # 10
+            self.storer.save_data('initial_conditions', self.ic) # 11
+            self.storer.save_data('settings', self.settings.to_dict()) # 12
+            self.storer.save_data('partitioning', self.worker.partition) # 13
+
+    def load(self):
+        if self.router['main'].rank == 0:
+            Node = namedtuple('Node', list(NODE_RESULTS.keys()) + ['labels'])
+            PipeStart = namedtuple('PipeStart', list(PIPE_START_RESULTS.keys()) + ['labels'])
+            PipeEnd = namedtuple('PipeEnd', list(PIPE_END_RESULTS.keys()) + ['labels'])
+
+            node_labels = self.storer.load_data('node.labels')[:]
+            Node.__repr__ = lambda x : '<Persistent Node Array [n = %d]>' % len(node_labels)
+            node_indexes = {l : i for i, l in enumerate(node_labels)}
+            node_labels = {i : l for l, i in node_indexes.items()}
+            Node.lloc = lambda x, i : node_indexes[i]
+            Node.ival = lambda x, i : node_labels[i]
+            self.results['node'] = Node(
+                labels = node_labels,
+                head = self.storer.load_data('node.head', node_indexes, node_labels),
+                demand_flow = self.storer.load_data('node.demand_flow', node_indexes, node_labels),
+                leak_flow = self.storer.load_data('node.leak_flow', node_indexes, node_labels)
+            )
+
+            pipe_start_labels = self.storer.load_data('pipe.start.labels')[:]
+            PipeStart.__repr__ = lambda x : '<Persistent PipeStart Array [n = %d]>' % len(pipe_start_labels)
+            pipe_start_indexes = {l : i for i, l in enumerate(pipe_start_labels)}
+            pipe_start_labels = {i : l for l, i in pipe_start_indexes.items()}
+            PipeStart.lloc = lambda x, i : pipe_start_indexes[i]
+            PipeStart.ival = lambda x, i : pipe_start_labels[i]
+            self.results['pipe.start'] = PipeStart(
+                labels = pipe_start_labels,
+                flowrate = self.storer.load_data('pipe.start.flowrate', pipe_start_indexes, pipe_start_labels)
+            )
+
+            pipe_end_labels = self.storer.load_data('pipe.start.labels')[:]
+            PipeEnd.__repr__ = lambda x : '<Persistent PipeEnd Array [n = %d]>' % len(pipe_end_labels)
+            pipe_end_indexes = {l : i for i, l in enumerate(pipe_end_labels)}
+            pipe_end_labels = {i : l for l, i in pipe_end_indexes.items()}
+            PipeEnd.lloc = lambda x, i : pipe_end_indexes[i]
+            PipeEnd.ival = lambda x, i : pipe_end_labels[i]
+            self.results['pipe.end'] = PipeEnd(
+                labels = pipe_end_labels,
+                flowrate = self.storer.load_data('pipe.end.flowrate', pipe_end_indexes, pipe_end_labels)
+            )
+
+            settings = self.storer.load_data('settings')
+            for i, j in settings.items():
+                if not i == 'settingsOK':
+                    self.settings.__setattr__(i, j)
+                else:
+                    continue
+
+            self.inpfile = self.storer.load_data('inpfile')
+            self.profiler = self.storer.load_data('profiler')
