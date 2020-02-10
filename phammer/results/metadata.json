@@ -1,0 +1,75 @@
+{
+    "inpfile" : {
+        "fname" : "fname.pkl",
+        "token" : 0,
+        "ftype" : "pickle"
+    },
+    "pipe.start.labels" : {
+        "fname" : "labels.zarr",
+        "token" : 1,
+        "ftype" : "array",
+        "dtype" : "str"
+    },
+    "pipe.start.flowrate" : {
+        "fname" : "flowrate.zarr",
+        "token" : 2,
+        "ftype" : "array",
+        "dtype" : "float"
+    },
+    "pipe.end.labels" : {
+        "fname" : "labels.zarr",
+        "token" : 3,
+        "ftype" : "array",
+        "dtype" : "str"
+    },
+    "pipe.end.flowrate" : {
+        "fname" : "flowrate.zarr",
+        "token" : 4,
+        "ftype" : "array",
+        "dtype" : "float"
+    },
+    "node.labels" : {
+        "fname" : "labels.zarr",
+        "token" : 5,
+        "ftype" : "array",
+        "dtype" : "str"
+    },
+    "node.head" : {
+        "fname" : "head.zarr",
+        "token" : 6,
+        "ftype" : "array",
+        "dtype" : "float"
+    },
+    "node.demand_flow" : {
+        "fname" : "demand_flow.zarr",
+        "token" : 7,
+        "ftype" : "array",
+        "dtype" : "float"
+    },
+    "node.leak_flow" : {
+        "fname" : "leak_flow.zarr",
+        "token" : 8,
+        "ftype" : "array",
+        "dtype" : "float"
+    },
+    "profiler" : {
+        "fname" : "profiler.pkl",
+        "token" : 9,
+        "ftype" : "pickle"
+    },
+    "initial_conditions" : {
+        "fname" : "ic.pkl",
+        "token" : 10,
+        "ftype" : "pickle"
+    },
+    "settings" : {
+        "fname" : "settings.pkl",
+        "token" : 11,
+        "ftype" : "pickle"
+    },
+    "partitioning" : {
+        "fname" : "partitioning.pkl",
+        "token" : 12,
+        "ftype" : "pickle"
+    }
+}
