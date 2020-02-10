@@ -13,34 +13,29 @@ class Worker:
     def __init__(self, **kwargs):
         self.send_queue = None
         self.recv_queue = None
-        self.global_comm = kwargs['comm']
-        self.comm = None
-        self.rank = kwargs['rank']
-        self.num_processors = kwargs['num_processors']
+        self.router = kwargs['router']
         self.wn = kwargs['wn']
         self.ic = kwargs['ic']
         self.global_where = kwargs['where']
         self.time_steps = kwargs['time_steps']
         self.mem_pool_points = None
         self.point_properties = None
-        self.pipe_start_results = None
-        self.pipe_end_results = None
-        self.node_results = None
         self.num_nodes = 0
         self.num_start_pipes = 0
         self.num_end_pipes = 0
         self.num_jip_nodes = 0
         self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves', 'pumps'])
-        self.processors = even(kwargs['num_points'], self.num_processors)
+        self.processors = even(kwargs['num_points'], self.router['main'].size)
         self.is_innactive = False
-        innactive_processors = np.empty(self.global_comm.size, dtype=bool)
-        self.profiler = Profiler(self.rank)
+        innactive_processors = np.empty(self.router['main'].size, dtype=bool)
+        self.results = {}
+        self.profiler = Profiler(self.router['main'].rank)
 
         ###
         self.profiler.start('get_partition')
         self.partition = get_partition(
-            self.processors, self.rank, self.global_where, self.ic,
-            self.wn, self.num_processors, kwargs['inpfile'])
+            self.processors, self.router['main'].rank, self.global_where, self.ic,
+            self.wn, self.router['main'].size, kwargs['inpfile'])
         self.profiler.stop('get_partition')
         ###
 
@@ -48,7 +43,7 @@ class Worker:
         self.profiler.start('check_processor_innactivity')
         if self.partition is None:
             self.is_innactive = True
-        self.global_comm.Alltoall(np.ones(self.global_comm.size, dtype=bool)*self.is_innactive, innactive_processors)
+        self.router['main'].Alltoall(np.ones(self.router['main'].size, dtype=bool)*self.is_innactive, innactive_processors)
         if np.any(innactive_processors):
             self.is_innactive = True
 
@@ -104,15 +99,15 @@ class Worker:
         self.mem_pool_points = Table2D(MEM_POOL_POINTS, self.num_points, 2)
         self.point_properties = Table(POINT_PROPERTIES, self.num_points)
         if self.num_nodes > 0:
-            self.node_results = Table2D(NODE_RESULTS, self.num_nodes, self.time_steps,
-                index = self.ic['node']._index_keys[self.where.nodes['all_to_points',]])
+            self.results['node'] = Table2D(NODE_RESULTS, self.num_nodes, self.time_steps,
+                labels = self.ic['node'].labels[self.where.nodes['all_to_points',]])
 
         are_my_uboundaries = self.global_where.points['are_uboundaries'] \
-            [self.processors[self.global_where.points['are_uboundaries']] == self.rank]
+            [self.processors[self.global_where.points['are_uboundaries']] == self.router['main'].rank]
         self.where.points['are_my_uboundaries'] = self.local_points[np.isin(self.points, are_my_uboundaries)]
 
         are_my_dboundaries = self.global_where.points['are_dboundaries'] \
-            [self.processors[self.global_where.points['are_dboundaries']] == self.rank]
+            [self.processors[self.global_where.points['are_dboundaries']] == self.router['main'].rank]
         self.where.points['are_my_dboundaries'] = self.local_points[np.isin(self.points, are_my_dboundaries)]
 
         ppoints_start = self.points[self.where.points['are_my_dboundaries']]
@@ -123,26 +118,26 @@ class Worker:
         self.num_start_pipes = len(ppoints_start)
         self.num_end_pipes = len(ppoints_end)
         if self.num_start_pipes > 0:
-            self.pipe_start_results = Table2D(PIPE_START_RESULTS, len(ppoints_start), self.time_steps, index = self.ic['pipe']._index_keys[pipes_start])
+            self.results['pipe.start'] = Table2D(PIPE_START_RESULTS, len(ppoints_start), self.time_steps, labels = self.ic['pipe'].labels[pipes_start])
         if self.num_end_pipes > 0:
-            self.pipe_end_results = Table2D(PIPE_END_RESULTS, len(ppoints_end), self.time_steps, index = self.ic['pipe']._index_keys[pipes_end])
+            self.results['pipe.end'] = Table2D(PIPE_END_RESULTS, len(ppoints_end), self.time_steps, labels = self.ic['pipe'].labels[pipes_end])
 
     def _define_dist_graph_comm(self):
-        self.comm = self.global_comm.Create_dist_graph_adjacent(
-            sources = self.recv_queue.keys,
-            destinations = self.send_queue.keys,
+        self.router.add_communicator('local', self.router['main'].Create_dist_graph_adjacent(
+            sources = self.recv_queue.labels,
+            destinations = self.send_queue.labels,
             sourceweights = list(map(len, self.recv_queue.values)),
-            destweights = list(map(len, self.send_queue.values)))
+            destweights = list(map(len, self.send_queue.values))))
 
     def _define_worker_comm_queues(self):
         local_points = self.partition['points']['local_idx']
         pp = self.processors[self.points]
-        pp_idx = np.where(pp != self.rank)[0]
+        pp_idx = np.where(pp != self.router['main'].rank)[0]
         ppoints = self.points[pp_idx]
         # Define receive queue
         self.recv_queue = ObjArray()
         for i, p in enumerate(pp_idx):
-            if not pp[p] in self.recv_queue.index:
+            if not pp[p] in self.recv_queue.indexes:
                 self.recv_queue[pp[p]] = []
             self.recv_queue[pp[p]].append(ppoints[i])
 
@@ -152,7 +147,7 @@ class Worker:
         dboundaries = self.points[self.where.points['are_dboundaries']]
         inner = self.points[self.where.points['are_inner']]
 
-        for p in self.recv_queue.keys:
+        for p in self.recv_queue.labels:
             self.recv_queue[p] = np.sort(self.recv_queue[p])
             urq = np.isin(self.recv_queue[p], uboundaries)
             drq = np.isin(self.recv_queue[p], dboundaries)
@@ -162,14 +157,14 @@ class Worker:
             extra_i = np.append(self.recv_queue[p][irq] - 1, self.recv_queue[p][irq] + 1)
             extra = np.append(extra_b, extra_i)
             reduced_extra = extra[np.isin(extra, self.points)]
-            real_extra = [local_points[r] for r in reduced_extra[self.processors[reduced_extra] == self.rank]] # local idx
+            real_extra = [local_points[r] for r in reduced_extra[self.processors[reduced_extra] == self.router['main'].rank]] # local idx
             if len(real_extra) > 0:
-                if not p in self.send_queue.index:
+                if not p in self.send_queue.indexes:
                     self.send_queue[p] = []
                 self.send_queue[p].extend(real_extra)
             self.recv_queue[p] = np.sort([local_points[r] for r in self.recv_queue[p]]) # convert to local idx
 
-        for p in self.send_queue.keys:
+        for p in self.send_queue.labels:
             self.send_queue[p] = np.sort(np.unique(self.send_queue[p]))
 
     def _create_selectors(self):
@@ -185,7 +180,7 @@ class Worker:
 
         nonpipe = np.isin(self.global_where.points['are_boundaries'], self.global_where.points['are_valve'])
         nonpipe = nonpipe | np.isin(self.global_where.points['are_boundaries'], self.global_where.points['are_pump'])
-        local_points = np.isin(self.global_where.points['are_boundaries'], self.points[self.processors[self.points] == self.rank])
+        local_points = np.isin(self.global_where.points['are_boundaries'], self.points[self.processors[self.points] == self.router['main'].rank])
         dboundary = np.zeros(len(nonpipe), dtype=bool); dboundary[::2] = 1
         uboundary = np.zeros(len(nonpipe), dtype=bool); uboundary[1::2] = 1
         # ---------------------------
@@ -290,15 +285,15 @@ class Worker:
         self.point_properties.has_minus[self.where.points['are_inner']] = 1
 
         if self.num_start_pipes > 0:
-            self.pipe_start_results.flowrate[:,0] = self.mem_pool_points.flowrate[self.where.points['are_my_dboundaries'], 0]
+            self.results['pipe.start'].flowrate[:,0] = self.mem_pool_points.flowrate[self.where.points['are_my_dboundaries'], 0]
         if self.num_end_pipes > 0:
-            self.pipe_end_results.flowrate[:,0] = self.mem_pool_points.flowrate[self.where.points['are_my_uboundaries'], 0]
+            self.results['pipe.end'].flowrate[:,0] = self.mem_pool_points.flowrate[self.where.points['are_my_uboundaries'], 0]
         if self.num_nodes > 0:
-            self.node_results.head[:, 0] = self.mem_pool_points.head[self.where.nodes['all_to_points'], 0]
-            self.node_results.leak_flow[:, 0] = \
+            self.results['node'].head[:, 0] = self.mem_pool_points.head[self.where.nodes['all_to_points'], 0]
+            self.results['node'].leak_flow[:, 0] = \
                 self.ic['node'].leak_coefficient[self.where.nodes['all_to_points',]] * \
                     np.sqrt(self.ic['node'].pressure[self.where.nodes['all_to_points',]])
-            self.node_results.demand_flow[:, 0] = \
+            self.results['node'].demand_flow[:, 0] = \
                 self.ic['node'].demand_coefficient[self.where.nodes['all_to_points',]] * \
                     np.sqrt(self.ic['node'].pressure[self.where.nodes['all_to_points',]])
 
@@ -309,8 +304,8 @@ class Worker:
         for v in self.send_queue.values:
             send_flow.append(self.mem_pool_points.flowrate[v,t1])
             send_head.append(self.mem_pool_points.head[v,t1])
-        self._comm_buffer_flow = self.comm.neighbor_alltoall(send_flow)
-        self._comm_buffer_head = self.comm.neighbor_alltoall(send_head)
+        self._comm_buffer_flow = self.router['local'].neighbor_alltoall(send_flow)
+        self._comm_buffer_head = self.router['local'].neighbor_alltoall(send_head)
         self.mem_pool_points.flowrate[self._recv_points, t1] = [item for sublist in self._comm_buffer_flow for item in sublist]
         self.mem_pool_points.head[self._recv_points, t1] = [item for sublist in self._comm_buffer_head for item in sublist]
 
@@ -339,11 +334,11 @@ class Worker:
 
         ###
         self.profiler.start('run_boundary_step')
-        if not self.node_results is None: # worker has junctions
+        if not self.results['node'] is None: # worker has junctions
             run_boundary_step(
                 H0, Q1, H1,
-                self.node_results.leak_flow[:,t],
-                self.node_results.demand_flow[:,t],
+                self.results['node'].leak_flow[:,t],
+                self.results['node'].demand_flow[:,t],
                 self.point_properties.Cp,
                 self.point_properties.Bp,
                 self.point_properties.Cm,
@@ -390,10 +385,10 @@ class Worker:
         ###
         self.profiler.start('store_results')
         if self.num_start_pipes > 0:
-            self.pipe_start_results.flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_my_dboundaries'], t1]
+            self.results['pipe.start'].flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_my_dboundaries'], t1]
         if self.num_end_pipes > 0:
-            self.pipe_end_results.flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_my_uboundaries'], t1]
+            self.results['pipe.end'].flowrate[:,t] = self.mem_pool_points.flowrate[self.where.points['are_my_uboundaries'], t1]
         if self.num_nodes > 0:
-            self.node_results.head[:, t] = self.mem_pool_points.head[self.where.nodes['all_to_points'], t1]
+            self.results['node'].head[:, t] = self.mem_pool_points.head[self.where.nodes['all_to_points'], t1]
         self.profiler.stop('store_results')
         ###
