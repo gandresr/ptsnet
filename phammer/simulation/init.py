@@ -189,7 +189,6 @@ class Initializator:
         )
 
         self.where.nodes['in_pipes'] = np.isin(self.where.pipes['to_nodes'], np.where(self.where.nodes['not_in_pipes'])[0])
-        self.where.nodes['in_pipes'] = np.isin(self.where.pipes['to_nodes'], np.where(self.where.nodes['not_in_pipes'])[0])
 
         self.where.nodes['to_points'] = self.where.points['are_boundaries'][node_points_order]
         self.where.nodes['to_points_are_uboundaries'] = (np.arange(2*self.wn.num_pipes) % 2 != 0).astype(int)[node_points_order]
@@ -224,13 +223,13 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
 
     # Data structures for node and link initial conditions
     nodes = Table(NODE_PROPERTIES, wn.num_nodes)
-    node_ids = []
+    node_labels = []
     pipes = Table(PIPE_PROPERTIES, wn.num_pipes)
-    pipe_ids = []
+    pipe_labels = []
     valves = Table(VALVE_PROPERTIES, wn.num_valves)
-    valve_ids = []
+    valve_labels = []
     pumps = Table(PUMP_PROPERTIES, wn.num_pumps)
-    pump_ids = []
+    pump_labels = []
 
     ic = {
         'node' : nodes,
@@ -252,7 +251,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     # Retrieve node conditions
     for i in range(1, wn.num_nodes+1):
         node_id = EPANET.ENgetnodeid(i)
-        node_ids.append(node_id)
+        node_labels.append(node_id)
         ic['node'].leak_coefficient[i-1] = EPANET.ENgetnodevalue(i, EN.EMITTER)
         ic['node'].demand[i-1] = EPANET.ENgetnodevalue(i, EN.DEMAND)
         ic['node'].head[i-1] = EPANET.ENgetnodevalue(i, EN.HEAD)
@@ -318,11 +317,11 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
             ic[ltype].type[k] = EPANET.ENgetlinktype(i)
 
         if link.link_type == 'Pipe':
-            pipe_ids.append(link.name)
+            pipe_labels.append(link.name)
             ic[ltype].length[k] = link.length
             ic[ltype].head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
         elif link.link_type == 'Pump':
-            pump_ids.append(link.name)
+            pump_labels.append(link.name)
             ic[ltype].initial_status[k] = link.initial_status
             ic[ltype].setting[k] = ic[ltype].initial_status[k]
             # Pump curve parameters
@@ -335,7 +334,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
             ic[ltype].source_head[k] = ic['node'].head[ic[ltype].start_node[k]]
             non_pipe_nodes += [ic[ltype].start_node[k], ic[ltype].end_node[k]]
         elif link.link_type == 'Valve':
-            valve_ids.append(link.name)
+            valve_labels.append(link.name)
             ic[ltype].initial_status[k] = EPANET.ENgetlinkvalue(i, EN.INITSTATUS)
             ic[ltype].setting[k] = ic[ltype].initial_status[k]
             ic[ltype].flowrate[k] = to_si(flow_units, float(ic[ltype].flowrate[k]), HydParam.Flow)
@@ -372,10 +371,10 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     KeKd = ic['node'].demand[demanded] / np.sqrt(ic['node'].pressure[demanded])
     ic['node'].demand_coefficient[demanded] = KeKd - ic['node'].leak_coefficient[demanded]
 
-    nodes.setindex(node_ids)
-    pipes.setindex(pipe_ids)
-    valves.setindex(valve_ids)
-    pumps.setindex(pump_ids)
+    nodes.assign_labels(node_labels)
+    pipes.assign_labels(pipe_labels)
+    valves.assign_labels(valve_labels)
+    pumps.assign_labels(pump_labels)
 
     non_pipe_nodes = np.array(non_pipe_nodes)
     zero_flow_pipes = ic['pipe'].flowrate == 0
@@ -390,12 +389,12 @@ def _fix_zero_flow_convention(ltype, non_pipe_nodes, zf, wn, ic):
     # Define flow convention for zero flow pipes attached to
     zero_flow = np.where(np.isin(ic[ltype].start_node, zf))[0]
     for k in zero_flow:
-        upipe = wn.get_links_for_node(ic['node'].ival(ic[ltype].start_node[k]))
-        upipe.remove(ic[ltype]._index_keys[k])
-        upipe = ic['pipe'].iloc(upipe[0])
-        dpipe = wn.get_links_for_node(ic['node'].ival(ic[ltype].end_node[k]))
-        dpipe.remove(ic[ltype]._index_keys[k])
-        dpipe = ic['pipe'].iloc(dpipe[0])
+        upipe = wn.get_links_for_node(ic['node'].ilabel(ic[ltype].start_node[k]))
+        upipe.remove(ic[ltype].labels[k])
+        upipe = ic['pipe'].lloc(upipe[0])
+        dpipe = wn.get_links_for_node(ic['node'].ilabel(ic[ltype].end_node[k]))
+        dpipe.remove(ic[ltype].labels[k])
+        dpipe = ic['pipe'].lloc(dpipe[0])
 
         if ic['pipe'].end_node[upipe] != ic[ltype].start_node[k]:
             ic['pipe'].direction[upipe] = -1 if ic['pipe'].direction[upipe] != -1 else 1

@@ -51,7 +51,7 @@ def _get_ghost_points(worker_points, worker_pipes):
 
     return ghosts
 
-def get_partition(processors, rank, where, ic, wn, num_processors, inpfile, save_pickle = True):
+def get_partition(processors, rank, where, ic, wn, num_processors, inpfile):
 
     # List of points needs to be sorted
     worker_points = np.where(processors == rank)[0]
@@ -86,8 +86,8 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile, save
             node = boundaries_to_nodes[b]
             degree = where.nodes['to_points',][node]
 
-            nnode = wn.get_node(ic['node'].ival(node))
-            l = wn.get_link(ic['pipe'].ival(where.points['to_pipes'][b]))
+            nnode = wn.get_node(ic['node'].ilabel(node))
+            l = wn.get_link(ic['pipe'].ilabel(where.points['to_pipes'][b]))
             snode = ic['pipe'].start_node[l.name]
             enode = ic['pipe'].end_node[l.name]
 
@@ -117,7 +117,7 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile, save
                     l2 = wn.get_link(links[1])
                     nonpipe = l1 if l1.link_type.lower() != 'pipe' else l2
                     nonpipe_type = nonpipe.link_type.lower()
-                    non_pipe_idx = ic[nonpipe_type].iloc(nonpipe.name)
+                    non_pipe_idx = ic[nonpipe_type].lloc(nonpipe.name)
                     nonpipe_start = ic[nonpipe_type].start_node[non_pipe_idx]
                     nonpipe_end = ic[nonpipe_type].end_node[non_pipe_idx]
                     is_inline = ic[nonpipe_type].is_inline[non_pipe_idx]
@@ -128,18 +128,18 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile, save
 
                     # Get upstream and downstream pipes
                     if start_deg == 2:
-                        start_links = wn.get_links_for_node(ic['node'].ival(nonpipe_start))
+                        start_links = wn.get_links_for_node(ic['node'].ilabel(nonpipe_start))
                         start_links.remove(nonpipe.name)
-                        start_pipe_idx = ic['pipe'].iloc(start_links[0])
+                        start_pipe_idx = ic['pipe'].lloc(start_links[0])
                         if nonpipe_start == ic['pipe'].start_node[start_pipe_idx]:
                             npipe_spoint = 2*start_pipe_idx
                         elif nonpipe_start == ic['pipe'].end_node[start_pipe_idx]:
                             npipe_spoint = 2*start_pipe_idx + 1
                         nonpipe_start_point = where.points['are_boundaries'][npipe_spoint]
                     if end_deg == 2:
-                        end_links = wn.get_links_for_node(ic['node'].ival(nonpipe_end))
+                        end_links = wn.get_links_for_node(ic['node'].ilabel(nonpipe_end))
                         end_links.remove(nonpipe.name)
-                        end_pipe_idx = ic['pipe'].iloc(end_links[0])
+                        end_pipe_idx = ic['pipe'].lloc(end_links[0])
                         if nonpipe_end == ic['pipe'].start_node[end_pipe_idx]:
                             npipe_epoint = 2*end_pipe_idx
                         elif nonpipe_end == ic['pipe'].end_node[end_pipe_idx]:
@@ -161,13 +161,13 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile, save
                             if processors[nonpipe_end_point + 1] != rank:
                                 points.append(nonpipe_end_point+1)
                             if nonpipe_type == 'valve':
-                                loc = ic['valve'].iloc(nonpipe.name)
+                                loc = ic['valve'].lloc(nonpipe.name)
                                 if not loc in inline_valves:
                                     inline_valves.append(loc)
                                     start_inline_valves.append(nonpipe_start_point)
                                     end_inline_valves.append(nonpipe_end_point)
                             elif nonpipe_type == 'pump':
-                                loc = ic['pump'].iloc(nonpipe.name)
+                                loc = ic['pump'].lloc(nonpipe.name)
                                 if not loc in inline_pumps:
                                     inline_pumps.append(loc)
                                     start_inline_pumps.append(nonpipe_start_point)
@@ -181,13 +181,13 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile, save
                         if nonpipe_type == 'valve':
                             if processors[b - 1] != rank:
                                 points.append(b - 1)
-                            single_valves.append(ic['valve'].iloc(nonpipe.name))
+                            single_valves.append(ic['valve'].lloc(nonpipe.name))
                             single_valve_points.append(b)
                             continue
                         if nonpipe_type == 'pump':
                             if processors[b + 1] != rank:
                                 points.append(b + 1)
-                            single_pumps.append(ic['pump'].iloc(nonpipe.name))
+                            single_pumps.append(ic['pump'].lloc(nonpipe.name))
                             single_pump_points.append(b)
                             continue
                         continue
@@ -285,13 +285,5 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile, save
                 'points' : np.array(single_pump_points).astype(int),
             }
         }
-
-    os.makedirs(resource_filename(__name__, 'tmp'), exist_ok=True)
-    pickle_path = resource_filename(__name__,
-        'tmp' + os.sep + '{inpfile}_{cores}_{rank}.tmp'.format(
-            inpfile = os.path.splitext(ntpath.basename(inpfile))[0], cores = num_processors, rank = rank))
-
-    with open(pickle_path, 'wb') as handle:
-        pickle.dump(partition, handle)
 
     return partition

@@ -104,11 +104,9 @@ NODE_RESULTS = {
 }
 
 PIPE_START_RESULTS = {
-    'global_idx' : np.int,
     'flowrate' : np.float,
 }
 
 PIPE_END_RESULTS = {
-    'global_idx' : np.int,
     'flowrate' : np.float,
 }
