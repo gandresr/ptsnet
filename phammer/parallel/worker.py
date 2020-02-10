@@ -334,7 +334,7 @@ class Worker:
 
         ###
         self.profiler.start('run_boundary_step')
-        if not self.results['node'] is None: # worker has junctions
+        if 'node' in self.results: # worker has junctions
             run_boundary_step(
                 H0, Q1, H1,
                 self.results['node'].leak_flow[:,t],
