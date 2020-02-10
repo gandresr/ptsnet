@@ -379,6 +379,7 @@ class HammerSimulation:
             self.progress.update(1)
             if self.is_over:
                 self.progress.close()
+                print('\n')
         if self.settings.store_data:
             if self.is_over:
                 self.save()
@@ -550,11 +551,11 @@ class HammerSimulation:
                 self.router['node'].Barrier()
 
         if self.router['main'].rank == 0:
-            self.storer.save_data('inpfile', self.inpfile) # 1
-            self.storer.save_data('profiler', self.worker.profiler) # 10
-            self.storer.save_data('initial_conditions', self.ic) # 11
-            self.storer.save_data('settings', self.settings.to_dict()) # 12
-            self.storer.save_data('partitioning', self.worker.partition) # 13
+            self.storer.save_data('inpfile', self.inpfile, comm = 'main') # 1
+            self.storer.save_data('profiler', self.worker.profiler, comm = 'main') # 10
+            self.storer.save_data('initial_conditions', self.ic, comm = 'main') # 11
+            self.storer.save_data('settings', self.settings.to_dict(), comm = 'main') # 12
+            self.storer.save_data('partitioning', self.worker.partition, comm = 'main') # 13
 
     def load(self):
         if self.router['main'].rank == 0:

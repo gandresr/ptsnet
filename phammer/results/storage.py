@@ -68,7 +68,7 @@ class StorageManager:
                     z = zarr.open(store, 'w', shape = zarr_shape, chunks = (1, zarr_shape[1],), dtype = dtype)
                 else:
                     z = zarr.open(store, 'w', shape = zarr_shape, chunks = (1,), dtype = dtype)
-            if b2:
+            if not b1:
                 self.router[comm].Barrier()
             z = zarr.open(store, mode = 'r+')
             if self.router is None:
