@@ -18,11 +18,12 @@ def check_compatibility(wn, ic):
     # Pumps can not have dead ends
     possible_dead_end = ic['node'].degree[ic['pump'].end_node] < 2
     if possible_dead_end.any():
-        raise ModelError("there are pumps with an incompatible end node" % ic['node']._index_keys[possible_dead_end])
+        raise ModelError("there are pumps with an incompatible end node" % ic['node'].labels[possible_dead_end])
+
     # Valves can not have isolated start nodes
     possible_isolated_vstart = ic['node'].degree[ic['valve'].start_node] < 2
     if possible_isolated_vstart.any():
-        raise ModelError("there are valves with an incompatible start node" % ic['node']._index_keys[possible_isolated_vstart])
+        raise ModelError("there are valves with an incompatible start node" % ic['node'].labels[possible_isolated_vstart])
 
     # Pumps can not have isolated start nodes that are not reservoirs
     incompatible_start_pnodes = (ic['node'].degree[ic['pump'].start_node[not_inline_pumps]] == 1) * \
@@ -30,7 +31,7 @@ def check_compatibility(wn, ic):
 
     incompatible_start_pnodes = ~np.isin(
         ic['node'].type[ic['pump'].start_node[not_inline_pumps][incompatible_start_pnodes]], (EN.TANK, EN.RESERVOIR,))
-    incompatible_start_pnodes = ic['node']._index_keys[not_inline_pumps][incompatible_start_pnodes]
+    incompatible_start_pnodes = ic['node'].labels[not_inline_pumps][incompatible_start_pnodes]
 
     if len(incompatible_start_pnodes) > 0:
         raise ModelError("start nodes of pumps are incompatible: \n%s" % incompatible_start_pnodes)
@@ -43,19 +44,19 @@ def check_compatibility(wn, ic):
     if start_valve_error.any():
         raise ModelError(
             "start nodes of valves are connected to more than one pipe: \n%s" % \
-                ic['node']._index_keys[ic['valve'].start_node][start_valve_error])
+                ic['node'].labels[ic['valve'].start_node][start_valve_error])
     if start_pump_error.any():
         raise ModelError(
             "start nodes of pumps are connected to more than one pipe: \n%s" % \
-                ic['node']._index_keys[ic['pump'].start_node][start_pump_error])
+                ic['node'].labels[ic['pump'].start_node][start_pump_error])
     if end_valve_error.any():
         raise ModelError(
             "end nodes of valves are connected to more than one pipe: \n%s" % \
-                ic['node']._index_keys[ic['valve'].end_node][end_valve_error])
+                ic['node'].labels[ic['valve'].end_node][end_valve_error])
     if end_pump_error.any():
         raise ModelError(
             "end nodes of pumps are connected to more than one pipe: \n%s" % \
-                ic['node']._index_keys[ic['pump'].end_node][end_pump_error])
+                ic['node'].labels[ic['pump'].end_node][end_pump_error])
 
     # Reservoirs can not be at the end of a pump
     if (ic['node'].type[ic['pump'].end_node] == EN.RESERVOIR).any():
@@ -85,13 +86,13 @@ def check_compatibility(wn, ic):
     demanded = ic['node'].demand_coefficient[all_non_pipe_nodes_nburst] > 0
     if leaking.any():
         raise ModelError("there is a non-pipe element connected to a leaking node\n%s" % \
-            str(ic['node']._index_keys[all_non_pipe_nodes_nburst][leaking]))
+            str(ic['node'].labels[all_non_pipe_nodes_nburst][leaking]))
     if demanded.any():
         raise ModelError("there are non-pipe elements connected to a node with demand\n%s" \
-            % str(ic['node']._index_keys[all_non_pipe_nodes_nburst][demanded]))
+            % str(ic['node'].labels[all_non_pipe_nodes_nburst][demanded]))
 
     # Demands cannot be negative
-    negative_demands = ic['node']._index_keys[np.where(ic['node'].demand < 0)[0]]
+    negative_demands = ic['node'].labels[np.where(ic['node'].demand < 0)[0]]
     negative_demands = negative_demands[np.where(~np.isin(negative_demands, wn.reservoir_name_list + wn.tank_name_list))[0]]
     if len(negative_demands) > 0:
         raise ModelError("nodes ['" + "', '".join(negative_demands) + "'] have negative demands")
