@@ -1,7 +1,7 @@
 import numpy as np
 
 from collections import namedtuple
-from phammer.simulation.util import is_iterable
+from phammer.utils.data import is_array
 from functools import lru_cache
 
 class Row(np.ndarray):

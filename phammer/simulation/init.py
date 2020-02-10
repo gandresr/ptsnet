@@ -9,7 +9,7 @@ from phammer.simulation.constants import G, TOL, FLOOR_FFACTOR, CEIL_FFACTOR, DE
 from phammer.simulation.constants import NODE_PROPERTIES, PIPE_PROPERTIES, PUMP_PROPERTIES, VALVE_PROPERTIES
 from phammer.simulation.validation import check_compatibility
 from phammer.arrays.selectors import SelectorSet
-from phammer.simulation.util import imerge
+from phammer.utils.data import imerge
 
 from time import time
 

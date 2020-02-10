@@ -1,8 +1,6 @@
 import numpy as np
-import pickle, os, ntpath
-from time import time
 from collections import defaultdict as ddict
-from phammer.simulation.util import imerge
+from phammer.utils.data import imerge
 from pkg_resources import resource_filename
 
 def even(num_points, num_processors):

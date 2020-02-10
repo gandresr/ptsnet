@@ -2,10 +2,13 @@ import numpy as np
 
 from time import time
 from collections import deque as dq
-from phammer.arrays import Table2D, Table, ObjArray
+from collections import namedtuple
+from pkg_resources import resource_filename
+from phammer.arrays import ObjArray
 from phammer.simulation.constants import COEFF_TOL
 from phammer.epanet.util import EN
-from phammer.simulation.util import define_curve, is_iterable, run_shell
+from phammer.utils.data import define_curve, is_array
+from phammer.utils.io import run_shell
 from phammer.simulation.init import Initializator
 from pkg_resources import resource_filename
 from phammer.parallel.worker import Worker

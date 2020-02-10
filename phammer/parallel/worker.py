@@ -4,7 +4,7 @@ from collections import defaultdict as ddict
 from phammer.arrays import Table2D, Table, ObjArray
 from phammer.parallel.partitioning import even, get_partition
 from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_START_RESULTS, PIPE_END_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G, COEFF_TOL
-from phammer.simulation.util import is_iterable
+from phammer.utils.data import is_array
 from phammer.arrays.selectors import SelectorSet
 from phammer.simulation.funcs import run_boundary_step, run_interior_step, run_pump_step, run_valve_step
 from phammer.profiler import Profiler
