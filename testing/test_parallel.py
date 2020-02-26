@@ -36,5 +36,5 @@ print('elapsed time [s]', time() - t, 's')
 
 tt = np.linspace(0, duration, sim.settings.time_steps)
 plt.plot(tt, sim.worker.pipe_start_results.flowrate.T)
-plt.legend(sim.worker.pipe_start_results._index_keys)
+plt.legend(sim.worker.pipe_start_results.labels)
 plt.show()

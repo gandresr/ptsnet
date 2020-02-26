@@ -7,8 +7,8 @@ from phammer.simulation.sim import HammerSimulation
 from phammer.utils.io import get_root_path
 
 ROOT = get_root_path()
-duration = 5; time_step = 1
-inpfile = os.path.join(ROOT, os.pardir, 'example_files', 'BWSN_F.inp')
+duration = 500; time_step = 1e-1
+inpfile = os.path.join(ROOT, os.pardir, 'example_files', 'toy_example.inp')
 
 sim = HammerSimulation(
     inpfile,
@@ -19,8 +19,8 @@ sim = HammerSimulation(
         'warnings_on' : False,
         'show_progress' : True,
     },
-    period = 219,
-    default_wave_speed = 1000)
+    period = 0,
+    default_wave_speed = 1200)
 
 sim.add_curve('V_BUTTERFLY', 'valve',
     [1, 0.8, 0.6, 0.4, 0.2, 0],
@@ -43,3 +43,16 @@ sim.worker.profiler.start('total_sim_time')
 while not sim.is_over:
     sim.run_step()
 sim.worker.profiler.stop('total_sim_time')
+
+plt.plot(sim['time'], sim['pipe.start'].flowrate.T)
+plt.legend(sim['pipe.start'].labels)
+plt.show()
+plt.plot(sim['time'], sim['pipe.end'].flowrate.T)
+plt.legend(sim['pipe.end'].labels)
+plt.show()
+plt.plot(sim['time'], sim['node'].head.T)
+plt.legend(sim['node'].labels)
+plt.show()
+plt.plot(sim['time'], sim['node'].demand_flow.T)
+plt.legend(sim['node'].labels)
+plt.show()

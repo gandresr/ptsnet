@@ -205,6 +205,7 @@ class HammerSimulation:
             raise ValueError("Duration has to be larger than time step")
         self.initializator.create_selectors()
         self.t = 0
+        self.time_stamps = np.linspace(0, self.settings.duration, self.settings.time_steps)
         self.inpfile = inpfile
         # ----------------------------------------
         self.router = CommManager()
@@ -219,7 +220,7 @@ class HammerSimulation:
             self.storer = StorageManager()
         # ----------------------------------------
         if (not self.settings.warnings_on) and (self.router['main'].rank == 0) and self.settings.show_progress:
-            self.progress = tqdm(total = self.settings.time_steps)
+            self.progress = tqdm(total = self.settings.time_steps, position = 0)
             self.progress.update(1)
 
     def __repr__(self):
@@ -228,6 +229,8 @@ class HammerSimulation:
 
     def __getitem__(self, index):
         keys = self.results.keys()
+        if index == 'time':
+            return self.time_stamps
         if not index in keys:
             raise ValueError("not valid label. Use one of the following: %s" % keys)
         return self.results[index]

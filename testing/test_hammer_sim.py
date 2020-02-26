@@ -11,8 +11,8 @@ from time import time
 from phammer.utils.io import get_root_path
 
 ROOT = get_root_path()
-duration = 5; time_step = 1
-inpfile = os.path.join(ROOT, os.pardir, 'example_files', 'BWSN_F.inp')
+duration = 10; time_step = 1
+inpfile = os.path.join(ROOT, os.pardir, 'example_files', 'PHFC_ws.inp')
 
 sim = HammerSimulation(
     inpfile,
@@ -23,8 +23,8 @@ sim = HammerSimulation(
         'warnings_on' : False,
         'show_progress' : True,
     },
-    period = 219,
-    default_wave_speed = 1000)
+    period = 0,
+    default_wave_speed = 100)
 
 sim.add_curve('V_BUTTERFLY', 'valve',
     [1, 0.8, 0.6, 0.4, 0.2, 0],
@@ -46,6 +46,7 @@ sim.initialize()
 sim.worker.profiler.start('total_sim_time')
 while not sim.is_over:
     sim.run_step()
+
 sim.worker.profiler.stop('total_sim_time')
 
 # fname = ntpath.basename(inpfile)

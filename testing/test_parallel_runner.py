@@ -1,4 +1,4 @@
-from phammer.simulation.util import run_shell
+from phammer.utils.io import run_shell
 from pkg_resources import resource_filename
 from mpi4py import MPI
 
