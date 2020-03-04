@@ -1,6 +1,7 @@
 import numpy as np
 
 from phammer.epanet.util import EN
+from phammer.simulation.constants import TOL
 
 class ModelError(Exception):
     pass
@@ -97,4 +98,7 @@ def check_compatibility(wn, ic):
     if len(negative_demands) > 0:
         raise ModelError("nodes ['" + "', '".join(negative_demands) + "'] have negative demands")
 
-    # TODO: FLOW THE PIPE UPSTREAM AN END VALVE ALWAYS FLOWS TOWARDS END VALVE
+    # Valves cannot have zero head_loss if initial flow is not zero
+    non_zero_flow_valves = np.where((ic['valve'].flowrate != 0) & (ic['valve'].head_loss < TOL))[0]
+    if len(non_zero_flow_valves) > 0:
+        raise ModelError("valves ['" + "', '".join(ic['valve'].labels[non_zero_flow_valves]) + "'] cannot have zero loss coefficient")

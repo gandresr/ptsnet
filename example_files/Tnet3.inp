@@ -317,14 +317,14 @@
 
 [VALVES]
 ;ID              	Node1           	Node2           	Diameter    	Type	Setting     	MinorLoss   
- VALVE-173       	JUNCTION-111    	JUNCTION-112    	6.000000    	TCV 	0.2000000   	0           	;
- VALVE-174       	JUNCTION-113    	JUNCTION-114    	6.000000    	TCV 	0.2000000   	0           	;
- VALVE-175       	JUNCTION-115    	JUNCTION-116    	10.000000   	TCV 	0.2000000   	0           	;
- VALVE-176       	JUNCTION-117    	JUNCTION-118    	6.000000    	TCV 	0.2000      	0           	;
- VALVE-177       	JUNCTION-119    	JUNCTION-120    	6.000000    	TCV 	0.2000000   	0           	;
- VALVE-178       	JUNCTION-121    	JUNCTION-122    	6.000000    	TCV 	0.2000000   	0           	;
- VALVE-179       	JUNCTION-123    	JUNCTION-124    	8.000000    	TCV 	0.2000000   	0           	;
- VALVE-180       	JUNCTION-125    	JUNCTION-126    	8.000000    	TCV 	0.20000     	0           	;
+ VALVE-173       	JUNCTION-111    	JUNCTION-112    	6.000000    	TCV 	0.8         	10          	;
+ VALVE-174       	JUNCTION-113    	JUNCTION-114    	6.000000    	TCV 	0.2000000   	10          	;
+ VALVE-175       	JUNCTION-115    	JUNCTION-116    	10.000000   	TCV 	0.2000000   	10          	;
+ VALVE-176       	JUNCTION-117    	JUNCTION-118    	6.000000    	TCV 	0.2000      	10          	;
+ VALVE-177       	JUNCTION-119    	JUNCTION-120    	6.000000    	TCV 	0.2000000   	10          	;
+ VALVE-178       	JUNCTION-121    	JUNCTION-122    	6.000000    	TCV 	0.2000000   	0.01        	;
+ VALVE-179       	JUNCTION-123    	JUNCTION-124    	8.000000    	TCV 	0.2000000   	0.02        	;
+ VALVE-180       	JUNCTION-125    	JUNCTION-126    	8.000000    	TCV 	0.20000     	10          	;
 
 [TAGS]
 
@@ -407,15 +407,15 @@
 
 [CURVES]
 ;ID              	X-Value     	Y-Value
-;PUMP: PUMP: PUMP: PUMP: PUMP:   
+;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP:   
  CURVE-0         	0.000000    	445.000000  
  CURVE-0         	790.000000  	365.000000  
  CURVE-0         	1460.000000 	120.000000  
-;PUMP: PUMP: PUMP: PUMP: PUMP:   
+;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP:   
  CURVE-1         	0.000000    	730.000000  
  CURVE-1         	1000.000000 	500.000000  
  CURVE-1         	1350.000000 	260.000000  
-;PUMP: PUMP: PUMP: PUMP: PUMP:   
+;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP:   
  CURVE-2         	0.000000    	740.000000  
  CURVE-2         	2000.000000 	530.000000  
  CURVE-2         	3240.000000 	205.000000  
@@ -425,7 +425,9 @@
 
 
 
+
 [RULES]
+
 
 
 
@@ -606,7 +608,7 @@
  JUNCTION-106    	22698.70        	7650.31         
  JUNCTION-109    	694.79          	-18.12          
  JUNCTION-110    	862.27          	205.84          
- JUNCTION-111    	8270.97         	12259.89        
+ JUNCTION-111    	8256.50         	12192.47        
  JUNCTION-112    	8176.75         	12053.87        
  JUNCTION-113    	9457.16         	13032.31        
  JUNCTION-114    	9711.67         	13144.65        

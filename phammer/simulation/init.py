@@ -30,7 +30,8 @@ class Initializator:
             try:
                 check_compatibility(wn=self.wn, ic=self.ic)
             except Exception as e:
-                print("Elapsed time (model check): ", time() - t, '[s]')
+                if warnings_on:
+                    print("Elapsed time (model check): ", time() - t, '[s]')
                 raise e
             if warnings_on:
                 print("Success - Compatible Model")
@@ -315,19 +316,20 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
             ic[ltype].diameter[k] = link.diameter
             ic[ltype].area[k] = np.pi * link.diameter ** 2 / 4
             ic[ltype].type[k] = EPANET.ENgetlinktype(i)
+            ic[ltype].head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
 
         if link.link_type == 'Pipe':
             pipe_labels.append(link.name)
             ic[ltype].length[k] = link.length
-            ic[ltype].head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
         elif link.link_type == 'Pump':
             pump_labels.append(link.name)
             ic[ltype].initial_status[k] = link.initial_status
             ic[ltype].setting[k] = ic[ltype].initial_status[k]
+            ic[ltype].head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
             # Pump curve parameters
             qp, hp = list(zip(*link.get_pump_curve().points)); qp = list(qp); hp = list(hp)
             qpp = to_si(flow_units, float(ic[ltype].flowrate[k]), HydParam.Flow)
-            hpp = to_si(flow_units, EPANET.ENgetlinkvalue(i, EN.HEADLOSS), HydParam.HydraulicHead)
+            hpp = to_si(flow_units, float(ic[ltype].head_loss[k]), HydParam.HydraulicHead)
             qp.append(qpp); hp.append(abs(hpp))
             ic[ltype].a2[k], ic[ltype].a1[k], ic[ltype].Hs[k] = np.polyfit(qp, hp, 2)
             # Source head
@@ -354,6 +356,8 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     to_si(flow_units, ic['pump'].flowrate, HydParam.Flow)
     to_si(flow_units, ic['pipe'].velocity, HydParam.Velocity)
     to_si(flow_units, ic['pump'].velocity, HydParam.Velocity)
+    to_si(flow_units, ic['pump'].head_loss, HydParam.HydraulicHead)
+    to_si(flow_units, ic['valve'].head_loss, HydParam.HydraulicHead)
     to_si(flow_units, ic['valve'].velocity, HydParam.Velocity)
 
     idx = ic['pipe'].ffactor == 0

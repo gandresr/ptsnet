@@ -50,7 +50,7 @@ PUMP_PROPERTIES = {
     'end_node' : np.int, #
     'flowrate' : np.float, #
     'velocity' : np.float, #
-    'headloss' : np.float, #
+    'head_loss' : np.float, #
     'direction' : np.int, #
     'initial_status' : np.int, #
     'is_inline' : np.bool, #
@@ -68,6 +68,7 @@ VALVE_PROPERTIES = {
     'end_node' : np.int, #
     'diameter' : np.float, #
     'area' : np.float, #
+    'head_loss' : np.float, #
     'flowrate' : np.float, #
     'velocity' : np.float, #
     'direction' : np.int, #
