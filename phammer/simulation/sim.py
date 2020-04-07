@@ -188,6 +188,7 @@ class HammerSimulation:
             self.settings.active_zarr = True
             self.results = {}
             self.load()
+            self.time_stamps = np.linspace(0, self.settings.duration, self.settings.time_steps)
             return
         if type(settings) != dict:
             raise TypeError("'settings' are not properly defined, use dict object")

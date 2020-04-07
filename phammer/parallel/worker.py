@@ -148,7 +148,7 @@ class Worker:
         inner = self.points[self.where.points['are_inner']]
 
         for p in self.recv_queue.labels:
-            self.recv_queue[p] = np.sort(self.recv_queue[p])
+            self.recv_queue[p].sort()
             urq = np.isin(self.recv_queue[p], uboundaries)
             drq = np.isin(self.recv_queue[p], dboundaries)
             irq = np.isin(self.recv_queue[p], inner)

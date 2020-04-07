@@ -330,7 +330,10 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
             qp, hp = list(zip(*link.get_pump_curve().points)); qp = list(qp); hp = list(hp)
             qpp = to_si(flow_units, float(ic[ltype].flowrate[k]), HydParam.Flow)
             hpp = to_si(flow_units, float(ic[ltype].head_loss[k]), HydParam.HydraulicHead)
-            qp.append(qpp); hp.append(abs(hpp))
+            qp.pop(); hp.pop(); qp.append(qpp); hp.append(abs(hpp))
+            order = np.argsort(qp)
+            qp = np.array(qp)[order]
+            hp = np.array(hp)[order]
             ic[ltype].a2[k], ic[ltype].a1[k], ic[ltype].Hs[k] = np.polyfit(qp, hp, 2)
             # Source head
             ic[ltype].source_head[k] = ic['node'].head[ic[ltype].start_node[k]]
