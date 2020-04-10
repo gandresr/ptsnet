@@ -25,6 +25,7 @@ class HammerSettings:
         skip_compatibility_check : bool = False,
         show_progress = False,
         store_data = True,
+        period = 0,
         _super = None):
 
         self._super = _super
@@ -41,6 +42,7 @@ class HammerSettings:
         self.defined_wave_speeds = False
         self.active_zarr = False
         self.blocked = False
+        self.period = period
         self.set_default()
         self.settingsOK = True
 
@@ -180,7 +182,7 @@ class HammerSimulation:
         'demand' : 'node',
     }
 
-    def __init__(self, inpfile = None, settings = None, period = 0, default_wave_speed = None, wave_speed_file = None, delimiter=','):
+    def __init__(self, inpfile = None, settings = None, default_wave_speed = None, wave_speed_file = None, delimiter=','):
         if inpfile == None:
             self.router = CommManager()
             self.storer = StorageManager(self.router)
@@ -195,7 +197,7 @@ class HammerSimulation:
         self.settings = HammerSettings(**settings, _super=self)
         self.initializator = Initializator(
             inpfile,
-            period = period,
+            period = self.settings.period,
             skip_compatibility_check = self.settings.skip_compatibility_check,
             warnings_on = self.settings.warnings_on,
             _super = self)
@@ -611,3 +613,9 @@ class HammerSimulation:
 
             self.inpfile = self.storer.load_data('inpfile')
             self.profiler = self.storer.load_data('profiler')
+            self.initializator = Initializator(
+                self.inpfile,
+                period = self.settings.period,
+                skip_compatibility_check = True,
+                warnings_on = self.settings.warnings_on,
+                _super = self)
