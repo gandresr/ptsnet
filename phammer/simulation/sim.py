@@ -591,7 +591,7 @@ class HammerSimulation:
                 flowrate = self.storer.load_data('pipe.start.flowrate', pipe_start_indexes, pipe_start_labels)
             )
 
-            pipe_end_labels = self.storer.load_data('pipe.start.labels')[:]
+            pipe_end_labels = self.storer.load_data('pipe.end.labels')[:]
             PipeEnd.__repr__ = lambda x : '<Persistent PipeEnd Array [n = %d]>' % len(pipe_end_labels)
             pipe_end_indexes = {l : i for i, l in enumerate(pipe_end_labels)}
             pipe_end_labels = {i : l for l, i in pipe_end_indexes.items()}
