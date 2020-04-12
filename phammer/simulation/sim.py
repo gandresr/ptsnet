@@ -26,6 +26,7 @@ class HammerSettings:
         show_progress = False,
         store_data = True,
         period = 0,
+        workspace = 'default',
         _super = None):
 
         self._super = _super
@@ -43,6 +44,7 @@ class HammerSettings:
         self.active_zarr = False
         self.blocked = False
         self.period = period
+        self.workspace = workspace
         self.set_default()
         self.settingsOK = True
 
