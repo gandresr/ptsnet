@@ -1,0 +1,181 @@
+[TITLE]
+
+
+[JUNCTIONS]
+;ID              	Elev        	Demand      	Pattern         
+ JUNCTION-5411   	80.0        	0           	                	;
+ JUNCTION-5423   	90.032211000000004	0           	                	;
+ JUNCTION-5576   	95.0        	0           	                	;
+ AUX-2           	87.27       	0           	                	;
+ AUX-1           	87.27       	0           	                	;
+ JUNCTION-5577   	87.272803999999994	0           	                	;
+ JUNCTION-5578   	89.469286999999994	0           	                	;
+ JUNCTION-5579   	71.864994999999993	0           	                	;
+ JUNCTION-5580   	80.0        	0           	                	;
+ JUNCTION-5581   	80.0        	0           	                	;
+ JUNCTION-5582   	80.0        	0           	                	;
+ JUNCTION-5583   	73.109388999999993	0           	                	;
+ JUNCTION-5584   	73.550438   	0           	                	;
+ JUNCTION-5586   	59.893510999999997	0           	                	;
+ JUNCTION-5587   	64.387730000000005	0           	                	;
+ JUNCTION-5588   	73.503721999999996	0           	                	;
+ JUNCTION-5589   	87.049664000000007	0           	                	;
+ JUNCTION-5590   	87.5        	0           	                	;
+
+[RESERVOIRS]
+;ID              	Head        	Pattern         
+ 1               	249.1       	                	;
+ 2               	235.95      	                	;
+
+[TANKS]
+;ID              	Elevation   	InitLevel   	MinLevel    	MaxLevel    	Diameter    	MinVol      	VolCurve
+
+[PIPES]
+;ID              	Node1           	Node2           	Length      	Diameter    	Roughness   	MinorLoss   	Status
+ LINK-7496       	JUNCTION-5423   	JUNCTION-5411   	13185.200000	42.000000   	140         	0.000000    	Open  	;
+ LINK-7639       	JUNCTION-5423   	JUNCTION-5576   	1094.900000 	42.000000   	140         	0.000000    	Open  	;
+ LINK-7640       	AUX-2           	JUNCTION-5576   	1317.400000 	42.000000   	140         	0.000000    	Open  	;
+ 3               	AUX-1           	JUNCTION-5577   	1000        	42          	140         	0           	Open  	;
+ LINK-7641       	JUNCTION-5578   	JUNCTION-5577   	336.600000  	42.000000   	140         	0.000000    	Open  	;
+ LINK-7642       	JUNCTION-5579   	JUNCTION-5578   	1389.700000 	42.000000   	140         	0.000000    	Open  	;
+ LINK-7643       	JUNCTION-5580   	JUNCTION-5579   	453.300000  	42.000000   	140         	0.000000    	Open  	;
+ LINK-7646       	JUNCTION-5580   	JUNCTION-5581   	1805.800000 	42.000000   	140         	0.000000    	Open  	;
+ LINK-7644       	JUNCTION-5581   	JUNCTION-5582   	152.900000  	42.000000   	140         	0.000000    	Open  	;
+ LINK-7647       	JUNCTION-5582   	JUNCTION-5583   	2594.200000 	42.000000   	140         	0.000000    	Open  	;
+ LINK-7648       	JUNCTION-5583   	JUNCTION-5584   	659.900000  	42.000000   	140         	0.000000    	Open  	;
+ LINK-7649       	JUNCTION-5584   	JUNCTION-5586   	646.500000  	42.000000   	140         	0.000000    	Open  	;
+ LINK-7651       	JUNCTION-5586   	JUNCTION-5587   	732.100000  	42.000000   	140         	0.000000    	Open  	;
+ LINK-7650       	JUNCTION-5587   	JUNCTION-5588   	535.100000  	42.000000   	140         	0.000000    	Open  	;
+ LINK-7652       	JUNCTION-5589   	JUNCTION-5588   	1518.100000 	42.000000   	140         	0.000000    	Open  	;
+ LINK-7653       	JUNCTION-5590   	JUNCTION-5589   	260.100000  	42.000000   	140         	0.000000    	Open  	;
+ LINK-7654       	JUNCTION-5590   	2               	1997.4      	42          	140         	0           	Open  	;
+ LINK-7484       	1               	JUNCTION-5411   	4447        	42          	140         	0           	Open  	;
+
+[PUMPS]
+;ID              	Node1           	Node2           	Parameters
+
+[VALVES]
+;ID              	Node1           	Node2           	Diameter    	Type	Setting     	MinorLoss   
+ AUX-VALVE       	AUX-1           	AUX-2           	42          	TCV 	0           	0.1         	;
+
+[TAGS]
+
+[DEMANDS]
+;Junction        	Demand      	Pattern         	Category
+
+[STATUS]
+;ID              	Status/Setting
+ AUX-VALVE       	Open
+
+[PATTERNS]
+;ID              	Multipliers
+;
+ PATTERN-0       	1.000000   
+
+[CURVES]
+;ID              	X-Value     	Y-Value
+
+[CONTROLS]
+
+[RULES]
+
+[ENERGY]
+ Global Efficiency  	75
+ Global Price       	0
+ Demand Charge      	0
+
+[EMITTERS]
+;Junction        	Coefficient
+
+[QUALITY]
+;Node            	InitQual
+
+[SOURCES]
+;Node            	Type        	Quality     	Pattern
+
+[REACTIONS]
+;Type     	Pipe/Tank       	Coefficient
+
+
+[REACTIONS]
+ Order Bulk            	1
+ Order Tank            	1
+ Order Wall            	1
+ Global Bulk           	0
+ Global Wall           	0
+ Limiting Potential    	0
+ Roughness Correlation 	0
+
+[MIXING]
+;Tank            	Model
+
+[TIMES]
+ Duration           	00:00
+ Hydraulic Timestep 	0:00
+ Quality Timestep   	0:00
+ Pattern Timestep   	0:00
+ Pattern Start      	0:00 
+ Report Timestep    	0:00
+ Report Start       	0:00 
+ Start ClockTime    	12 am
+ Statistic          	None
+
+[REPORT]
+ Status             	No
+ Summary            	No
+ Page               	0
+
+[OPTIONS]
+ Units              	GPM
+ Headloss           	H-W
+ Specific Gravity   	1
+ Viscosity          	1
+ Trials             	100
+ Accuracy           	0.0003
+ CHECKFREQ          	2
+ MAXCHECK           	10
+ DAMPLIMIT          	0
+ Unbalanced         	Continue 10
+ Pattern            	PATTERN-0
+ Demand Multiplier  	1
+ Emitter Exponent   	0.5
+ Quality            	Chemical mg/L
+ Diffusivity        	1
+ Tolerance          	0.01
+
+[COORDINATES]
+;Node            	X-Coord         	Y-Coord
+ JUNCTION-5411   	591044.38       	1277729.88      
+ JUNCTION-5423   	584152.38       	1266415.21      
+ JUNCTION-5576   	583110.38       	1266444.00      
+ AUX-2           	582394.46       	1266469.00      
+ AUX-1           	582100.96       	1266454.32      
+ JUNCTION-5577   	581792.94       	1266445.88      
+ JUNCTION-5578   	581436.15       	1266275.59      
+ JUNCTION-5579   	581117.25       	1265314.25      
+ JUNCTION-5580   	581025.81       	1264875.00      
+ JUNCTION-5581   	579915.13       	1263453.25      
+ JUNCTION-5582   	579818.31       	1263334.88      
+ JUNCTION-5583   	577600.69       	1262523.75      
+ JUNCTION-5584   	576940.81       	1262530.63      
+ JUNCTION-5586   	576294.38       	1262537.38      
+ JUNCTION-5587   	575562.31       	1262541.00      
+ JUNCTION-5588   	575027.19       	1262543.75      
+ JUNCTION-5589   	573509.13       	1262547.88      
+ JUNCTION-5590   	573249.00       	1262547.00      
+ 1               	591757.43       	1279019.83      
+ 2               	569636.96       	1262563.06      
+
+[VERTICES]
+;Link            	X-Coord         	Y-Coord
+
+[LABELS]
+;X-Coord           Y-Coord          Label & Anchor Node
+
+[BACKDROP]
+ DIMENSIONS     	495576.74       	1212949.89      	603141.15       	1360074.74      
+ UNITS          	None
+ FILE           	
+ OFFSET         	0.00            	0.00            
+
+[END]
