@@ -16,29 +16,29 @@ class StorageManager:
         if any(elem in workspace_name for elem in ('.', os.sep)):
             raise ValueError("Workspace name is not valid")
         self.root = os.path.join(get_root_path(), 'workspaces')
-        self.tmp_path = os.path.join(self.root, workspace_name)
+        self.workspace_path = os.path.join(self.root, workspace_name)
         self._module_path = resource_filename(__name__, '')
         with open( os.path.join(self._module_path,  'metadata.json'), 'r' ) as f:
             self.metadata = json.load(f)
-        self.tmp_folders = self.get_tmp_folders()
+        self.workspace_folders = self.get_workspace_folders()
         self.router = router
         self.data = {}
 
-    def get_tmp_folders(self):
+    def get_workspace_folders(self):
         with open(os.path.join(self._module_path, 'file_structure.json'), 'r') as f:
             fs = json.load(f)
-        paths = walk(fs, self.tmp_path)
+        paths = walk(fs, self.workspace_path)
         tokens = list(map(os.path.basename, paths))
         clean_paths = list(map(os.path.dirname, paths))
         return {int(token) : path for token, path in zip(tokens, clean_paths)}
 
-    def create_tmp_folders(self):
-        for folder in self.tmp_folders.values():
+    def create_workspace_folders(self):
+        for folder in self.workspace_folders.values():
             os.makedirs(folder, exist_ok=True)
 
-    def flush_tmp(self):
-        if os.path.isdir(self.tmp_path):
-            shutil.rmtree(self.tmp_path)
+    def flush_workspace(self):
+        if os.path.isdir(self.workspace_path):
+            shutil.rmtree(self.workspace_path)
 
     def save_data(self, data_label, data, zarr_shape = None, comm = None):
         '''
@@ -50,7 +50,7 @@ class StorageManager:
         if not b1: b2 = self.router[comm].rank == 0
 
         idx = self.metadata[data_label]["token"]
-        data_path = self.tmp_folders[idx]
+        data_path = self.workspace_folders[idx]
         fname = self.metadata[data_label]['fname']
         full_path = os.path.join(data_path, fname)
         file_type = self.metadata[data_label]['ftype']
@@ -86,7 +86,7 @@ class StorageManager:
 
     def load_data(self, data_label, indexes = None, labels = None):
         d = self.metadata[data_label]
-        full_path = os.path.join(self.tmp_folders[d['token']], d['fname'])
+        full_path = os.path.join(self.workspace_folders[d['token']], d['fname'])
         if d['ftype'] == 'array':
             return ZarrArray(full_path, indexes, labels)
         elif d['ftype'] == 'pickle':
