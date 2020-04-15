@@ -493,7 +493,7 @@ class HammerSimulation:
 
     def save(self):
         if self.router['main'].rank == 0:
-            self.storer.flush_tmp()
+            self.storer.flush_workspace()
             self.storer.create_tmp_folders()
         self.router['main'].Barrier()
 
