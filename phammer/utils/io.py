@@ -25,3 +25,7 @@ def walk(folder_structure, root_path):
         paths.append(new_root_path)
 
     return paths
+
+def get_workspaces():
+    return os.listdir(os.path.join(get_root_path(), 'workspaces'))
+

@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 from tqdm import tqdm
 from collections import deque as dq
@@ -8,7 +9,7 @@ from phammer.arrays import ObjArray
 from phammer.simulation.constants import COEFF_TOL
 from phammer.epanet.util import EN
 from phammer.utils.data import define_curve, is_array
-from phammer.utils.io import run_shell
+from phammer.utils.io import run_shell, get_root_path
 from phammer.simulation.init import Initializator
 from phammer.parallel.comm import CommManager
 from phammer.parallel.worker import Worker
@@ -184,14 +185,13 @@ class HammerSimulation:
         'demand' : 'node',
     }
 
-    def __init__(self, inpfile = None, settings = None, default_wave_speed = None, wave_speed_file = None, delimiter=','):
+    def __init__(self, workspace_name = 'tmp', inpfile = None, settings = None, default_wave_speed = None, wave_speed_file = None, delimiter=','):
         if inpfile == None:
             self.router = CommManager()
-            self.storer = StorageManager(self.router)
             self.settings = HammerSettings()
             self.settings.active_zarr = True
             self.results = {}
-            self.load()
+            self.load(workspace_name)
             self.time_stamps = np.linspace(0, self.settings.duration, self.settings.time_steps)
             return
         if type(settings) != dict:
@@ -220,9 +220,9 @@ class HammerSimulation:
         self.worker = None
         self.results = None
         if self.router['main'].size > 1:
-            self.storer = StorageManager(self.router)
+            self.storer = StorageManager(workspace_name, router = self.router)
         else:
-            self.storer = StorageManager()
+            self.storer = StorageManager(workspace_name)
         # ----------------------------------------
         if (not self.settings.warnings_on) and (self.router['main'].rank == 0) and self.settings.show_progress:
             self.progress = tqdm(total = self.settings.time_steps, position = 0)
@@ -565,11 +565,19 @@ class HammerSimulation:
             self.storer.save_data('settings', self.settings.to_dict(), comm = 'main') # 12
             self.storer.save_data('partitioning', self.worker.partition, comm = 'main') # 13
 
-    def load(self):
+    def load(self, workspace_name):
         if self.router['main'].rank == 0:
+            storer_root = os.path.join(get_root_path(), 'workspaces', workspace_name)
+
+            if any(elem in workspace_name for elem in ('.', os.sep)) or not os.path.exists(storer_root):
+                raise ValueError("The specified workspace does not exist")
+
+            self.storer = StorageManager(workspace_name, router = self.router)
+
             Node = namedtuple('Node', list(NODE_RESULTS.keys()) + ['labels'])
             PipeStart = namedtuple('PipeStart', list(PIPE_START_RESULTS.keys()) + ['labels'])
             PipeEnd = namedtuple('PipeEnd', list(PIPE_END_RESULTS.keys()) + ['labels'])
+
 
             node_labels = self.storer.load_data('node.labels')[:]
             Node.__repr__ = lambda x : '<Persistent Node Array [n = %d]>' % len(node_labels)

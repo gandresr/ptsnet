@@ -12,9 +12,11 @@ from phammer.utils.io import get_root_path, walk
 
 class StorageManager:
 
-    def __init__(self, router = None):
-        self.root = get_root_path()
-        self.tmp_path = os.path.join(self.root, 'tmp')
+    def __init__(self, workspace_name, router = None):
+        if any(elem in workspace_name for elem in ('.', os.sep)):
+            raise ValueError("Workspace name is not valid")
+        self.root = os.path.join(get_root_path(), 'workspaces')
+        self.tmp_path = os.path.join(self.root, workspace_name)
         self._module_path = resource_filename(__name__, '')
         with open( os.path.join(self._module_path,  'metadata.json'), 'r' ) as f:
             self.metadata = json.load(f)
