@@ -494,7 +494,7 @@ class HammerSimulation:
     def save(self):
         if self.router['main'].rank == 0:
             self.storer.flush_workspace()
-            self.storer.create_tmp_folders()
+            self.storer.create_workspace_folders()
         self.router['main'].Barrier()
 
         if 'pipe.start' in self.router.intra_communicators:
