@@ -12527,11 +12527,13 @@
  JUNCTION-12521  	85          	0           	PATTERN-1       	;
  JUNCTION-12522  	59.909999999999997	0           	PATTERN-1       	;
  JUNCTION-125A   	30.6        	0           	                	;
+ AUX-2           	87.27       	0           	                	;
+ AUX-1           	87.27       	0           	                	;
 
 [RESERVOIRS]
 ;ID              	Head        	Pattern         
- RESERVOIR-12523 	241.69999999999999	PATTERN-3       	;
- RESERVOIR-12524 	241.69999999999999	PATTERN-4       	;
+ RESERVOIR-12523 	241         	PATTERN-3       	;
+ RESERVOIR-12524 	241         	PATTERN-4       	;
 
 [TANKS]
 ;ID              	Elevation   	InitLevel   	MinLevel    	MaxLevel    	Diameter    	MinVol      	VolCurve
@@ -20180,7 +20182,7 @@
  LINK-7637       	JUNCTION-5575   	JUNCTION-5573   	253.400000  	6.000000    	140         	0.000000    	Open  	;
  LINK-7638       	JUNCTION-5569   	JUNCTION-5575   	650.800000  	6.000000    	140         	0.000000    	Open  	;
  LINK-7639       	JUNCTION-5423   	JUNCTION-5576   	1094.900000 	42.000000   	140         	0.000000    	Open  	;
- LINK-7640       	JUNCTION-5577   	JUNCTION-5576   	1317.400000 	42.000000   	140         	0.000000    	Open  	;
+ LINK-7640       	AUX-2           	JUNCTION-5576   	1317.400000 	42.000000   	140         	0.000000    	Open  	;
  LINK-7641       	JUNCTION-5578   	JUNCTION-5577   	336.600000  	42.000000   	140         	0.000000    	Open  	;
  LINK-7642       	JUNCTION-5579   	JUNCTION-5578   	1389.700000 	42.000000   	140         	0.000000    	Open  	;
  LINK-7643       	JUNCTION-5580   	JUNCTION-5579   	453.300000  	42.000000   	140         	0.000000    	Open  	;
@@ -27363,6 +27365,7 @@
  LINK-14820      	JUNCTION-12521  	JUNCTION-647    	22          	4           	140         	0           	Open  	;
  LINK-14821      	JUNCTION-12522  	JUNCTION-12257  	50          	24          	140         	0           	Open  	;
  1               	JUNCTION-12514  	JUNCTION-125A   	100         	12          	140         	0           	Open  	;
+ 3               	AUX-1           	JUNCTION-5577   	1000        	42          	140         	0           	Open  	;
 
 [PUMPS]
 ;ID              	Node1           	Node2           	Parameters
@@ -27370,11 +27373,12 @@
 
 [VALVES]
 ;ID              	Node1           	Node2           	Diameter    	Type	Setting     	MinorLoss   
- VALVE-14826     	JUNCTION-12501  	JUNCTION-12502  	14          	TCV 	0           	0           	;
- VALVE-14827     	JUNCTION-12505  	JUNCTION-12506  	14          	TCV 	0           	0           	;
- VALVE-14828     	JUNCTION-12508  	JUNCTION-12509  	12          	TCV 	0           	0           	;
- VALVE-14829     	JUNCTION-125A   	JUNCTION-12515  	12          	TCV 	0           	0           	;
+ VALVE-14826     	JUNCTION-12501  	JUNCTION-12502  	14          	TCV 	0           	0.08        	;
+ VALVE-14827     	JUNCTION-12505  	JUNCTION-12506  	14          	TCV 	0           	0.08        	;
+ VALVE-14828     	JUNCTION-12508  	JUNCTION-12509  	12          	TCV 	0           	0.08        	;
+ VALVE-14829     	JUNCTION-125A   	JUNCTION-12515  	12          	TCV 	0           	0.08        	;
  VALVE-14830     	JUNCTION-12518  	JUNCTION-12517  	1.5         	PSV 	64          	0.1         	;
+ AUX-VALVE       	AUX-1           	AUX-2           	42          	PRV 	0           	0.1         	;
 
 [TAGS]
 
@@ -27388,6 +27392,7 @@
  VALVE-14828     	Open
  VALVE-14829     	Open
  VALVE-14830     	Open
+ AUX-VALVE       	Open
 
 [PATTERNS]
 ;ID              	Multipliers
@@ -28024,15 +28029,15 @@
 
 [CURVES]
 ;ID              	X-Value     	Y-Value
-;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
+;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
  CURVE-0         	0.000000    	110.000000  
  CURVE-0         	500.000000  	90.000000   
  CURVE-0         	1000.000000 	40.000000   
-;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
+;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
  CURVE-1         	0.000000    	45.000000   
  CURVE-1         	500.000000  	35.000000   
  CURVE-1         	1000.000000 	15.000000   
-;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
+;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
  CURVE-2         	0           	189         
  CURVE-2         	200         	188.99      
  CURVE-2         	400         	188.72      
@@ -28040,7 +28045,7 @@
  CURVE-2         	800         	179         
  CURVE-2         	1000        	165.74      
  CURVE-2         	1200        	146.88      
-;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
+;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
  CURVE-3         	0           	255.89      
  CURVE-3         	603         	253.16      
  CURVE-3         	843.4       	251.73      
@@ -28050,7 +28055,7 @@
  CURVE-3         	1804.8      	200.2       
  CURVE-3         	2045.2      	173.89      
  CURVE-3         	2285.6      	142.73      
-;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
+;PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: PUMP: 
  CURVE-4         	0           	46.7        
  CURVE-4         	200         	40.2        
  CURVE-4         	353         	33.0        
@@ -28838,7 +28843,11 @@ LINK VALVE-14826 1432.6233 AT TIME 934:35:39
 
 
 
+
+
 [RULES]
+
+
 
 
 
@@ -34522,7 +34531,7 @@ LINK VALVE-14826 1432.6233 AT TIME 934:35:39
  JUNCTION-5575   	584343.38       	1300972.13      
  JUNCTION-5576   	583110.38       	1266444.00      
  JUNCTION-5577   	581792.94       	1266445.88      
- JUNCTION-5578   	581456.38       	1266446.38      
+ JUNCTION-5578   	581436.15       	1266275.59      
  JUNCTION-5579   	581117.25       	1265314.25      
  JUNCTION-5580   	581025.81       	1264875.00      
  JUNCTION-5581   	579915.13       	1263453.25      
@@ -41468,6 +41477,8 @@ LINK VALVE-14826 1432.6233 AT TIME 934:35:39
  JUNCTION-12521  	559319.12       	1331514.87      
  JUNCTION-12522  	549619.09       	1267873.09      
  JUNCTION-125A   	563236.19       	1294301.56      
+ AUX-2           	582394.46       	1266469.00      
+ AUX-1           	582100.96       	1266454.32      
  RESERVOIR-12523 	589732.44       	1282613.88      
  RESERVOIR-12524 	589726.94       	1282514.13      
  TANK-12525      	549620.13       	1267609.00      
