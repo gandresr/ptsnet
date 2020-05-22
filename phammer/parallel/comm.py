@@ -2,6 +2,7 @@ from mpi4py import MPI
 
 class CommManager:
     def __init__(self):
+        self.MPI = MPI
         self.communicators = {}
         self.intra_communicators = {}
         self.add_communicator('main', MPI.COMM_WORLD)

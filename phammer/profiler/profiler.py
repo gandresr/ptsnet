@@ -24,7 +24,8 @@ class Job:
     @property
     def duration(self):
         if len(self.time_stamps) >= 2:
-            return self.time_stamps[-1] - self.time_stamps[-2]
+            tstamps = np.array(self.time_stamps)
+            return tstamps[1::2] - tstamps[::2]
         else:
             return None
 
