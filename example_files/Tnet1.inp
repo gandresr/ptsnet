@@ -35,7 +35,7 @@
 
 [VALVES]
 ;ID              	Node1           	Node2           	Diameter    	Type	Setting     	MinorLoss   
- VALVE           	N7              	N8              	184         	FCV 	10000       	0           	;
+ VALVE           	N7              	N8              	184         	FCV 	10000       	0.8         	;
 
 [TAGS]
 
@@ -55,7 +55,9 @@
 [CONTROLS]
 
 
+
 [RULES]
+
 
 
 [ENERGY]
