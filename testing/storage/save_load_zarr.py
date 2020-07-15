@@ -17,14 +17,12 @@ zarr_shape = (num_points, T)
 comm.barrier()
 store = zarr.DirectoryStore(os.path.join(os.getcwd(), 'zarr_array', 'x.zarr'))
 data = np.random.rand(num_elements, T)
-try:
+if rank == 0:
     z = zarr.open(store, 'w', shape = zarr_shape, chunks = (1, zarr_shape[1],), dtype = float)
-except:
-    print(rank)
-    z = None
+comm.barrier()
+z = zarr.open(store, mode = 'r+')
 chunk_size = data.shape[0]
 final_index = comm.scan(chunk_size)
 initial_index = final_index - chunk_size
 print(rank, initial_index, final_index, chunk_size, z.shape, data.shape)
-if z:
-    z[initial_index:final_index,:] = data
+z[initial_index:final_index,:] = data
