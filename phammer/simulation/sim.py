@@ -42,7 +42,7 @@ class HammerSettings:
         self.show_progress = show_progress
         self.store_data = store_data
         self.defined_wave_speeds = False
-        self.active_zarr = False
+        self.active_persistance = False
         self.blocked = False
         self.period = period
         self.workspace = workspace
@@ -189,7 +189,7 @@ class HammerSimulation:
         if inpfile == None:
             self.router = CommManager()
             self.settings = HammerSettings()
-            self.settings.active_zarr = True
+            self.settings.active_persistance = True
             self.results = {}
             self.load(workspace_name)
             self.time_stamps = np.linspace(0, self.settings.duration, self.settings.time_steps)
@@ -499,71 +499,50 @@ class HammerSimulation:
 
         if 'pipe.start' in self.router.intra_communicators:
             self.storer.save_data(
-                'pipe.start.labels',
-                self['pipe.start'].labels,
-                zarr_shape = (self.wn.num_pipes,),
-                comm = 'pipe.start') # 2
-            self.router['pipe.start'].Barrier()
-
-            self.storer.save_data(
                 'pipe.start.flowrate',
                 self['pipe.start'].flowrate,
-                zarr_shape = (self.wn.num_pipes, self.settings.time_steps),
-                comm = 'pipe.start') # 3
+                shape = (self.wn.num_pipes, self.settings.time_steps),
+                comm = 'pipe.start') # 1
             self.router['pipe.start'].Barrier()
 
         if 'pipe.end' in self.router.intra_communicators:
             self.storer.save_data(
-                'pipe.end.labels',
-                self['pipe.end'].labels,
-                zarr_shape = (self.wn.num_pipes,),
-                comm = 'pipe.end') # 4
-            self.router['pipe.end'].Barrier()
-
-            self.storer.save_data(
                 'pipe.end.flowrate',
                 self['pipe.end'].flowrate,
-                zarr_shape = (self.wn.num_pipes, self.settings.time_steps),
-                comm = 'pipe.end') # 5
+                shape = (self.wn.num_pipes, self.settings.time_steps),
+                comm = 'pipe.end') # 2
             self.router['pipe.end'].Barrier()
 
         len_nodes = np.sum(self.where.nodes['to_points',] > 0)
         if 'node' in self.router.intra_communicators:
             if self.worker.num_nodes > 0:
                 self.storer.save_data(
-                    'node.labels',
-                    self['node'].labels,
-                    zarr_shape = (len_nodes,),
-                    comm = 'node') # 6
-                self.router['node'].Barrier()
-
-                self.storer.save_data(
                     'node.head',
                     self['node'].head,
-                    zarr_shape = (len_nodes, self.settings.time_steps), # 7
+                    shape = (len_nodes, self.settings.time_steps), # 3
                     comm = 'node')
                 self.router['node'].Barrier()
 
                 self.storer.save_data(
                     'node.demand_flow',
                     self['node'].demand_flow,
-                    zarr_shape = (len_nodes, self.settings.time_steps), # 8
+                    shape = (len_nodes, self.settings.time_steps), # 4
                     comm = 'node')
                 self.router['node'].Barrier()
 
                 self.storer.save_data(
                     'node.leak_flow',
                     self['node'].leak_flow,
-                    zarr_shape = (len_nodes, self.settings.time_steps), # 9
+                    shape = (len_nodes, self.settings.time_steps), # 5
                     comm = 'node')
                 self.router['node'].Barrier()
 
         if self.router['main'].rank == 0:
-            self.storer.save_data('inpfile', self.inpfile, comm = 'main') # 1
-            self.storer.save_data('profiler', self.worker.profiler, comm = 'main') # 10
-            self.storer.save_data('initial_conditions', self.ic, comm = 'main') # 11
-            self.storer.save_data('settings', self.settings.to_dict(), comm = 'main') # 12
-            self.storer.save_data('partitioning', self.worker.partition, comm = 'main') # 13
+            self.storer.save_data('inpfile', self.inpfile, comm = 'main') # 0
+            self.storer.save_data('profiler', self.worker.profiler, comm = 'main') # 6
+            self.storer.save_data('initial_conditions', self.ic, comm = 'main') # 7
+            self.storer.save_data('settings', self.settings.to_dict(), comm = 'main') # 8
+            self.storer.save_data('partitioning', self.worker.partition, comm = 'main') # 9
 
     def load(self, workspace_name):
         if self.router['main'].rank == 0:

@@ -1,1 +1,1 @@
-from .arrays import Row, Table, Table2D, ObjArray, ZarrArray
+from .arrays import Row, Table, Table2D, ObjArray

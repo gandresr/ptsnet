@@ -1,12 +1,12 @@
 import numpy as np
-import zarr, pickle
+import pickle
 import os
 import shutil
 import time
 import uuid
 import json
+import h5py
 
-from phammer.arrays import ZarrArray
 from pkg_resources import resource_filename
 from phammer.utils.io import get_root_path, walk
 
@@ -40,7 +40,7 @@ class StorageManager:
         if os.path.isdir(self.workspace_path):
             shutil.rmtree(self.workspace_path)
 
-    def save_data(self, data_label, data, zarr_shape = None, comm = None):
+    def save_data(self, data_label, data, shape = None, comm = None):
         '''
         shape[0] : rows associated with elements
         shape[1] : rows associated with time steps
@@ -62,27 +62,24 @@ class StorageManager:
                 pickle.dump(data, f)
         elif file_type == 'array':
             dtype = self.metadata[data_label]['dtype']
-            if dtype == "str":
-                dtype = data.dtype
-            store = zarr.DirectoryStore(full_path)
-            if b1 or b2:
-                if len(zarr_shape) > 1:
-                    z = zarr.open(store, 'w', shape = zarr_shape, chunks = (1, zarr_shape[1],), dtype = dtype)
+            if comm is None:
+                f = h5py.File(full_path, 'w')
                 else:
-                    z = zarr.open(store, 'w', shape = zarr_shape, chunks = (1,), dtype = dtype)
+                f = h5py.File(full_path, 'w', driver='mpio', comm=self.router[comm])
+            try:
+                data_set = f.create_dataset(data_label, shape, dtype = 'float')
             if not b1:
                 self.router[comm].Barrier()
-            z = zarr.open(store, mode = 'r+')
             if self.router is None:
-                z[:] = data
+                    data_set[:] = data
             else:
-                chunk_size = data.shape[0]
-                final_index = self.router[comm].scan(chunk_size)
-                initial_index = final_index - chunk_size
-                if len(zarr_shape) > 1:
-                    z[initial_index:final_index,:] = data
-                else:
-                    z[initial_index:final_index] = data
+                    i2 = self.router[comm].scan(data.shape[0])
+                    i1 = i2 - data.shape[0]
+                    data_set[i1:i2] = data
+                f.close()
+            except Exception as error:
+                f.close()
+                raise error
 
     def load_data(self, data_label, indexes = None, labels = None):
         d = self.metadata[data_label]

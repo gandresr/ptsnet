@@ -1,5 +1,4 @@
 import numpy as np
-import zarr
 
 from collections import namedtuple
 from phammer.utils.data import is_array
@@ -175,26 +174,3 @@ class ObjArray:
 
     def lloc(self, label):
         return self.indexes[label]
-
-
-class ZarrArray:
-    def __init__(self, full_path, indexes = None, labels = None):
-        self.z = zarr.open(full_path)
-        self.indexes = indexes
-        if not indexes is None:
-            if labels is None:
-                self.labels = {j : i for i, j in indexes.items()}
-            else:
-                self.labels = labels
-
-    def __getitem__(self, index):
-        if type(index) == str:
-            return self.z[self.indexes[index]]
-        else:
-            return self.z[index]
-
-    def lloc(self, label):
-        return self.indexes[label]
-
-    def ival(self, index):
-        return self.labels[index]
