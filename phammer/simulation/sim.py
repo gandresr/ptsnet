@@ -3,9 +3,8 @@ import os
 
 from tqdm import tqdm
 from collections import deque as dq
-from collections import namedtuple
 from pkg_resources import resource_filename
-from phammer.arrays import ObjArray
+from phammer.arrays import ObjArray, Table2D
 from phammer.simulation.constants import COEFF_TOL
 from phammer.epanet.util import EN
 from phammer.utils.data import define_curve, is_array
@@ -186,6 +185,7 @@ class HammerSimulation:
     }
 
     def __init__(self, workspace_name = 'tmp', inpfile = None, settings = None, default_wave_speed = None, wave_speed_file = None, delimiter=','):
+        ### Persistance ----------------------------
         if inpfile == None:
             self.router = CommManager()
             self.settings = HammerSettings()
@@ -194,6 +194,8 @@ class HammerSimulation:
             self.load(workspace_name)
             self.time_stamps = np.linspace(0, self.settings.duration, self.settings.time_steps)
             return
+        ### ----------------------------------------
+        ### New Sim --------------------------------
         if type(settings) != dict:
             raise TypeError("'settings' are not properly defined, use dict object")
         self.settings = HammerSettings(**settings, _super=self)
@@ -543,6 +545,7 @@ class HammerSimulation:
             self.storer.save_data('initial_conditions', self.ic, comm = 'main') # 7
             self.storer.save_data('settings', self.settings.to_dict(), comm = 'main') # 8
             self.storer.save_data('partitioning', self.worker.partition, comm = 'main') # 9
+            self.storer.save_data('local_to_global', self.worker.local_to_global, comm = 'main') # 9
 
     def load(self, workspace_name):
         if self.router['main'].rank == 0:
@@ -552,46 +555,35 @@ class HammerSimulation:
                 raise ValueError("The specified workspace does not exist")
 
             self.storer = StorageManager(workspace_name, router = self.router)
+            local_to_global = self.storer.load_data('local_to_global')
 
-            Node = namedtuple('Node', list(NODE_RESULTS.keys()) + ['labels'])
-            PipeStart = namedtuple('PipeStart', list(PIPE_START_RESULTS.keys()) + ['labels'])
-            PipeEnd = namedtuple('PipeEnd', list(PIPE_END_RESULTS.keys()) + ['labels'])
+            node_labels = local_to_global['node']
+            sorted_node_labels = sorted(node_labels, key=node_labels.get)
+            node_head = self.storer.load_data('node.head')
+            node_demand_flow = self.storer.load_data('node.demand_flow')
+            node_leak_flow = self.storer.load_data('node.leak_flow')
+            self.results['node'] = \
+                Table2D(NODE_RESULTS, node_head.shape[0], node_head.shape[1],
+                labels = sorted_node_labels)
+            self.results['node'].head[:] = node_head
+            self.results['node'].demand_flow[:] = node_demand_flow
+            self.results['node'].leak_flow[:] = node_leak_flow
 
+            pipe_start_labels = local_to_global['pipe.start']
+            sorted_pipe_start_labels = sorted(pipe_start_labels, key=pipe_start_labels.get)
+            pipe_start_flowrate = self.storer.load_data('pipe.start.flowrate')
+            self.results['pipe.start'] = \
+                Table2D(PIPE_START_RESULTS, pipe_start_flowrate.shape[0], pipe_start_flowrate.shape[1],
+                labels = sorted_pipe_start_labels)
+            self.results['pipe.start'].flowrate[:] = pipe_start_flowrate
 
-            node_labels = self.storer.load_data('node.labels')[:]
-            Node.__repr__ = lambda x : '<Persistent Node Array [n = %d]>' % len(node_labels)
-            node_indexes = {l : i for i, l in enumerate(node_labels)}
-            node_labels = {i : l for l, i in node_indexes.items()}
-            Node.lloc = lambda x, i : node_indexes[i]
-            Node.ival = lambda x, i : node_labels[i]
-            self.results['node'] = Node(
-                labels = node_labels,
-                head = self.storer.load_data('node.head', node_indexes, node_labels),
-                demand_flow = self.storer.load_data('node.demand_flow', node_indexes, node_labels),
-                leak_flow = self.storer.load_data('node.leak_flow', node_indexes, node_labels)
-            )
-
-            pipe_start_labels = self.storer.load_data('pipe.start.labels')[:]
-            PipeStart.__repr__ = lambda x : '<Persistent PipeStart Array [n = %d]>' % len(pipe_start_labels)
-            pipe_start_indexes = {l : i for i, l in enumerate(pipe_start_labels)}
-            pipe_start_labels = {i : l for l, i in pipe_start_indexes.items()}
-            PipeStart.lloc = lambda x, i : pipe_start_indexes[i]
-            PipeStart.ival = lambda x, i : pipe_start_labels[i]
-            self.results['pipe.start'] = PipeStart(
-                labels = pipe_start_labels,
-                flowrate = self.storer.load_data('pipe.start.flowrate', pipe_start_indexes, pipe_start_labels)
-            )
-
-            pipe_end_labels = self.storer.load_data('pipe.end.labels')[:]
-            PipeEnd.__repr__ = lambda x : '<Persistent PipeEnd Array [n = %d]>' % len(pipe_end_labels)
-            pipe_end_indexes = {l : i for i, l in enumerate(pipe_end_labels)}
-            pipe_end_labels = {i : l for l, i in pipe_end_indexes.items()}
-            PipeEnd.lloc = lambda x, i : pipe_end_indexes[i]
-            PipeEnd.ival = lambda x, i : pipe_end_labels[i]
-            self.results['pipe.end'] = PipeEnd(
-                labels = pipe_end_labels,
-                flowrate = self.storer.load_data('pipe.end.flowrate', pipe_end_indexes, pipe_end_labels)
-            )
+            pipe_end_labels = local_to_global['pipe.end']
+            sorted_pipe_end_labels = sorted(pipe_end_labels, key=pipe_end_labels.get)
+            pipe_end_flowrate = self.storer.load_data('pipe.end.flowrate')
+            self.results['pipe.end'] = \
+                Table2D(PIPE_END_RESULTS, pipe_end_flowrate.shape[0], pipe_end_flowrate.shape[1],
+                labels = sorted_pipe_end_labels)
+            self.results['pipe.end'].flowrate[:] = pipe_end_flowrate
 
             settings = self.storer.load_data('settings')
             for i, j in settings.items():

@@ -53,5 +53,10 @@
         "fname" : "partitioning.pkl",
         "token" : 9,
         "ftype" : "pickle"
+    },
+    "local_to_global" : {
+        "fname" : "local_to_global.pkl",
+        "token" : 10,
+        "ftype" : "pickle"
     }
 }

@@ -20,10 +20,10 @@ class Worker:
         self.time_steps = kwargs['time_steps']
         self.mem_pool_points = None
         self.point_properties = None
-        self.num_nodes = 0
-        self.num_start_pipes = 0
-        self.num_end_pipes = 0
-        self.num_jip_nodes = 0
+        self.num_nodes = 0 # number of nodes in worker
+        self.num_start_pipes = 0 # number of start pipes in worker
+        self.num_end_pipes = 0 # number of end pipes in worker
+        self.num_jip_nodes = 0 # number of just-in-pipes junction nodes in worker
         self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves', 'pumps'])
         self.processors = even(kwargs['num_points'], self.router['main'].size)
         self.is_innactive = False
@@ -85,6 +85,8 @@ class Worker:
 
         ###
         self.profiler.start('_allocate_memory')
+        if self.router['main'].rank == 0:
+            self.local_to_global = {}
         self._allocate_memory()
         self.profiler.stop('_allocate_memory')
         ###
@@ -121,6 +123,25 @@ class Worker:
             self.results['pipe.start'] = Table2D(PIPE_START_RESULTS, len(ppoints_start), self.time_steps, labels = self.ic['pipe'].labels[pipes_start])
         if self.num_end_pipes > 0:
             self.results['pipe.end'] = Table2D(PIPE_END_RESULTS, len(ppoints_end), self.time_steps, labels = self.ic['pipe'].labels[pipes_end])
+
+        # Root processor gathers indexes to facilitate reading results
+
+        node_indexes = self.router['main'].gather(self.where.nodes['all_to_points',], root = 0)
+        pipe_start_indexes = self.router['main'].gather(pipes_start, root = 0)
+        pipe_end_indexes = self.router['main'].gather(pipes_end, root = 0)
+
+        if self.router['main'].rank == 0:
+            node_indexes = np.concatenate(node_indexes)
+            pipe_start_indexes = np.concatenate(pipe_start_indexes)
+            pipe_end_indexes = np.concatenate(pipe_end_indexes)
+
+            node_labels = self.ic['node'].labels[node_indexes]
+            pipe_start_labels = self.ic['pipe'].labels[pipe_start_indexes]
+            pipe_end_labels = self.ic['pipe'].labels[pipe_end_indexes]
+
+            self.local_to_global['node'] = {l : i for i, l in enumerate(node_labels)}
+            self.local_to_global['pipe.start'] = {l : i for i, l in enumerate(pipe_start_labels)}
+            self.local_to_global['pipe.end'] = {l : i for i, l in enumerate(pipe_end_labels)}
 
     def _define_dist_graph_comm(self):
         self.router.add_communicator('local', self.router['main'].Create_dist_graph_adjacent(
@@ -392,3 +413,5 @@ class Worker:
             self.results['node'].head[:, t] = self.mem_pool_points.head[self.where.nodes['all_to_points'], t1]
         self.profiler.stop('store_results')
         ###
+
+
