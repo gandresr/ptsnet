@@ -192,7 +192,6 @@ class HammerSimulation:
             self.settings.active_persistance = True
             self.results = {}
             self.workspace_name = workspace_name
-            self.time_stamps = np.linspace(0, self.settings.duration, self.settings.time_steps)
             return
         ### ----------------------------------------
         ### New Sim --------------------------------
@@ -244,6 +243,7 @@ class HammerSimulation:
 
     def __enter__(self):
         self.load(self.workspace_name)
+        self.time_stamps = np.linspace(0, self.settings.duration, self.settings.time_steps)
         return self
 
     def __exit__(self, type, value, traceback):

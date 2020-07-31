@@ -201,3 +201,7 @@ class PersistentArray:
     def __str__(self):
         s = str(self.array)
         return s.replace('<HDF5 dataset', '<PersistentArray')
+
+    @property
+    def shape(self):
+        return self.array.shape
