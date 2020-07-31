@@ -3,6 +3,7 @@ import numpy as np
 from collections import namedtuple
 from phammer.utils.data import is_array
 from functools import lru_cache
+from h5py import Dataset
 
 class Row(np.ndarray):
     def __new__(subtype, shape, dtype=float, desc = None, _super=None):
@@ -28,9 +29,10 @@ class Row(np.ndarray):
             super().__setitem__(index, value)
 
 class Table:
-    def __init__(self, properties, num_rows, labels = None):
+    def __init__(self, properties, num_rows, labels = None, allow_replacement = False):
         self.__dict__['shape'] = (len(properties), num_rows,)
         self.__dict__['properties'] = properties
+        self.__dict__['allow_replacement'] = allow_replacement
         self.__dict__['labels'] = None
         self.__dict__['indexes'] = None
         self.assign_labels(labels, dim = 1)
@@ -42,15 +44,21 @@ class Table:
         if not hasattr(self, name):
             raise TypeError("'Table' does not support attribute assignment")
         else:
-            old_val = self.__dict__[name]
-            new_val = value
+            if not self.allow_replacement:
+                old_val = self.__dict__[name]
+                new_val = value
 
-            if type(old_val) != type(new_val):
-                raise ValueError("Property '%s' can only be updated not replaced: types do not coincide" % name)
-            elif old_val.shape != new_val.shape:
-                raise ValueError("Property '%s' can only be updated not replaced: shapes do not coincide" % name)
+                if type(old_val) != type(new_val):
+                    raise ValueError("Property '%s' can only be updated not replaced: types do not coincide" % name)
+                elif old_val.shape != new_val.shape:
+                    raise ValueError("Property '%s' can only be updated not replaced: shapes do not coincide" % name)
+                else:
+                    old_val[:] = new_val
             else:
-                old_val[:] = new_val
+                if type(value) == Dataset:
+                    self.__dict__[name] = PersistentArray(value, _super=self)
+                else:
+                    raise TypeError("'Table' does not support attribute assignment")
 
     def __getitem__(self, indexes):
         if not (is_array(indexes) or type(indexes) == slice):
@@ -110,9 +118,10 @@ class Table:
                     raise ValueError("index values have to be unique, '%s' is repeated" % str(labels[i]))
 
 class Table2D(Table):
-    def __init__(self, properties, num_rows, num_cols, labels = None):
+    def __init__(self, properties, num_rows, num_cols, labels = None, allow_replacement = False):
         self.__dict__['shape'] = (num_rows, num_cols, len(properties))
         self.__dict__['properties'] = properties
+        self.__dict__['allow_replacement'] = allow_replacement
         self.__dict__['labels'] = None
         self.__dict__['indexes'] = None
         self.assign_labels(labels, dim = 2)
@@ -135,7 +144,6 @@ class Table2D(Table):
         sliced_table = Table2D(self.properties, len(slice_index), self.shape[1], slice_labels)
         for p in self.properties:
             sliced_table.__dict__[p][:] = self.__dict__[p][slice_index]
-
             return sliced_table
 
 class ObjArray:
@@ -174,3 +182,22 @@ class ObjArray:
 
     def lloc(self, label):
         return self.indexes[label]
+
+class PersistentArray:
+    def __init__(self, array, _super = None):
+        self.__dict__['array'] = array
+        self.__dict__['_super'] = _super
+
+    def __setattr__(self, name, value):
+        if not hasattr(self, name):
+            raise TypeError("'Table' does not support attribute assignment")
+
+    def __getitem__(self, index):
+        if type(index) == str: # label
+            return self.array[self._super.indexes[index]]
+        else:
+            return self.array[index]
+
+    def __str__(self):
+        s = str(self.array)
+        return s.replace('<HDF5 dataset', '<PersistentArray')

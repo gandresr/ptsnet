@@ -1,8 +1,0 @@
-TACC:  Starting up job 5119118 
-TACC:  Starting parallel tasks... 
-PRINTING: /work/05969/griano/lonestar/Documents/Github/phammer/testing/results/BWSN_F/rank_{comm_size}/data_{rank}.pickle
-/home1/05969/griano/.local/lib/python3.7/site-packages/wntr/epanet/io.py:2085: UserWarning:
-
-Not all curves were used in "/work/05969/griano/lonestar/Documents/Github/phammer/example_files/BWSN_F.inp"; added with type None, units conversion left to user
-
-TACC:  Shutdown complete. Exiting. 

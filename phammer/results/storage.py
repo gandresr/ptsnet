@@ -25,6 +25,7 @@ class StorageManager:
         self.workspace_folders = self.get_workspace_folders()
         self.router = router
         self.data = {}
+        self.persistent_files = {}
 
     def get_workspace_folders(self):
         with open(os.path.join(self._module_path, 'file_structure.json'), 'r') as f:
@@ -87,10 +88,15 @@ class StorageManager:
         d = self.metadata[data_label]
         full_path = os.path.join(self.workspace_folders[d['token']], d['fname'])
         if d['ftype'] == 'array':
-            f = h5py.File(full_path, 'r')
-            data = f[data_label][:]
-            f.close()
+            if not full_path in self.persistent_files:
+                self.persistent_files[full_path] = h5py.File(full_path, 'r')
+            data = self.persistent_files[full_path][data_label]
             return data
         elif d['ftype'] == 'pickle':
             with open(full_path, 'rb') as f:
                 return pickle.load(f)
+
+    def close(self):
+        if self.persistent_files:
+            for key in self.persistent_files:
+                self.persistent_files[key].close()
