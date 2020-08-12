@@ -570,8 +570,13 @@ class HammerSimulation:
             node_demand_flow = self.storer.load_data('node.demand_flow')
             node_leak_flow = self.storer.load_data('node.leak_flow')
             self.results['node'] = \
-                Table2D(NODE_RESULTS, node_head.shape[0], node_head.shape[1],
-                labels = sorted_node_labels, allow_replacement = True)
+                Table2D(
+                    NODE_RESULTS,
+                    node_head.shape[0],
+                    node_head.shape[1],
+                    labels = sorted_node_labels,
+                    allow_replacement = True,
+                    persistent = True)
             self.results['node'].head = node_head
             self.results['node'].demand_flow = node_demand_flow
             self.results['node'].leak_flow = node_leak_flow
@@ -580,16 +585,26 @@ class HammerSimulation:
             sorted_pipe_start_labels = sorted(pipe_start_labels, key=pipe_start_labels.get)
             pipe_start_flowrate = self.storer.load_data('pipe.start.flowrate')
             self.results['pipe.start'] = \
-                Table2D(PIPE_START_RESULTS, pipe_start_flowrate.shape[0], pipe_start_flowrate.shape[1],
-                labels = sorted_pipe_start_labels, allow_replacement = True)
+                Table2D(
+                    PIPE_START_RESULTS,
+                    pipe_start_flowrate.shape[0],
+                    pipe_start_flowrate.shape[1],
+                    labels = sorted_pipe_start_labels,
+                    allow_replacement = True,
+                    persistent = True)
             self.results['pipe.start'].flowrate = pipe_start_flowrate
 
             pipe_end_labels = local_to_global['pipe.end']
             sorted_pipe_end_labels = sorted(pipe_end_labels, key=pipe_end_labels.get)
             pipe_end_flowrate = self.storer.load_data('pipe.end.flowrate')
             self.results['pipe.end'] = \
-                Table2D(PIPE_END_RESULTS, pipe_end_flowrate.shape[0], pipe_end_flowrate.shape[1],
-                labels = sorted_pipe_end_labels, allow_replacement = True)
+                Table2D(
+                    PIPE_END_RESULTS,
+                    pipe_end_flowrate.shape[0],
+                    pipe_end_flowrate.shape[1],
+                    labels = sorted_pipe_end_labels,
+                    allow_replacement = True,
+                    persistent = True)
             self.results['pipe.end'].flowrate = pipe_end_flowrate
 
             settings = self.storer.load_data('settings')

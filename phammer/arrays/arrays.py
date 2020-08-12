@@ -29,7 +29,7 @@ class Row(np.ndarray):
             super().__setitem__(index, value)
 
 class Table:
-    def __init__(self, properties, num_rows, labels = None, allow_replacement = False):
+    def __init__(self, properties, num_rows, labels = None, allow_replacement = False, persistent = False):
         self.__dict__['shape'] = (len(properties), num_rows,)
         self.__dict__['properties'] = properties
         self.__dict__['allow_replacement'] = allow_replacement
@@ -38,7 +38,8 @@ class Table:
         self.assign_labels(labels, dim = 1)
 
         for p, dtype in self.properties.items():
-            self.__dict__[p] = Row(num_rows, dtype=dtype, _super=self)
+            row = Row(num_rows, dtype=dtype, _super=self) if not persistent else None
+            self.__dict__[p] = row
 
     def __setattr__(self, name, value):
         if not hasattr(self, name):
@@ -118,7 +119,7 @@ class Table:
                     raise ValueError("index values have to be unique, '%s' is repeated" % str(labels[i]))
 
 class Table2D(Table):
-    def __init__(self, properties, num_rows, num_cols, labels = None, allow_replacement = False):
+    def __init__(self, properties, num_rows, num_cols, labels = None, allow_replacement = False, persistent = False):
         self.__dict__['shape'] = (num_rows, num_cols, len(properties))
         self.__dict__['properties'] = properties
         self.__dict__['allow_replacement'] = allow_replacement
@@ -127,7 +128,8 @@ class Table2D(Table):
         self.assign_labels(labels, dim = 2)
 
         for p, dtype in self.properties.items():
-            self.__dict__[p] = Row((num_rows, num_cols), dtype=dtype, _super=self)
+            row = Row((num_rows, num_cols), dtype=dtype, _super=self) if not persistent else None
+            self.__dict__[p] = row
 
     def __repr__(self):
         return "<Table2D rows: %d, cols: %d, properties: %d, labeled: %s>" % (self.shape + (not self.labels is None,))
