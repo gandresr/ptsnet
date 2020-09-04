@@ -69,7 +69,7 @@ class Initializator:
 
     def _set_segments(self, wave_speed_method = 'critical'):
         # method \in {'critical', 'user'}
-        if method == 'critical':
+        if wave_speed_method == 'critical':
             self.ic['pipe'].segments = self.ic['pipe'].length
             self.ic['pipe'].segments /= self.ic['pipe'].wave_speed
 
@@ -80,13 +80,20 @@ class Initializator:
             # The number of segments is defined
             self.ic['pipe'].segments /= self._super.settings.time_step
             int_segments = np.round(self.ic['pipe'].segments)
-        elif method == 'user':
+        elif wave_speed_method == 'user':
             self.ic['pipe'].segments = self.ic['pipe'].length
             self.ic['pipe'].segments /= (self.ic['pipe'].wave_speed * self._super.settings.time_step)
             int_segments = np.round(self.ic['pipe'].segments)
             int_segments[self.ic['pipe'].segments < 2] = 2
         else:
             raise ValueError("Method is not compatible. Try: ['critical', 'user']")
+
+        # The wave_speed values are adjusted to compensate the truncation error
+        self.ic['pipe'].wave_speed = self.ic['pipe'].wave_speed * self.ic['pipe'].segments/int_segments
+        self.ic['pipe'].segments = int_segments
+        self.ic['pipe'].dx = self.ic['pipe'].length / self.ic['pipe'].segments
+        self.num_segments = int(sum(self.ic['pipe'].segments))
+        self.num_points = self.num_segments + self.wn.num_pipes
 
     def _create_nonpipe_selectors(self, object_type):
         '''
