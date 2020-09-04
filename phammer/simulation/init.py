@@ -37,7 +37,7 @@ class Initializator:
                 print("Success - Compatible Model")
                 print("Elapsed time (model check): ", time() - t, '[s]')
 
-    def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter=','):
+    def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter = ',', wave_speed_method = 'critical'):
             if default_wave_speed is None and wave_speed_file is None:
                 raise ValueError("wave_speed was not specified")
 
@@ -55,7 +55,7 @@ class Initializator:
                         self.ic['pipe'].wave_speed[pipe] = float(wave_speed)
                         modified_lines += 1
             else:
-                self._set_segments()
+                self._set_segments(wave_speed_method)
                 return True
 
             if modified_lines != self.wn.num_pipes:
@@ -64,27 +64,29 @@ class Initializator:
                 excep += "it is necessary to define a default wave speed value"
                 raise ValueError(excep)
 
-            self._set_segments()
+            self._set_segments(wave_speed_method)
             return True
 
-    def _set_segments(self):
-        self.ic['pipe'].segments = self.ic['pipe'].length
-        self.ic['pipe'].segments /= self.ic['pipe'].wave_speed
+    def _set_segments(self, wave_speed_method = 'critical'):
+        # method \in {'critical', 'user'}
+        if method == 'critical':
+            self.ic['pipe'].segments = self.ic['pipe'].length
+            self.ic['pipe'].segments /= self.ic['pipe'].wave_speed
 
-        # Maximum time_step in the system to capture waves in all pipes
-        max_dt = min(self.ic['pipe'].segments) / 2 # at least 2 segments in critical pipe
-        self._super.settings.time_step = min(self._super.settings.time_step, max_dt)
+            # Maximum time_step in the system to capture waves in all pipes
+            max_dt = min(self.ic['pipe'].segments) / 2 # at least 2 segments in critical pipe
+            self._super.settings.time_step = min(self._super.settings.time_step, max_dt)
 
-        # The number of segments is defined
-        self.ic['pipe'].segments /= self._super.settings.time_step
-        int_segments = np.round(self.ic['pipe'].segments)
-
-        # The wave_speed values are adjusted to compensate the truncation error
-        self.ic['pipe'].wave_speed = self.ic['pipe'].wave_speed * self.ic['pipe'].segments/int_segments
-        self.ic['pipe'].segments = int_segments
-        self.ic['pipe'].dx = self.ic['pipe'].length / self.ic['pipe'].segments
-        self.num_segments = int(sum(self.ic['pipe'].segments))
-        self.num_points = self.num_segments + self.wn.num_pipes
+            # The number of segments is defined
+            self.ic['pipe'].segments /= self._super.settings.time_step
+            int_segments = np.round(self.ic['pipe'].segments)
+        elif method == 'user':
+            self.ic['pipe'].segments = self.ic['pipe'].length
+            self.ic['pipe'].segments /= (self.ic['pipe'].wave_speed * self._super.settings.time_step)
+            int_segments = np.round(self.ic['pipe'].segments)
+            int_segments[self.ic['pipe'].segments < 2] = 2
+        else:
+            raise ValueError("Method is not compatible. Try: ['critical', 'user']")
 
     def _create_nonpipe_selectors(self, object_type):
         '''

@@ -184,7 +184,7 @@ class HammerSimulation:
         'demand' : 'node',
     }
 
-    def __init__(self, workspace_name = 'tmp', inpfile = None, settings = None, default_wave_speed = None, wave_speed_file = None, delimiter=','):
+    def __init__(self, workspace_name = 'tmp', inpfile = None, settings = None, default_wave_speed = None, wave_speed_file = None, delimiter = ',', wave_speed_method = 'critical'):
         ### Persistance ----------------------------
         if inpfile == None:
             self.router = CommManager()
@@ -206,7 +206,7 @@ class HammerSimulation:
             _super = self)
         self.curves = ObjArray()
         self.element_settings = {type_ : ElementSettings(self) for type_ in self.SETTING_TYPES}
-        self.settings.defined_wave_speeds = self.initializator.set_wave_speeds(default_wave_speed, wave_speed_file, delimiter)
+        self.settings.defined_wave_speeds = self.initializator.set_wave_speeds(default_wave_speed, wave_speed_file, delimiter, wave_speed_method)
         if self.settings.time_step > self.settings.duration:
             raise ValueError("Duration has to be larger than time step")
         self.initializator.create_selectors()
