@@ -80,8 +80,8 @@ class Worker:
         for r in self.recv_queue.values:
             self._comm_buffer_head.append(np.zeros(len(r)))
             self._recv_points.extend(r)
-        self._comm_buffer_flow = np.array(self._comm_buffer_head)
-        self._comm_buffer_head = np.array(self._comm_buffer_head)
+        self._comm_buffer_flow = np.array(self._comm_buffer_head, dtype = object)
+        self._comm_buffer_head = np.array(self._comm_buffer_head, dtype = object)
 
         ###
         self.profiler.start('_allocate_memory')
