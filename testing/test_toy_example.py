@@ -15,7 +15,6 @@ duration = 25; time_step = 0.01
 inpfile = os.path.join(ROOT, os.pardir, 'example_files', 'Tnet1.inp')
 
 sim = HammerSimulation(
-    workspace_name = 'test',
     inpfile = inpfile,
     settings = {
         'time_step' : time_step,

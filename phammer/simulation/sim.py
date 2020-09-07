@@ -13,6 +13,7 @@ from phammer.simulation.init import Initializator
 from phammer.parallel.comm import CommManager
 from phammer.parallel.worker import Worker
 from phammer.results.storage import StorageManager
+from phammer.results.workspaces import generate_workspace_name, list_workspaces
 from phammer.simulation.constants import NODE_RESULTS, PIPE_END_RESULTS, PIPE_START_RESULTS
 
 class HammerSettings:
@@ -24,9 +25,8 @@ class HammerSettings:
         gpu : bool = False,
         skip_compatibility_check : bool = False,
         show_progress = False,
-        store_data = True,
+        save_results = True,
         period = 0,
-        workspace = 'default',
         _super = None):
 
         self._super = _super
@@ -39,14 +39,14 @@ class HammerSettings:
         self.gpu = gpu
         self.skip_compatibility_check = skip_compatibility_check
         self.show_progress = show_progress
-        self.store_data = store_data
+        self.save_results = save_results
         self.defined_wave_speeds = False
         self.active_persistance = False
         self.blocked = False
         self.period = period
-        self.workspace = workspace
         self.set_default()
         self.settingsOK = True
+        self.num_points = None
 
     def __repr__(self):
         rep = "\nSimulation settings:\n\n"
@@ -184,14 +184,14 @@ class HammerSimulation:
         'demand' : 'node',
     }
 
-    def __init__(self, workspace_name = 'tmp', inpfile = None, settings = None, default_wave_speed = None, wave_speed_file = None, delimiter = ',', wave_speed_method = 'critical'):
+    def __init__(self, workspace_id = 0, inpfile = None, settings = None, default_wave_speed = None, wave_speed_file = None, delimiter = ',', wave_speed_method = 'critical'):
         ### Persistance ----------------------------
         if inpfile == None:
             self.router = CommManager()
             self.settings = HammerSettings()
             self.settings.active_persistance = True
             self.results = {}
-            self.workspace_name = workspace_name
+            self.workspace_id = workspace_id
             return
         ### ----------------------------------------
         ### New Sim --------------------------------
@@ -213,6 +213,7 @@ class HammerSimulation:
         self.t = 0
         self.time_stamps = np.linspace(0, self.settings.duration, self.settings.time_steps)
         self.inpfile = inpfile
+        self.settings.num_points = self.initializator.num_points
         # ----------------------------------------
         self.router = CommManager()
         if self.router['main'].size > self.num_points:
@@ -221,9 +222,9 @@ class HammerSimulation:
         self.worker = None
         self.results = None
         if self.router['main'].size > 1:
-            self.storer = StorageManager(workspace_name, router = self.router)
+            self.storer = StorageManager(generate_workspace_name(), router = self.router)
         else:
-            self.storer = StorageManager(workspace_name)
+            self.storer = StorageManager(generate_workspace_name())
         # ----------------------------------------
         if (not self.settings.warnings_on) and (self.router['main'].rank == 0) and self.settings.show_progress:
             self.progress = tqdm(total = self.settings.time_steps, position = 0)
@@ -231,7 +232,7 @@ class HammerSimulation:
 
     def __repr__(self):
         return "HammerSimulation <duration = %d [s] | time_steps = %d | num_points = %s>" % \
-            (self.settings.duration, self.settings.time_steps, format(self.initializator.num_points, ',d'))
+            (self.settings.duration, self.settings.time_steps, format(self.settings.num_points, ',d'))
 
     def __getitem__(self, index):
         keys = self.results.keys()
@@ -242,7 +243,7 @@ class HammerSimulation:
         return self.results[index]
 
     def __enter__(self):
-        self.load(self.workspace_name)
+        self.load(self.workspace_id)
         self.time_stamps = np.linspace(0, self.settings.duration, self.settings.time_steps)
         return self
 
@@ -397,7 +398,7 @@ class HammerSimulation:
             if self.is_over:
                 self.progress.close()
                 print('\n')
-        if self.settings.store_data:
+        if self.settings.save_results:
             if self.is_over:
                 self.save()
 
@@ -554,14 +555,13 @@ class HammerSimulation:
             self.storer.save_data('partitioning', self.worker.partition, comm = 'main') # 9
             self.storer.save_data('local_to_global', self.worker.local_to_global, comm = 'main') # 9
 
-    def load(self, workspace_name):
+    def load(self, workspace_id):
         if self.router['main'].rank == 0:
-            storer_root = os.path.join(get_root_path(), 'workspaces', workspace_name)
+            wps = list_workspaces()
+            if len(wps) > workspace_id:
+                raise ValueError(f'The workspace with ID ({workspace_id}) does not exist')
 
-            if any(elem in workspace_name for elem in ('.', os.sep)) or not os.path.exists(storer_root):
-                raise ValueError("The specified workspace does not exist")
-
-            self.storer = StorageManager(workspace_name, router = self.router)
+            self.storer = StorageManager(wps[workspace_id-1], router = self.router)
             local_to_global = self.storer.load_data('local_to_global')
 
             node_labels = local_to_global['node']
