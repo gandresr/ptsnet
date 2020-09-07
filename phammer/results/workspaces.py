@@ -15,27 +15,50 @@ def delete_all_workspaces():
         return
     ROOT = get_root_path()
     for d in os.listdir(os.path.join(ROOT, 'workspaces')):
-        shutil.rmtree(os.path.join(get_root_path(), 'workspaces', d))
+        abs_path = os.path.join(get_root_path(), 'workspaces', d)
+        if os.path.isdir(abs_path):
+            shutil.rmtree(abs_path)
+        else:
+            os.remove(abs_path)
 
 def list_workspaces():
-    return os.listdir(os.path.join(get_root_path(), 'workspaces'))
+    wps = [d for d in os.listdir(os.path.join(get_root_path(), 'workspaces')) if '.' not in d]
+    wps.sort()
+    return wps
 
-def print_workspaces():
+def print_workspaces(full_path = False):
     txt = {}
     for d in list_workspaces():
-        with open(os.path.join(get_root_path(), 'workspaces', d, 'settings.pkl'), 'rb') as f:
+        abs_path = os.path.join(get_root_path(), 'workspaces', d)
+        with open(os.path.join(abs_path, 'settings.pkl'), 'rb') as f:
             s = pickle.load(f)
-            txt[d] = f"T = {s['duration']}, t = {s['time_step']}, N = {s['num_points']}, p = {s['num_processors']}"
+        with open(os.path.join(abs_path, 'fname.pkl'), 'rb') as f:
+            fname = pickle.load(f)
+            if full_path:
+                fname = os.path.basename(fname)
+        txt[d] = [fname, f"T = {s['duration']}, t = {s['time_step']}, N = {s['num_points']}, n = {s['num_processors']}"]
     print('\n')
     for i, d in enumerate(txt):
-        print(f'  ({i})', d)
-        print('    ' + txt[d])
+        print(f'  ({i})', txt[d][0])
+        print('    ' + txt[d][1])
         print('\n')
 
 def num_workspaces():
     return len(list_workspaces())
 
-def generate_workspace_name():
-    w_name = str(hash(str(datetime.now())))
-    w_name = w_name.replace('-', 'm')
-    return 'W640465'
+def get_count_path():
+    return os.path.join(get_root_path(), 'workspaces', 'count.pkl')
+
+def new_workspace_name(is_root = True):
+    if is_root:
+        if not os.path.exists(get_count_path()):
+            count = 0
+        else:
+            with open(get_count_path(), 'rb') as f:
+                count = pickle.load(f)
+        count += 1
+        with open(get_count_path(), 'wb') as f:
+            pickle.dump(count, f)
+        print(f'W{count}')
+        return f'W{count}'
+    return None

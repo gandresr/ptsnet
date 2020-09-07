@@ -13,7 +13,7 @@ from phammer.simulation.init import Initializator
 from phammer.parallel.comm import CommManager
 from phammer.parallel.worker import Worker
 from phammer.results.storage import StorageManager
-from phammer.results.workspaces import generate_workspace_name, list_workspaces
+from phammer.results.workspaces import new_workspace_name, list_workspaces, num_workspaces
 from phammer.simulation.constants import NODE_RESULTS, PIPE_END_RESULTS, PIPE_START_RESULTS
 
 class HammerSettings:
@@ -184,14 +184,17 @@ class HammerSimulation:
         'demand' : 'node',
     }
 
-    def __init__(self, workspace_id = 0, inpfile = None, settings = None, default_wave_speed = None, wave_speed_file = None, delimiter = ',', wave_speed_method = 'critical'):
+    def __init__(self, workspace_id = None, inpfile = None, settings = None, default_wave_speed = None, wave_speed_file = None, delimiter = ',', wave_speed_method = 'critical'):
         ### Persistance ----------------------------
         if inpfile == None:
             self.router = CommManager()
             self.settings = HammerSettings()
             self.settings.active_persistance = True
             self.results = {}
-            self.workspace_id = workspace_id
+            if workspace_id is None:
+                self.workspace_id = num_workspaces() - 1
+            else:
+                self.workspace_id = workspace_id
             return
         ### ----------------------------------------
         ### New Sim --------------------------------
@@ -222,9 +225,12 @@ class HammerSimulation:
         self.worker = None
         self.results = None
         if self.router['main'].size > 1:
-            self.storer = StorageManager(generate_workspace_name(), router = self.router)
+            is_root = self.router['main'].rank == 0
+            worspace_name = new_workspace_name(is_root)
+            worspace_name = self.router['main'].bcast(worspace_name, root = 0)
+            self.storer = StorageManager(worspace_name, router = self.router)
         else:
-            self.storer = StorageManager(generate_workspace_name())
+            self.storer = StorageManager(new_workspace_name())
         # ----------------------------------------
         if (not self.settings.warnings_on) and (self.router['main'].rank == 0) and self.settings.show_progress:
             self.progress = tqdm(total = self.settings.time_steps, position = 0)
@@ -558,10 +564,10 @@ class HammerSimulation:
     def load(self, workspace_id):
         if self.router['main'].rank == 0:
             wps = list_workspaces()
-            if len(wps) > workspace_id:
+            if len(wps) < workspace_id:
                 raise ValueError(f'The workspace with ID ({workspace_id}) does not exist')
 
-            self.storer = StorageManager(wps[workspace_id-1], router = self.router)
+            self.storer = StorageManager(wps[workspace_id], router = self.router)
             local_to_global = self.storer.load_data('local_to_global')
 
             node_labels = local_to_global['node']
