@@ -23,7 +23,7 @@ def delete_all_workspaces():
 
 def list_workspaces():
     wps = [d for d in os.listdir(os.path.join(get_root_path(), 'workspaces')) if '.' not in d]
-    wps.sort()
+    wps.sort(key = lambda x: int(x[1:]))
     return wps
 
 def print_workspaces(full_path = False):
