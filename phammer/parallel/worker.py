@@ -29,7 +29,8 @@ class Worker:
         self.is_innactive = False
         innactive_processors = np.empty(self.router['main'].size, dtype=bool)
         self.results = {}
-        self.profiler = Profiler(self.router['main'].rank)
+        self.profiler_on = kwargs['profiler_on']
+        self.profiler = Profiler(self.router['main'].rank, is_on = self.profiler_on)
 
         ###
         self.profiler.start('get_partition')

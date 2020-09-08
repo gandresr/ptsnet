@@ -30,15 +30,19 @@ class Job:
             return None
 
 class Profiler:
-    def __init__(self, rank = 0):
+
+    def __init__(self, rank = 0, is_on = False):
         self.jobs = {}
         self.rank = rank
+        self.is_on = is_on
 
     def start(self, label, rank = 0):
+        if not self.is_on: return
         if label in self.jobs:
             self.jobs[label].restart()
         else:
             self.jobs[label] = Job(label)
 
     def stop(self, label):
+        if not self.is_on: return
         self.jobs[label].stop()

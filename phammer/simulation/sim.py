@@ -26,6 +26,7 @@ class HammerSettings:
         skip_compatibility_check : bool = False,
         show_progress = False,
         save_results = True,
+        profiler_on = False,
         period = 0,
         _super = None):
 
@@ -40,6 +41,7 @@ class HammerSettings:
         self.skip_compatibility_check = skip_compatibility_check
         self.show_progress = show_progress
         self.save_results = save_results
+        self.profiler_on = profiler_on,
         self.defined_wave_speeds = False
         self.active_persistance = False
         self.blocked = False
@@ -351,7 +353,8 @@ class HammerSimulation:
             wn = self.wn,
             ic = self.ic,
             time_steps = self.settings.time_steps,
-            inpfile = self.inpfile)
+            inpfile = self.inpfile,
+            profiler_on = self.settings.profiler_on)
         self.results = self.worker.results
 
         # Adding extra communicators
@@ -407,6 +410,9 @@ class HammerSimulation:
         if self.settings.save_results:
             if self.is_over:
                 self.save()
+        if self.settings.profiler_on:
+            if self.is_over:
+                self.save_profiler()
 
     def _set_element_setting(self, type_, element_name, value, step = None, check_warning = False):
         if self.t == 0:
@@ -560,6 +566,75 @@ class HammerSimulation:
             self.storer.save_data('settings', self.settings.to_dict(), comm = 'main') # 8
             self.storer.save_data('partitioning', self.worker.partition, comm = 'main') # 9
             self.storer.save_data('local_to_global', self.worker.local_to_global, comm = 'main') # 9
+
+    def save_profiler(self):
+        if not self.settings.profiler_on: return
+
+        if self.router['main'].rank == 0:
+            self.storer.flush_workspace()
+            self.storer.create_workspace_folders()
+        self.router['main'].Barrier()
+
+
+        step_jobs = [
+            'run_step',
+            'run_interior_step',
+            'run_boundary_step',
+            'run_valve_step',
+            'run_pump_step',
+            'store_results',
+            'exchange_data'
+        ]
+
+        comm_jobs = [
+            'exchange_data',
+            'barrier1',
+            'barrier2'
+        ]
+
+        init_jobs = [
+            'get_partition',
+            '_create_selectors',
+            '_define_dist_graph_comm',
+            '_allocate_memory',
+            '_load_initial_conditions'
+        ]
+
+        raw_step_times = np.zeros(
+            (len(step_jobs), len(self.worker.profiler.jobs[step_jobs[0]].duration)), dtype=float)
+        for i, job in enumerate(step_jobs):
+            raw_step_times[i] = self.worker.profiler.jobs[job].duration
+
+        raw_comm_times = np.zeros(
+            (len(comm_jobs), len(self.worker.profiler.jobs[comm_jobs[0]].duration)), dtype=float)
+        for i, job in enumerate(comm_jobs):
+            raw_comm_times[i] = self.worker.profiler.jobs[job].duration
+
+        raw_init_times = np.zeros(
+            (len(init_jobs), len(self.worker.profiler.jobs[init_jobs[0]].duration)), dtype=float)
+        for i, job in enumerate(init_jobs):
+            raw_init_times[i] = self.worker.profiler.jobs[job].duration
+
+        self.storer.save_data(
+            'raw_step_times',
+            raw_step_times,
+            shape = (len(step_jobs)*self.settings.num_processors, raw_step_times.shape[1]),
+            comm = 'main')
+        self.router['main'].Barrier()
+
+        self.storer.save_data(
+            'raw_comm_times',
+            raw_comm_times,
+            shape = (len(comm_jobs)*self.settings.num_processors, raw_comm_times.shape[1]),
+            comm = 'main')
+        self.router['main'].Barrier()
+
+        self.storer.save_data(
+            'raw_init_times',
+            raw_init_times,
+            shape = (len(init_jobs)*self.settings.num_processors, raw_init_times.shape[1]),
+            comm = 'main')
+        self.router['main'].Barrier()
 
     def load(self, workspace_id):
         if self.router['main'].rank == 0:
