@@ -697,7 +697,6 @@ class HammerSimulation:
                     continue
 
             self.inpfile = self.storer.load_data('inpfile')
-            self.profiler = self.storer.load_data('profiler')
             self.initializator = Initializator(
                 self.inpfile,
                 period = self.settings.period,
