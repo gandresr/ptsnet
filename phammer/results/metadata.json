@@ -34,47 +34,42 @@
         "ftype" : "array",
         "dtype" : "float"
     },
-    "profiler" : {
-        "fname" : "profiler.pkl",
-        "token" : 6,
-        "ftype" : "pickle"
-    },
     "raw_step_times" : {
         "fname" : "raw_step_times.h5",
-        "token" : 7,
+        "token" : 6,
         "ftype" : "array",
         "dtype" : "float"
     },
     "raw_comm_times" : {
         "fname" : "raw_comm_times.h5",
-        "token" : 8,
+        "token" : 7,
         "ftype" : "array",
         "dtype" : "float"
     },
     "raw_init_times" : {
         "fname" : "raw_init_times.h5",
-        "token" : 9,
+        "token" : 8,
         "ftype" : "array",
         "dtype" : "float"
     },
     "initial_conditions" : {
         "fname" : "ic.pkl",
-        "token" : 10,
+        "token" : 9,
         "ftype" : "pickle"
     },
     "settings" : {
         "fname" : "settings.pkl",
-        "token" : 11,
+        "token" : 10,
         "ftype" : "pickle"
     },
     "partitioning" : {
         "fname" : "partitioning.pkl",
-        "token" : 12,
+        "token" : 11,
         "ftype" : "pickle"
     },
     "local_to_global" : {
         "fname" : "local_to_global.pkl",
-        "token" : 13,
+        "token" : 12,
         "ftype" : "pickle"
     }
 }

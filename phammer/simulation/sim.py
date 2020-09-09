@@ -344,6 +344,11 @@ class HammerSimulation:
         self._distribute_work()
         self.t = 1
         self.settings.is_initialized = True
+        if self.router['main'].rank == 0:
+            self.storer.flush_workspace()
+            self.storer.create_workspace_folders()
+        self.router['main'].Barrier()
+        self.save_sim_data()
 
     def _distribute_work(self):
         self.worker = Worker(
@@ -513,12 +518,15 @@ class HammerSimulation:
                 print("Warning: operating at time time %f" % check_time)
             return True
 
-    def save(self):
+    def save_sim_data(self):
         if self.router['main'].rank == 0:
-            self.storer.flush_workspace()
-            self.storer.create_workspace_folders()
-        self.router['main'].Barrier()
+            self.storer.save_data('inpfile', self.inpfile, comm = 'main')
+            self.storer.save_data('initial_conditions', self.ic, comm = 'main')
+            self.storer.save_data('settings', self.settings.to_dict(), comm = 'main')
+            self.storer.save_data('partitioning', self.worker.partition, comm = 'main')
+            self.storer.save_data('local_to_global', self.worker.local_to_global, comm = 'main')
 
+    def save(self):
         if 'pipe.start' in self.router.intra_communicators:
             self.storer.save_data(
                 'pipe.start.flowrate',
@@ -559,22 +567,8 @@ class HammerSimulation:
                     comm = 'node')
                 self.router['node'].Barrier()
 
-        if self.router['main'].rank == 0:
-            self.storer.save_data('inpfile', self.inpfile, comm = 'main') # 0
-            self.storer.save_data('profiler', self.worker.profiler, comm = 'main') # 6
-            self.storer.save_data('initial_conditions', self.ic, comm = 'main') # 7
-            self.storer.save_data('settings', self.settings.to_dict(), comm = 'main') # 8
-            self.storer.save_data('partitioning', self.worker.partition, comm = 'main') # 9
-            self.storer.save_data('local_to_global', self.worker.local_to_global, comm = 'main') # 9
-
     def save_profiler(self):
         if not self.settings.profiler_on: return
-
-        if self.router['main'].rank == 0:
-            self.storer.flush_workspace()
-            self.storer.create_workspace_folders()
-        self.router['main'].Barrier()
-
 
         step_jobs = [
             'run_step',
@@ -583,13 +577,6 @@ class HammerSimulation:
             'run_valve_step',
             'run_pump_step',
             'store_results',
-            'exchange_data'
-        ]
-
-        comm_jobs = [
-            'exchange_data',
-            'barrier1',
-            'barrier2'
         ]
 
         init_jobs = [
@@ -600,20 +587,16 @@ class HammerSimulation:
             '_load_initial_conditions'
         ]
 
+        comm_jobs = [
+            'exchange_data',
+            'barrier1',
+            'barrier2'
+        ]
+
         raw_step_times = np.zeros(
             (len(step_jobs), len(self.worker.profiler.jobs[step_jobs[0]].duration)), dtype=float)
         for i, job in enumerate(step_jobs):
             raw_step_times[i] = self.worker.profiler.jobs[job].duration
-
-        raw_comm_times = np.zeros(
-            (len(comm_jobs), len(self.worker.profiler.jobs[comm_jobs[0]].duration)), dtype=float)
-        for i, job in enumerate(comm_jobs):
-            raw_comm_times[i] = self.worker.profiler.jobs[job].duration
-
-        raw_init_times = np.zeros(
-            (len(init_jobs), len(self.worker.profiler.jobs[init_jobs[0]].duration)), dtype=float)
-        for i, job in enumerate(init_jobs):
-            raw_init_times[i] = self.worker.profiler.jobs[job].duration
 
         self.storer.save_data(
             'raw_step_times',
@@ -622,12 +605,10 @@ class HammerSimulation:
             comm = 'main')
         self.router['main'].Barrier()
 
-        self.storer.save_data(
-            'raw_comm_times',
-            raw_comm_times,
-            shape = (len(comm_jobs)*self.settings.num_processors, raw_comm_times.shape[1]),
-            comm = 'main')
-        self.router['main'].Barrier()
+        raw_init_times = np.zeros(
+            (len(init_jobs), len(self.worker.profiler.jobs[init_jobs[0]].duration)), dtype=float)
+        for i, job in enumerate(init_jobs):
+            raw_init_times[i] = self.worker.profiler.jobs[job].duration
 
         self.storer.save_data(
             'raw_init_times',
@@ -635,6 +616,19 @@ class HammerSimulation:
             shape = (len(init_jobs)*self.settings.num_processors, raw_init_times.shape[1]),
             comm = 'main')
         self.router['main'].Barrier()
+
+        if self.router['main'].size > 1:
+            raw_comm_times = np.zeros(
+                (len(comm_jobs), len(self.worker.profiler.jobs[comm_jobs[0]].duration)), dtype=float)
+            for i, job in enumerate(comm_jobs):
+                raw_comm_times[i] = self.worker.profiler.jobs[job].duration
+
+            self.storer.save_data(
+                'raw_comm_times',
+                raw_comm_times,
+                shape = (len(comm_jobs)*self.settings.num_processors, raw_comm_times.shape[1]),
+                comm = 'main')
+            self.router['main'].Barrier()
 
     def load(self, workspace_id):
         if self.router['main'].rank == 0:

@@ -59,6 +59,5 @@ def new_workspace_name(is_root = True):
         count += 1
         with open(get_count_path(), 'wb') as f:
             pickle.dump(count, f)
-        print(f'W{count}')
         return f'W{count}'
     return None
