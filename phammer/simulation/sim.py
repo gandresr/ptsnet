@@ -238,6 +238,9 @@ class HammerSimulation:
             self.progress = tqdm(total = self.settings.time_steps, position = 0)
             self.progress.update(1)
         # ----------------------------------------
+        if self.router['main'].rank == 0:
+            self.storer.create_workspace_folders()
+        self.router['main'].Barrier()
         self.save_sim_data()
 
     def __repr__(self):
@@ -346,9 +349,6 @@ class HammerSimulation:
         self._distribute_work()
         self.t = 1
         self.settings.is_initialized = True
-        if self.router['main'].rank == 0:
-            self.storer.create_workspace_folders()
-        self.router['main'].Barrier()
         self.save_init_data()
 
     def _distribute_work(self):
