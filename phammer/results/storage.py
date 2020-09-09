@@ -37,7 +37,7 @@ class StorageManager:
         for folder in self.workspace_folders.values():
             os.makedirs(folder, exist_ok=True)
 
-    def flush_workspace(self):
+    def _flush_workspace(self):
         if os.path.isdir(self.workspace_path):
             shutil.rmtree(self.workspace_path)
 

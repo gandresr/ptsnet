@@ -237,6 +237,8 @@ class HammerSimulation:
         if (not self.settings.warnings_on) and (self.router['main'].rank == 0) and self.settings.show_progress:
             self.progress = tqdm(total = self.settings.time_steps, position = 0)
             self.progress.update(1)
+        # ----------------------------------------
+        self.save_sim_data()
 
     def __repr__(self):
         return "HammerSimulation <duration = %d [s] | time_steps = %d | num_points = %s>" % \
@@ -345,10 +347,9 @@ class HammerSimulation:
         self.t = 1
         self.settings.is_initialized = True
         if self.router['main'].rank == 0:
-            self.storer.flush_workspace()
             self.storer.create_workspace_folders()
         self.router['main'].Barrier()
-        self.save_sim_data()
+        self.save_init_data()
 
     def _distribute_work(self):
         self.worker = Worker(
@@ -360,6 +361,7 @@ class HammerSimulation:
             time_steps = self.settings.time_steps,
             inpfile = self.inpfile,
             profiler_on = self.settings.profiler_on)
+
         self.results = self.worker.results
 
         # Adding extra communicators
@@ -406,7 +408,9 @@ class HammerSimulation:
             self.router['local'].Barrier()
             self.worker.profiler.stop('barrier2')
             ###
+
         self.t += 1
+
         if (not self.settings.warnings_on) and (self.router['main'].rank == 0) and self.settings.show_progress:
             self.progress.update(1)
             if self.is_over:
@@ -523,6 +527,9 @@ class HammerSimulation:
             self.storer.save_data('inpfile', self.inpfile, comm = 'main')
             self.storer.save_data('initial_conditions', self.ic, comm = 'main')
             self.storer.save_data('settings', self.settings.to_dict(), comm = 'main')
+
+    def save_init_data(self):
+        if self.router['main'].rank == 0:
             self.storer.save_data('partitioning', self.worker.partition, comm = 'main')
             self.storer.save_data('local_to_global', self.worker.local_to_global, comm = 'main')
 
