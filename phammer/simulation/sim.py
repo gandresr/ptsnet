@@ -5,7 +5,7 @@ from tqdm import tqdm
 from collections import deque as dq
 from pkg_resources import resource_filename
 from phammer.arrays import ObjArray, Table2D
-from phammer.simulation.constants import COEFF_TOL
+from phammer.simulation.constants import COEFF_TOL, STEP_JOBS, INIT_JOBS, COMM_JOBS
 from phammer.epanet.util import EN
 from phammer.utils.data import define_curve, is_array
 from phammer.utils.io import run_shell, get_root_path
@@ -15,6 +15,7 @@ from phammer.parallel.worker import Worker
 from phammer.results.storage import StorageManager
 from phammer.results.workspaces import new_workspace_name, list_workspaces, num_workspaces
 from phammer.simulation.constants import NODE_RESULTS, PIPE_END_RESULTS, PIPE_START_RESULTS
+from phammer.profiler import Profiler
 
 class HammerSettings:
     def __init__(self,
@@ -186,13 +187,14 @@ class HammerSimulation:
         'demand' : 'node',
     }
 
-    def __init__(self, workspace_id = None, inpfile = None, settings = None, default_wave_speed = None, wave_speed_file = None, delimiter = ',', wave_speed_method = 'critical'):
+    def __init__(self, workspace_id = None, inpfile = None, settings = None, default_wave_speed = None, wave_speed_file = None, delimiter = ',', wave_speed_method = 'critical', init_on = False):
         ### Persistance ----------------------------
         if inpfile == None:
             self.router = CommManager()
             self.settings = HammerSettings()
             self.settings.active_persistance = True
             self.results = {}
+            self.init_on = init_on
             if workspace_id is None:
                 self.workspace_id = num_workspaces() - 1
             else:
@@ -577,63 +579,40 @@ class HammerSimulation:
     def save_profiler(self):
         if not self.settings.profiler_on: return
 
-        step_jobs = [
-            'run_step',
-            'run_interior_step',
-            'run_boundary_step',
-            'run_valve_step',
-            'run_pump_step',
-            'store_results',
-        ]
-
-        init_jobs = [
-            'get_partition',
-            '_create_selectors',
-            '_define_dist_graph_comm',
-            '_allocate_memory',
-            '_load_initial_conditions'
-        ]
-
-        comm_jobs = [
-            'exchange_data',
-            'barrier1',
-            'barrier2'
-        ]
-
         raw_step_times = np.zeros(
-            (len(step_jobs), len(self.worker.profiler.jobs[step_jobs[0]].duration)), dtype=float)
-        for i, job in enumerate(step_jobs):
+            (len(STEP_JOBS), len(self.worker.profiler.jobs[STEP_JOBS[0]].duration)), dtype=float)
+        for i, job in enumerate(STEP_JOBS):
             raw_step_times[i] = self.worker.profiler.jobs[job].duration
 
         self.storer.save_data(
             'raw_step_times',
             raw_step_times,
-            shape = (len(step_jobs)*self.settings.num_processors, raw_step_times.shape[1]),
+            shape = (len(STEP_JOBS)*self.settings.num_processors, raw_step_times.shape[1]),
             comm = 'main')
         self.router['main'].Barrier()
 
         raw_init_times = np.zeros(
-            (len(init_jobs), len(self.worker.profiler.jobs[init_jobs[0]].duration)), dtype=float)
-        for i, job in enumerate(init_jobs):
+            (len(INIT_JOBS), len(self.worker.profiler.jobs[INIT_JOBS[0]].duration)), dtype=float)
+        for i, job in enumerate(INIT_JOBS):
             raw_init_times[i] = self.worker.profiler.jobs[job].duration
 
         self.storer.save_data(
             'raw_init_times',
             raw_init_times,
-            shape = (len(init_jobs)*self.settings.num_processors, raw_init_times.shape[1]),
+            shape = (len(INIT_JOBS)*self.settings.num_processors, raw_init_times.shape[1]),
             comm = 'main')
         self.router['main'].Barrier()
 
         if self.router['main'].size > 1:
             raw_comm_times = np.zeros(
-                (len(comm_jobs), len(self.worker.profiler.jobs[comm_jobs[0]].duration)), dtype=float)
-            for i, job in enumerate(comm_jobs):
+                (len(COMM_JOBS), len(self.worker.profiler.jobs[COMM_JOBS[0]].duration)), dtype=float)
+            for i, job in enumerate(COMM_JOBS):
                 raw_comm_times[i] = self.worker.profiler.jobs[job].duration
 
             self.storer.save_data(
                 'raw_comm_times',
                 raw_comm_times,
-                shape = (len(comm_jobs)*self.settings.num_processors, raw_comm_times.shape[1]),
+                shape = (len(COMM_JOBS)*self.settings.num_processors, raw_comm_times.shape[1]),
                 comm = 'main')
             self.router['main'].Barrier()
 
@@ -644,6 +623,8 @@ class HammerSimulation:
                 raise ValueError(f'The workspace with ID ({workspace_id}) does not exist')
 
             self.storer = StorageManager(wps[workspace_id], router = self.router)
+            self.profiler = Profiler(storer = self.storer)
+            self.profiler.summarize_step_times()
             local_to_global = self.storer.load_data('local_to_global')
 
             node_labels = local_to_global['node']
@@ -697,9 +678,11 @@ class HammerSimulation:
                     continue
 
             self.inpfile = self.storer.load_data('inpfile')
-            self.initializator = Initializator(
-                self.inpfile,
-                period = self.settings.period,
-                skip_compatibility_check = True,
-                warnings_on = self.settings.warnings_on,
-                _super = self)
+
+            if self.init_on:
+                self.initializator = Initializator(
+                    self.inpfile,
+                    period = self.settings.period,
+                    skip_compatibility_check = True,
+                    warnings_on = self.settings.warnings_on,
+                    _super = self)

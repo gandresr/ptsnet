@@ -111,3 +111,26 @@ PIPE_START_RESULTS = {
 PIPE_END_RESULTS = {
     'flowrate' : np.float,
 }
+
+STEP_JOBS = (
+    'run_step',
+    'run_interior_step',
+    'run_boundary_step',
+    'run_valve_step',
+    'run_pump_step',
+    'store_results',
+)
+
+INIT_JOBS = (
+    'get_partition',
+    '_create_selectors',
+    '_define_dist_graph_comm',
+    '_allocate_memory',
+    '_load_initial_conditions'
+)
+
+COMM_JOBS = (
+    'exchange_data',
+    'barrier1',
+    'barrier2'
+)
