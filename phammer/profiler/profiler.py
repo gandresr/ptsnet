@@ -34,11 +34,13 @@ class Job:
 
 class Profiler:
 
-    def __init__(self, rank = 0, is_on = False, storer = None):
+    def __init__(self, rank = 0, is_on = False, _super = None):
         self.jobs = {}
         self.rank = rank
         self.is_on = is_on
-        self.storer = storer
+        self._super = _super
+        if not _super is None:
+            self.storer = self._super.storer
         self.summary = {}
 
     def start(self, label, rank = 0):

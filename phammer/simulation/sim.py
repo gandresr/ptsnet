@@ -623,60 +623,14 @@ class HammerSimulation:
                 raise ValueError(f'The workspace with ID ({workspace_id}) does not exist')
 
             self.storer = StorageManager(wps[workspace_id], router = self.router)
-            self.profiler = Profiler(storer = self.storer)
-            self.profiler.summarize_step_times()
-            local_to_global = self.storer.load_data('local_to_global')
-
-            node_labels = local_to_global['node']
-            sorted_node_labels = sorted(node_labels, key=node_labels.get)
-            node_head = self.storer.load_data('node.head')
-            node_demand_flow = self.storer.load_data('node.demand_flow')
-            node_leak_flow = self.storer.load_data('node.leak_flow')
-            self.results['node'] = \
-                Table2D(
-                    NODE_RESULTS,
-                    node_head.shape[0],
-                    node_head.shape[1],
-                    labels = sorted_node_labels,
-                    allow_replacement = True,
-                    persistent = True)
-            self.results['node'].head = node_head
-            self.results['node'].demand_flow = node_demand_flow
-            self.results['node'].leak_flow = node_leak_flow
-
-            pipe_start_labels = local_to_global['pipe.start']
-            sorted_pipe_start_labels = sorted(pipe_start_labels, key=pipe_start_labels.get)
-            pipe_start_flowrate = self.storer.load_data('pipe.start.flowrate')
-            self.results['pipe.start'] = \
-                Table2D(
-                    PIPE_START_RESULTS,
-                    pipe_start_flowrate.shape[0],
-                    pipe_start_flowrate.shape[1],
-                    labels = sorted_pipe_start_labels,
-                    allow_replacement = True,
-                    persistent = True)
-            self.results['pipe.start'].flowrate = pipe_start_flowrate
-
-            pipe_end_labels = local_to_global['pipe.end']
-            sorted_pipe_end_labels = sorted(pipe_end_labels, key=pipe_end_labels.get)
-            pipe_end_flowrate = self.storer.load_data('pipe.end.flowrate')
-            self.results['pipe.end'] = \
-                Table2D(
-                    PIPE_END_RESULTS,
-                    pipe_end_flowrate.shape[0],
-                    pipe_end_flowrate.shape[1],
-                    labels = sorted_pipe_end_labels,
-                    allow_replacement = True,
-                    persistent = True)
-            self.results['pipe.end'].flowrate = pipe_end_flowrate
-
             settings = self.storer.load_data('settings')
             for i, j in settings.items():
                 if not i == 'settingsOK':
                     self.settings.__setattr__(i, j)
                 else:
                     continue
-
+            self.profiler = Profiler(_super = self)
+            self.profiler.summarize_step_times()
             self.inpfile = self.storer.load_data('inpfile')
 
             if self.init_on:
@@ -686,3 +640,49 @@ class HammerSimulation:
                     skip_compatibility_check = True,
                     warnings_on = self.settings.warnings_on,
                     _super = self)
+
+            if self.settings.save_results:
+                local_to_global = self.storer.load_data('local_to_global')
+
+                node_labels = local_to_global['node']
+                sorted_node_labels = sorted(node_labels, key=node_labels.get)
+                node_head = self.storer.load_data('node.head')
+                node_demand_flow = self.storer.load_data('node.demand_flow')
+                node_leak_flow = self.storer.load_data('node.leak_flow')
+                self.results['node'] = \
+                    Table2D(
+                        NODE_RESULTS,
+                        node_head.shape[0],
+                        node_head.shape[1],
+                        labels = sorted_node_labels,
+                        allow_replacement = True,
+                        persistent = True)
+                self.results['node'].head = node_head
+                self.results['node'].demand_flow = node_demand_flow
+                self.results['node'].leak_flow = node_leak_flow
+
+                pipe_start_labels = local_to_global['pipe.start']
+                sorted_pipe_start_labels = sorted(pipe_start_labels, key=pipe_start_labels.get)
+                pipe_start_flowrate = self.storer.load_data('pipe.start.flowrate')
+                self.results['pipe.start'] = \
+                    Table2D(
+                        PIPE_START_RESULTS,
+                        pipe_start_flowrate.shape[0],
+                        pipe_start_flowrate.shape[1],
+                        labels = sorted_pipe_start_labels,
+                        allow_replacement = True,
+                        persistent = True)
+                self.results['pipe.start'].flowrate = pipe_start_flowrate
+
+                pipe_end_labels = local_to_global['pipe.end']
+                sorted_pipe_end_labels = sorted(pipe_end_labels, key=pipe_end_labels.get)
+                pipe_end_flowrate = self.storer.load_data('pipe.end.flowrate')
+                self.results['pipe.end'] = \
+                    Table2D(
+                        PIPE_END_RESULTS,
+                        pipe_end_flowrate.shape[0],
+                        pipe_end_flowrate.shape[1],
+                        labels = sorted_pipe_end_labels,
+                        allow_replacement = True,
+                        persistent = True)
+                self.results['pipe.end'].flowrate = pipe_end_flowrate
