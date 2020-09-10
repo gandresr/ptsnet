@@ -80,8 +80,7 @@ class Profiler:
             self.summary['init_jobs'] = Table(init_jobs, raw_init_times.shape[1])
 
             comm_jobs = {job : np.float for job in COMM_JOBS}
-            if num_processors > 1:
-                self.summary['comm_jobs'] = Table(comm_jobs, raw_comm_times.shape[1])
+            self.summary['comm_jobs'] = Table(comm_jobs, raw_comm_times.shape[1])
 
             for i, job in enumerate(step_jobs):
                 self.summary['step_jobs'].__dict__[job][:] = \
