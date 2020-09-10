@@ -52,24 +52,29 @@
         "ftype" : "array",
         "dtype" : "float"
     },
+    "summary" : {
+        "fname" : "summary.pkl",
+        "token" : 9,
+        "ftype" : "pickle"
+    },
     "initial_conditions" : {
         "fname" : "ic.pkl",
-        "token" : 9,
+        "token" : 10,
         "ftype" : "pickle"
     },
     "settings" : {
         "fname" : "settings.pkl",
-        "token" : 10,
+        "token" : 11,
         "ftype" : "pickle"
     },
     "partitioning" : {
         "fname" : "partitioning.pkl",
-        "token" : 11,
+        "token" : 12,
         "ftype" : "pickle"
     },
     "local_to_global" : {
         "fname" : "local_to_global.pkl",
-        "token" : 12,
+        "token" : 13,
         "ftype" : "pickle"
     }
 }

@@ -98,3 +98,8 @@ class StorageManager:
         if self.persistent_files:
             for key in self.persistent_files:
                 self.persistent_files[key].close()
+
+    def exists(self, data_label):
+        d = self.metadata[data_label]
+        full_path = os.path.join(self.workspace_folders[d['token']], d['fname'])
+        return os.path.exists(full_path)
