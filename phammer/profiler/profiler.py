@@ -101,6 +101,6 @@ class Profiler:
                     self.summary[job] = sum(self.summary['comm_jobs'].__dict__[job])
                 else:
                     self.summary['comm_jobs'].__dict__[job][:] = 0
-                    self.summary['job'] = 0
+                    self.summary[job] = 0
 
             self.storer.save_data('summary', self.summary, comm = 'main')
