@@ -56,43 +56,40 @@ class Profiler:
 
     def summarize_step_times(self):
         raw_step_times = self.storer.load_data('raw_step_times')
-        num_processors = int(raw_step_times.shape[0] / len(STEP_JOBS))
-        steps = raw_step_times.shape[1]
+        ssize = len(STEP_JOBS)
+
+        # hack for old format
+        if raw_step_times.shape[0] % ssize != 0: ssize += 1
+        num_processors = int(raw_step_times.shape[0] / ssize)
 
         raw_init_times = self.storer.load_data('raw_init_times')
+        isize = len(INIT_JOBS)
 
         if num_processors > 1:
             raw_comm_times = self.storer.load_data('raw_comm_times')
-
+            csize = len(COMM_JOBS)
 
         step_jobs = {job : np.float for job in STEP_JOBS}
-        self.summary['step_jobs'] = Table(
-                    step_jobs,
-                    raw_step_times.shape[1])
-
-        critical_step_processors = np.argmax(raw_step_times[::num_processors], axis = 0)
+        self.summary['step_jobs'] = Table(step_jobs, raw_step_times.shape[1])
+        critical_step_processors = np.argmax(raw_step_times[::ssize], axis = 0)
 
         init_jobs = {job : np.float for job in INIT_JOBS}
-        self.summary['init_jobs'] = Table(
-                    init_jobs,
-                    raw_init_times.shape[1])
+        self.summary['init_jobs'] = Table(init_jobs, raw_init_times.shape[1])
 
         if num_processors > 1:
             comm_jobs = {job : np.float for job in COMM_JOBS}
-            self.summary['comm_jobs'] = Table(
-                        comm_jobs,
-                        raw_comm_times.shape[1])
+            self.summary['comm_jobs'] = Table(comm_jobs, raw_comm_times.shape[1])
 
         for i, job in enumerate(step_jobs):
             self.summary['step_jobs'].__dict__[job][:] = \
-                raw_step_times[i::num_processors][critical_step_processors, np.arange(steps, dtype = int)]
+                raw_step_times[i::ssize][critical_step_processors, np.arange(raw_step_times.shape[1], dtype = int)]
             self.summary[job] = sum(self.summary['step_jobs'].__dict__[job])
         for i, job in enumerate(init_jobs):
             self.summary['init_jobs'].__dict__[job][:] = \
-                np.max(raw_init_times[i::num_processors], axis = 0)
+                np.max(raw_init_times[i::isize], axis = 0)
             self.summary[job] = sum(self.summary['init_jobs'].__dict__[job])
         if num_processors > 1:
             for i, job in enumerate(comm_jobs):
                 self.summary['comm_jobs'].__dict__[job][:] = \
-                    np.max(raw_comm_times[i::num_processors], axis = 0)
+                    np.max(raw_comm_times[i::csize], axis = 0)
                 self.summary[job] = sum(self.summary['comm_jobs'].__dict__[job])
