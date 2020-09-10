@@ -94,13 +94,13 @@ class Profiler:
                 self.summary['init_jobs'].__dict__[job][:] = \
                     np.max(raw_init_times[i::isize], axis = 0)
                 self.summary[job] = sum(self.summary['init_jobs'].__dict__[job])
-            if num_processors > 1:
-                for i, job in enumerate(comm_jobs):
+            for i, job in enumerate(comm_jobs):
+                if num_processors > 1:
                     self.summary['comm_jobs'].__dict__[job][:] = \
                         np.max(raw_comm_times[i::csize], axis = 0)
                     self.summary[job] = sum(self.summary['comm_jobs'].__dict__[job])
-            else:
-                for i, job in enumerate(comm_jobs):
+                else:
                     self.summary['comm_jobs'].__dict__[job][:] = 0
+                    self.summary['job'] = 0
 
             self.storer.save_data('summary', self.summary, comm = 'main')
