@@ -3,7 +3,9 @@ import os
 import pickle
 
 from datetime import datetime
-from phammer.utils.io import get_root_path
+from phammer.utils.io import get_root_path, walk
+from pkg_resources import resource_filename
+from phammer.results.storage import StorageManager
 
 def delete_all_workspaces():
     confirmation = None
@@ -68,3 +70,13 @@ def new_workspace_name(is_root = True):
             pickle.dump(count, f)
         return f'W{count}'
     return None
+
+def exists(data_label, workspace_id=None, workspace_name=None):
+    if workspace_id:
+        wps = list_workspaces()
+        stmanager = StorageManager(wps[workspace_id])
+    elif workspace_name:
+        stmanager = StorageManager(workspace_name)
+    else:
+        raise ValueError("It is necessary to define either workspace_id or workspace_name")
+    return stmanager.exists(data_label)
