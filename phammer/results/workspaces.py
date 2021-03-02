@@ -32,15 +32,22 @@ def print_workspaces(full_path = False):
         abs_path = os.path.join(get_root_path(), 'workspaces', d)
         with open(os.path.join(abs_path, 'settings.pkl'), 'rb') as f:
             s = pickle.load(f)
+        with open(os.path.join(abs_path, 'inpfile.pkl'), 'rb') as f:
+            inp = pickle.load(f)
         with open(os.path.join(abs_path, 'fname.pkl'), 'rb') as f:
             fname = pickle.load(f)
             if full_path:
                 fname = os.path.basename(fname)
-        txt[d] = [fname, f"T = {s['duration']}, t = {s['time_step']}, N = {s['num_points']}, n = {s['num_processors']}"]
+        txt[d] = [
+            fname,
+            f"Input File: {inp}",
+            f"T = {s['duration']}, t = {s['time_step']}, N = {s['num_points']}, n = {s['num_processors']}",
+        ]
     print('\n')
     for i, d in enumerate(txt):
         print(f'  ({i})', txt[d][0])
         print('    ' + txt[d][1])
+        print('    ' + txt[d][2])
         print('\n')
 
 def num_workspaces():
