@@ -218,7 +218,7 @@ class HammerSimulation:
             raise ValueError("Duration has to be larger than time step")
         self.initializator.create_selectors()
         self.t = 0
-        self.time_stamps = np.linspace(0, self.settings.duration, self.settings.time_steps)
+        self.time_stamps = np.array([i*self.settings.time_step for i in range(self.settings.time_steps)])
         self.inpfile = inpfile
         self.settings.num_points = self.initializator.num_points
         # ----------------------------------------
@@ -259,7 +259,7 @@ class HammerSimulation:
 
     def __enter__(self):
         self.load(self.workspace_id)
-        self.time_stamps = np.linspace(0, self.settings.duration, self.settings.time_steps)
+        self.time_stamps = np.array([i*self.settings.time_step for i in range(self.settings.time_steps)])
         return self
 
     def __exit__(self, type, value, traceback):
