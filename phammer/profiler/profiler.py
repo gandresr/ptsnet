@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from time import time
+from time import time, clock
 from phammer.arrays import Table
 from phammer.simulation.constants import COEFF_TOL, STEP_JOBS, INIT_JOBS, COMM_JOBS
 
