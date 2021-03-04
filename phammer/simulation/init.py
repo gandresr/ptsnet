@@ -68,29 +68,35 @@ class Initializator:
             return True
 
     def _set_segments(self, wave_speed_method = 'critical'):
-        # method \in {'critical', 'user'}
-        if wave_speed_method == 'critical':
+        # method \in {'critical', 'user', 'dt'}
+        if wave_speed_method in ('critical', 'dt'):
             self.ic['pipe'].segments = self.ic['pipe'].length
             self.ic['pipe'].segments /= self.ic['pipe'].wave_speed
-
             # Maximum time_step in the system to capture waves in all pipes
             max_dt = min(self.ic['pipe'].segments) / 2 # at least 2 segments in critical pipe
             self._super.settings.time_step = min(self._super.settings.time_step, max_dt)
-
             # The number of segments is defined
             self.ic['pipe'].segments /= self._super.settings.time_step
-            int_segments = np.round(self.ic['pipe'].segments)
         elif wave_speed_method == 'user':
             self.ic['pipe'].segments = self.ic['pipe'].length
             self.ic['pipe'].segments /= (self.ic['pipe'].wave_speed * self._super.settings.time_step)
-            int_segments = np.round(self.ic['pipe'].segments)
-            int_segments[self.ic['pipe'].segments < 2] = 2
+        elif wave_speed_method == 'dt':
+            phi = self.ic['pipe'].length
         else:
             raise ValueError("Method is not compatible. Try: ['critical', 'user']")
 
-        # The wave_speed values are adjusted to compensate the truncation error
-        self.ic['pipe'].wave_speed = self.ic['pipe'].wave_speed * self.ic['pipe'].segments/int_segments
-        self.ic['pipe'].segments = int_segments
+        int_segments = np.ceil(self.ic['pipe'].segments)
+        int_segments[int_segments < 2] = 2
+
+        if wave_speed_method in ('critical', 'user'):
+            # The wave_speed values are adjusted to compensate the truncation error
+            self.ic['pipe'].wave_speed = self.ic['pipe'].wave_speed * self.ic['pipe'].segments/int_segments
+            self.ic['pipe'].segments = int_segments
+        elif wave_speed_method == 'dt':
+            # The wave_speed is not adjusted when wave_speed_method == 'dt'
+            # since the error is absorved by the time step
+            self.ic['pipe'].segments = int_segments
+
         self.ic['pipe'].dx = self.ic['pipe'].length / self.ic['pipe'].segments
         self.num_segments = int(sum(self.ic['pipe'].segments))
         self.num_points = self.num_segments + self.wn.num_pipes
