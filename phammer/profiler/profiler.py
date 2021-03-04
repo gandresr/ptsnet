@@ -13,7 +13,7 @@ class Job:
         self.label = label
 
     def restart(self):
-        self.start_time = time()
+        self.start_time = clock()
         if len(self.time_stamps) % 2 != 0:
             self.time_stamps[-1] = self.start_time
         else:
@@ -21,7 +21,7 @@ class Job:
 
     def stop(self):
         if len(self.time_stamps) % 2 != 0:
-            self.end_time = time()
+            self.end_time = clock()
             self.time_stamps.append(self.end_time)
 
     @property
