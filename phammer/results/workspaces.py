@@ -74,10 +74,10 @@ def delete_workspace(workspace_id, full_path=True):
 
         if confirmation == 'no':
             continue
-        if os.path.isdir(abs_path):
-            shutil.rmtree(abs_path)
+        if os.path.isdir(apath):
+            shutil.rmtree(apath)
         else:
-            os.remove(abs_path)
+            os.remove(apath)
 
 
 
