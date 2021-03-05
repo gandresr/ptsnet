@@ -61,7 +61,7 @@ def delete_workspace(workspace_id, full_path=True):
         ]
 
         print('\n')
-        print(f'  ({wids[i]}) ' + f'Last Modification on: {txt[0]}')
+        print(f'  ({wids[i]}) ' + txt[0])
         print('      ' + txt[1])
         print('      ' + txt[2])
         print('\n')
