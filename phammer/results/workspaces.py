@@ -23,8 +23,25 @@ def delete_all_workspaces():
         else:
             os.remove(abs_path)
 
+def delete_workspace(workspace_id):
+    confirmation = None
+    while confirmation is None:
+        confirmation = input('Are you sure that you want to delete all the workspaces? (yes/no): ')
+        if not confirmation in ('yes', 'no'):
+            confirmation = None
+    if confirmation == 'no':
+        return
+    ROOT = get_root_path()
+    wpl = list_workspaces()
+    abs_path = os.path.join(get_root_path(), 'workspaces', wpl[workspace_id])
+    if os.path.isdir(abs_path):
+        shutil.rmtree(abs_path)
+    else:
+        os.remove(abs_path)
+
 def list_workspaces():
     wps = [d for d in os.listdir(os.path.join(get_root_path(), 'workspaces')) if '.' not in d]
+    # workspace code starts with 'W' and then is followed by a number
     wps.sort(key = lambda x: int(x[1:]))
     return wps
 
