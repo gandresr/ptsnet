@@ -67,9 +67,9 @@ class Initializator:
             self._set_segments(wave_speed_method)
             return True
 
-    def _set_segments(self, wave_speed_method = 'critical'):
-        # method \in {'critical', 'user', 'dt'}
-        if wave_speed_method in ('critical', 'dt'):
+    def _set_segments(self, wave_speed_method = 'optimal'):
+        # method \in {'critical', 'user', 'dt', 'optimal'}
+        if wave_speed_method in ('critical', 'dt', 'optimal'):
             self.ic['pipe'].segments = self.ic['pipe'].length
             self.ic['pipe'].segments /= self.ic['pipe'].wave_speed
             # Maximum time_step in the system to capture waves in all pipes
@@ -85,7 +85,7 @@ class Initializator:
         else:
             raise ValueError("Method is not compatible. Try: ['critical', 'user']")
 
-        int_segments = np.ceil(self.ic['pipe'].segments)
+        int_segments = np.round(self.ic['pipe'].segments)
         int_segments[int_segments < 2] = 2
 
         if wave_speed_method in ('critical', 'user'):
@@ -96,7 +96,12 @@ class Initializator:
             # The wave_speed is not adjusted when wave_speed_method == 'dt'
             # since the error is absorved by the time step
             self.ic['pipe'].segments = int_segments
-
+        elif wave_speed_method == 'optimal':
+            self.ic['pipe'].segments = int_segments
+            phi = self.ic['pipe'].length / (self.ic['pipe'].wave_speed * self.ic['pipe'].segments)
+            theta = np.dot(phi,np.ones_like(phi)) / np.dot(phi, phi)
+            self._super.settings.time_step = 1/theta
+            self.ic['pipe'].wave_speed = self.ic['pipe'].wave_speed * (phi*theta)
         self.ic['pipe'].dx = self.ic['pipe'].length / self.ic['pipe'].segments
         self.num_segments = int(sum(self.ic['pipe'].segments))
         self.num_points = self.num_segments + self.wn.num_pipes
