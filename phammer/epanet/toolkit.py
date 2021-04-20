@@ -483,6 +483,20 @@ class ENepanet():
         self._error()
         return iIndex.value
 
+    def ENgetlinkid(self, iIndex):
+        """[summary]
+
+        TODO DOCS
+
+        Arguments:
+            iIndex {[type]} -- [description]
+        """
+
+        fValue = ctypes.create_string_buffer(b'', 50)
+        self.errcode = self.ENlib.ENgetlinkid(iIndex, fValue)
+        self._error()
+        return fValue.value.decode()
+
     def ENgetlinkvalue(self, iIndex, iCode):
         """Retrieves parameter value for a link
 
