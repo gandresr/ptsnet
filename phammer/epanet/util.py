@@ -297,31 +297,31 @@ class QualParam(enum.Enum):
 
         # Do conversions
         if self in [QualParam.Concentration, QualParam.Quality, QualParam.LinkQuality]:
-            data = data * (mass_units.factor/0.001)  # MASS /L to kg/m3
+            data *= (mass_units.factor/0.001)  # MASS /L to kg/m3
 
         elif self in [QualParam.SourceMassInject]:
-            data = data * (mass_units.factor/60.0)  # MASS /min to kg/s
+            data *= (mass_units.factor/60.0)  # MASS /min to kg/s
 
         elif self in [QualParam.BulkReactionCoeff] and reaction_order == 1:
-                data = data * (1/86400.0)  # per day to per second
+                data *= (1/86400.0)  # per day to per second
 
         elif self in [QualParam.WallReactionCoeff] and reaction_order == 0:
             if flow_units.is_traditional:
-                data = data * (mass_units.factor*0.092903/86400.0)  # M/ft2/d to SI
+                data *= (mass_units.factor*0.092903/86400.0)  # M/ft2/d to SI
             else:
-                data = data * (mass_units.factor/86400.0)  # M/m2/day to M/m2/s
+                data *= (mass_units.factor/86400.0)  # M/m2/day to M/m2/s
 
         elif self in [QualParam.WallReactionCoeff] and reaction_order == 1:
             if flow_units.is_traditional:
-                data = data * (0.3048/86400.0)  # ft/d to m/s
+                data *= (0.3048/86400.0)  # ft/d to m/s
             else:
-                data = data * (1.0/86400.0)  # m/day to m/s
+                data *= (1.0/86400.0)  # m/day to m/s
 
         elif self in [QualParam.SourceMassInject]:
-            data = data * (mass_units.factor/60.0)  # per min to per second
+            data *= (mass_units.factor/60.0)  # per min to per second
 
         elif self in [QualParam.WaterAge]:
-            data = data * 3600.0  # hr to s
+            data *= 3600.0  # hr to s
 
         # Convert back to input data type
         if data_type is dict:
@@ -362,31 +362,31 @@ class QualParam(enum.Enum):
 
         # Do conversions
         if self in [QualParam.Concentration, QualParam.Quality, QualParam.LinkQuality]:
-            data = data / (mass_units.factor/0.001)  # MASS /L fr kg/m3
+            data /= (mass_units.factor/0.001)  # MASS /L fr kg/m3
 
         elif self in [QualParam.SourceMassInject]:
-            data = data / (mass_units.factor/60.0)  # MASS /min fr kg/s
+            data /= (mass_units.factor/60.0)  # MASS /min fr kg/s
 
         elif self in [QualParam.BulkReactionCoeff] and reaction_order == 1:
-                data = data / (1/86400.0)  # per day fr per second
+                data /= (1/86400.0)  # per day fr per second
 
         elif self in [QualParam.WallReactionCoeff] and reaction_order == 0:
             if flow_units.is_traditional:
-                data = data / (mass_units.factor*0.092903/86400.0)  # M/ft2/d fr SI
+                data /= (mass_units.factor*0.092903/86400.0)  # M/ft2/d fr SI
             else:
-                data = data / (mass_units.factor/86400.0)  # M/m2/day fr M/m2/s
+                data /= (mass_units.factor/86400.0)  # M/m2/day fr M/m2/s
 
         elif self in [QualParam.WallReactionCoeff] and reaction_order == 1:
             if flow_units.is_traditional:
-                data = data / (0.3048/86400.0)  # ft/d fr m/s
+                data /= (0.3048/86400.0)  # ft/d fr m/s
             else:
-                data = data / (1.0/86400.0)  # m/day fr m/s
+                data /= (1.0/86400.0)  # m/day fr m/s
 
         elif self in [QualParam.SourceMassInject]:
-            data = data / (mass_units.factor/60.0)  # per min fr per second
+            data /= (mass_units.factor/60.0)  # per min fr per second
 
         elif self in [QualParam.WaterAge]:
-            data = data / 3600.0  # hr fr s
+            data /= 3600.0  # hr fr s
 
         # Convert back to input data type
         if data_type is dict:
@@ -503,48 +503,48 @@ class HydParam(enum.Enum):
 
         # Do conversions
         if self in [HydParam.Demand, HydParam.Flow, HydParam.EmitterCoeff]:
-            data = data * flow_units.factor
+            data *= flow_units.factor
             if self is HydParam.EmitterCoeff:
                 if flow_units.is_traditional:
-                    data = data * (1.422070534698521 ** 0.5)  # flowunit/psi0.5 to flowunit/m0.5
+                    data *= (1.422070534698521 ** 0.5)  # flowunit/psi0.5 to flowunit/m0.5
         elif self in [HydParam.PipeDiameter]:
             if flow_units.is_traditional:
-                data = data * 0.0254  # in to m
+                data *= 0.0254  # in to m
             elif flow_units.is_metric:
-                data = data * 0.001  # mm to m
+                data *= 0.001  # mm to m
 
         elif self in [HydParam.RoughnessCoeff] and darcy_weisbach:
             if flow_units.is_traditional:
-                data = data * (1000.0*0.3048)  # 1e-3 ft to m
+                data *= (1000.0*0.3048)  # 1e-3 ft to m
             elif flow_units.is_metric:
-                data = data * 0.001  # mm to m
+                data *= 0.001  # mm to m
 
         elif self in [HydParam.TankDiameter, HydParam.Elevation, HydParam.HydraulicHead,
                       HydParam.Length]:#, HydParam.HeadLoss]:
             if flow_units.is_traditional:
-                data = data * 0.3048  # ft to m
+                data *= 0.3048  # ft to m
 
         elif self in [HydParam.Velocity]:
             if flow_units.is_traditional:
-                data = data * 0.3048  # ft/s to m/s
+                data *= 0.3048  # ft/s to m/s
 
         elif self in [HydParam.Energy]:
-            data = data * 3600000.0  # kW*hr to J
+            data *= 3600000.0  # kW*hr to J
 
         elif self in [HydParam.Power]:
             if flow_units.is_traditional:
-                data = data * 745.699872  # hp to W (Nm/s)
+                data *= 745.699872  # hp to W (Nm/s)
             elif flow_units.is_metric:
-                data = data * 1000.0  # kW to W (Nm/s)
+                data *= 1000.0  # kW to W (Nm/s)
 
         elif self in [HydParam.Pressure]:
             if flow_units.is_traditional:
-#                data = data * 0.703249614902
-                data = data * (0.3048/0.4333)  # psi * (m/ft / psi/ft)
+#                data *= 0.703249614902
+                data *= (0.3048/0.4333)  # psi * (m/ft / psi/ft)
 
         elif self in [HydParam.Volume]:
             if flow_units.is_traditional:
-                data = data * np.power(0.3048, 3)  # ft3 to m3
+                data *= np.power(0.3048, 3)  # ft3 to m3
 
         # Convert back to input data type
         if data_type is pd.core.frame.DataFrame:
@@ -553,7 +553,8 @@ class HydParam(enum.Enum):
             data = dict(zip(data_keys, data))
         elif data_type is list:
             data = list(data)
-
+        else:
+            return
         return data
 
     def _from_si(self, flow_units, data, darcy_weisbach=False):
@@ -589,55 +590,57 @@ class HydParam(enum.Enum):
 
         # Do onversions
         if self in [HydParam.Demand, HydParam.Flow, HydParam.EmitterCoeff]:
-            data = data / flow_units.factor
+            data /= flow_units.factor
             if self is HydParam.EmitterCoeff:
                 if flow_units.is_traditional:
-                    data = data / (1.422070534698521 ** 0.5)  # flowunit/psi0.5 from flowunit/m0.5
+                    data /= (1.422070534698521 ** 0.5)  # flowunit/psi0.5 from flowunit/m0.5
 
         elif self in [HydParam.PipeDiameter]:
             if flow_units.is_traditional:
-                data = data / 0.0254  # in from m
+                data /= 0.0254  # in from m
             elif flow_units.is_metric:
-                data = data / 0.001  # mm from m
+                data /= 0.001  # mm from m
 
         elif self in [HydParam.RoughnessCoeff] and darcy_weisbach:
             if flow_units.is_traditional:
-                data = data / (1000.0*0.3048)  # 1e-3 ft from m
+                data /= (1000.0*0.3048)  # 1e-3 ft from m
             elif flow_units.is_metric:
-                data = data / 0.001  # mm from m
+                data /= 0.001  # mm from m
 
         elif self in [HydParam.TankDiameter, HydParam.Elevation, HydParam.HydraulicHead,
                       HydParam.Length]:#, HydParam.HeadLoss]:
             if flow_units.is_traditional:
-                data = data / 0.3048  # ft from m
+                data /= 0.3048  # ft from m
 
         elif self in [HydParam.Velocity]:
             if flow_units.is_traditional:
-                data = data / 0.3048  # ft/s from m/s
+                data /= 0.3048  # ft/s from m/s
 
         elif self in [HydParam.Energy]:
-            data = data / 3600000.0  # kW*hr from J
+            data /= 3600000.0  # kW*hr from J
 
         elif self in [HydParam.Power]:
             if flow_units.is_traditional:
-                data = data / 745.699872  # hp from W (Nm/s)
+                data /= 745.699872  # hp from W (Nm/s)
             elif flow_units.is_metric:
-                data = data / 1000.0  # kW from W (Nm/s)
+                data /= 1000.0  # kW from W (Nm/s)
 
         elif self in [HydParam.Pressure]:
             if flow_units.is_traditional:
-#                data = data / 0.703249614902
-                data = data / (0.3048/0.4333)  # psi from mH2O, i.e. psi / (m/ft / psi/ft) )
+#                data /= 0.703249614902
+                data /= (0.3048/0.4333)  # psi from mH2O, i.e. psi / (m/ft / psi/ft) )
 
         elif self in [HydParam.Volume]:
             if flow_units.is_traditional:
-                data = data / np.power(0.3048, 3)  # ft3 from m3
+                data /= np.power(0.3048, 3)  # ft3 from m3
 
         # Put back into data format passed in
         if data_type is dict:
             data = dict(zip(data_keys, data))
         elif data_type is list:
             data = list(data)
+        else:
+            return
         return data
 
 

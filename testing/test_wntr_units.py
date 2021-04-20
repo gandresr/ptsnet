@@ -8,7 +8,6 @@ inpfile = '/home/griano/Documents/Github/phammer/example_files/LoopedNet_leak_us
 rptfile = '/home/griano/Documents/Github/phammer/example_files/LoopedNet_leak_us.rpt'
 outfile = '/home/griano/Documents/Github/phammer/example_files/LoopedNet_leak_us.out'
 
-
 wn = wntr.network.WaterNetworkModel(inpfile)
 
 # Getting results from EPANET using WNTR
