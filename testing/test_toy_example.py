@@ -6,15 +6,15 @@ import os
 import pickle
 import matplotlib.pyplot as plt
 import ntpath
-from phammer.simulation.sim import HammerSimulation
+from ptsnet.simulation.sim import PTSNETSimulation
 from time import time
-from phammer.utils.io import get_root_path
+from ptsnet.utils.io import get_root_path
 
 ROOT = get_root_path()
 duration = 25; time_step = 0.01
 inpfile = os.path.join(ROOT, os.pardir, 'example_files', 'Tnet1.inp')
 
-sim = HammerSimulation(
+sim = PTSNETSimulation(
     inpfile = inpfile,
     settings = {
         'time_step' : time_step,

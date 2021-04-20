@@ -7,10 +7,10 @@ import uuid
 import json
 import h5py
 
-from phammer.arrays import Table2D
-from phammer.simulation.constants import MEM_POOL_POINTS, PIPE_START_RESULTS, PIPE_END_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G, COEFF_TOL
+from ptsnet.arrays import Table2D
+from ptsnet.simulation.constants import MEM_POOL_POINTS, PIPE_START_RESULTS, PIPE_END_RESULTS, NODE_RESULTS, POINT_PROPERTIES, G, COEFF_TOL
 from pkg_resources import resource_filename
-from phammer.utils.io import get_root_path, walk
+from ptsnet.utils.io import get_root_path, walk
 
 class StorageManager:
 

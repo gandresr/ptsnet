@@ -1,4 +1,4 @@
-from phammer.simulation.constants import G
+from ptsnet.simulation.constants import G
 import numpy as np
 from time import time
 

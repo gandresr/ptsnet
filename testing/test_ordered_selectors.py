@@ -1,4 +1,4 @@
-from phammer.arrays.selectors import SelectorSet
+from ptsnet.arrays.selectors import SelectorSet
 
 where = SelectorSet(['points', 'nodes'])
 

@@ -1,6 +1,6 @@
 import numpy as np
 from collections import defaultdict as ddict
-from phammer.utils.data import imerge
+from ptsnet.utils.data import imerge
 from pkg_resources import resource_filename
 
 def even(num_points, num_processors):

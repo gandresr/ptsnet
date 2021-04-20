@@ -4,16 +4,16 @@ import pandas as pd
 import wntr
 import tsnet
 
-from phammer.simulation.sim import HammerSimulation
+from ptsnet.simulation.sim import PTSNETSimulation
 from time import time
 
 default_time_step = 0.01
 duration = 50
 
 inpfiles = (
-    '/home/griano/Documents/Github/phammer/example_files/simple_pump.inp',
-    '/home/griano/Documents/Github/phammer/example_files/Tnet1.inp',
-    '/home/griano/Documents/Github/phammer/example_files/Tnet2.inp')
+    '/home/griano/Documents/Github/ptsnet/example_files/simple_pump.inp',
+    '/home/griano/Documents/Github/ptsnet/example_files/Tnet1.inp',
+    '/home/griano/Documents/Github/ptsnet/example_files/Tnet2.inp')
 
 for i, inpfile in enumerate(inpfiles):
     tm = tsnet.network.TransientModel(inpfile)
@@ -35,7 +35,7 @@ for i, inpfile in enumerate(inpfiles):
     tm = tsnet.simulation.MOCSimulator(tm)
     time_step = tm.time_step
 
-    sim = HammerSimulation(
+    sim = PTSNETSimulation(
     inpfile,
     {
         'time_step' : default_time_step,
@@ -69,7 +69,7 @@ for i, inpfile in enumerate(inpfiles):
     if i == 0: # simple_pump.py
         node = tm.get_node('2')
         plt.plot(tm.simulation_timestamps, node.head, label='TSNet')
-        plt.plot(tt, sim.worker.node_results.head['2'], label='phammer')
+        plt.plot(tt, sim.worker.node_results.head['2'], label='ptsnet')
         plt.xlim([tm.simulation_timestamps[0],tm.simulation_timestamps[-1]])
         plt.title('Pressure Head at Node 2')
         plt.xlabel("Time [s]")
@@ -78,7 +78,7 @@ for i, inpfile in enumerate(inpfiles):
         plt.show()
         pipe = tm.get_link('p2')
         plt.plot(tm.simulation_timestamps, pipe.start_node_flowrate, label='TSNet')
-        plt.plot(tt, sim.worker.pipe_start_results.flowrate['p2'], label='phammer')
+        plt.plot(tt, sim.worker.pipe_start_results.flowrate['p2'], label='ptsnet')
         plt.xlim([tm.simulation_timestamps[0],tm.simulation_timestamps[-1]])
         plt.title('Flowrate at pipe p2')
         plt.xlabel("Time [s]")
@@ -88,7 +88,7 @@ for i, inpfile in enumerate(inpfiles):
     elif i == 1:
         node = tm.get_node('N3')
         plt.plot(tm.simulation_timestamps, node.head, label='TSNet')
-        plt.plot(tt, sim.worker.node_results.head['N3'], label='phammer')
+        plt.plot(tt, sim.worker.node_results.head['N3'], label='ptsnet')
         plt.xlim([tm.simulation_timestamps[0],tm.simulation_timestamps[-1]])
         plt.title('Pressure Head at Node N3')
         plt.xlabel("Time [s]")
@@ -97,7 +97,7 @@ for i, inpfile in enumerate(inpfiles):
         plt.show()
         pipe = tm.get_link('P7')
         plt.plot(tm.simulation_timestamps, pipe.end_node_flowrate, label='TSNet')
-        plt.plot(tt, sim.worker.pipe_end_results.flowrate['P7'], label='phammer')
+        plt.plot(tt, sim.worker.pipe_end_results.flowrate['P7'], label='ptsnet')
         plt.xlim([tm.simulation_timestamps[0],tm.simulation_timestamps[-1]])
         plt.title('Flowrate at pipe P7')
         plt.xlabel("Time [s]")
@@ -107,7 +107,7 @@ for i, inpfile in enumerate(inpfiles):
     elif i == 2:
         node = tm.get_node('JUNCTION-105')
         plt.plot(tm.simulation_timestamps, node.head, label='TSNet')
-        plt.plot(tt, sim.worker.node_results.head['JUNCTION-105'], label='phammer')
+        plt.plot(tt, sim.worker.node_results.head['JUNCTION-105'], label='ptsnet')
         plt.xlim([tm.simulation_timestamps[0],tm.simulation_timestamps[-1]])
         plt.title('Pressure Head at Node JUNCTION-105')
         plt.xlabel("Time [s]")
@@ -116,7 +116,7 @@ for i, inpfile in enumerate(inpfiles):
         plt.show()
         pipe = tm.get_link('PIPE-109')
         plt.plot(tm.simulation_timestamps, pipe.end_node_flowrate, label='TSNet')
-        plt.plot(tt, sim.worker.pipe_end_results.flowrate['PIPE-109'], label='phammer')
+        plt.plot(tt, sim.worker.pipe_end_results.flowrate['PIPE-109'], label='ptsnet')
         plt.xlim([tm.simulation_timestamps[0],tm.simulation_timestamps[-1]])
         plt.title('Flowrate at pipe PIPE-109')
         plt.xlabel("Time [s]")

@@ -1,6 +1,6 @@
 from time import time
 from mpi4py import MPI
-from phammer.parallel.comm import exchange_point_data
+from ptsnet.parallel.comm import exchange_point_data
 import numpy as np
 
 comm = MPI.COMM_WORLD

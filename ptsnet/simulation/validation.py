@@ -1,7 +1,7 @@
 import numpy as np
 
-from phammer.epanet.util import EN
-from phammer.simulation.constants import TOL
+from ptsnet.epanet.util import EN
+from ptsnet.simulation.constants import TOL
 
 class ModelError(Exception):
     pass

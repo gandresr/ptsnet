@@ -4,8 +4,8 @@ for i in range(1,1001):
     with open('sjob_%d.sh' % i, 'w') as f:
         x = '''#!/bin/bash
 
-#SBATCH -J tphammer{p}     # job name
-#SBATCH -o tphammer{p}.o%j # output and error file name (%j expands to j$
+#SBATCH -J tptsnet{p}     # job name
+#SBATCH -o tptsnet{p}.o%j # output and error file name (%j expands to j$
 #SBATCH -N {nodes}               # number of nodes requested
 #SBATCH -n {p}                # total number of mpi tasks requested
 #SBATCH -p normal           # queue (partition) -- normal, developmen$

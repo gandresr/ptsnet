@@ -3,14 +3,14 @@ import numpy as np
 import pandas as pd
 import wntr
 
-from phammer.simulation.sim import HammerSimulation
-from phammer.parallel.partitioning import even
+from ptsnet.simulation.sim import PTSNETSimulation
+from ptsnet.parallel.partitioning import even
 from time import time
 
 duration = 200; time_step = 1
-inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet_valve.inp'
+inpfile = '/home/watsup/Documents/Github/ptsnet/example_files/LoopedNet_valve.inp'
 
-sim = HammerSimulation(
+sim = PTSNETSimulation(
     inpfile,
     {
         'time_step' : time_step,

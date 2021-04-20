@@ -7,7 +7,7 @@ def run_shell(command):
 
 def get_root_path():
     rpath = resource_filename(__name__, '')
-    token = 'phammer'
+    token = 'ptsnet'
     idx = rpath.rfind(token)
     return rpath[:idx+len(token)]
 

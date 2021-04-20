@@ -1,5 +1,5 @@
 # from mpi4py import MPI
-import wntr, phammer
+import wntr, ptsnet
 print('hey')
 from mpi4py import MPI
 print('hey2')

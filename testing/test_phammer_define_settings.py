@@ -1,14 +1,14 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from phammer.simulation.sim import HammerSimulation
+from ptsnet.simulation.sim import PTSNETSimulation
 
 from time import time
 
 duration = 0.5; time_step = 0.01
-inpfile = '/home/watsup/Documents/Github/phammer/example_files/PHFC_SIM_17_4_13.inp'
+inpfile = '/home/watsup/Documents/Github/ptsnet/example_files/PHFC_SIM_17_4_13.inp'
 
-sim = HammerSimulation(inpfile, {
+sim = PTSNETSimulation(inpfile, {
     'time_step' : time_step,
     'duration' : duration
 })

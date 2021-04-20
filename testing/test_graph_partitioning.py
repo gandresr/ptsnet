@@ -3,18 +3,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from time import time
-from phammer.partitioning.network import get_denser_graph
-from phammer.simulation.sim import HammerSimulation
+from ptsnet.partitioning.network import get_denser_graph
+from ptsnet.simulation.sim import PTSNETSimulation
 
-inpfile = '/home/watsup/Documents/Github/phammer/example_files/PHFC_SIM_17_4_13.inp'
+inpfile = '/home/watsup/Documents/Github/ptsnet/example_files/PHFC_SIM_17_4_13.inp'
 duration = 1; time_step = 0.01
 
 t = time()
-sim = HammerSimulation(inpfile, {
+sim = PTSNETSimulation(inpfile, {
     'time_step' : time_step,
     'duration' : duration # TODO change only data structures affected by the change
 })
-print('HammerSimulation', time() - t)
+print('PTSNETSimulation', time() - t)
 
 t = time()
 sim.set_wave_speeds(1200)

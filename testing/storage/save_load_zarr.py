@@ -2,7 +2,7 @@ import numpy as np
 import os
 import zarr
 
-from phammer.arrays import ZarrArray
+from ptsnet.arrays import ZarrArray
 from mpi4py import MPI
 
 comm = MPI.COMM_WORLD

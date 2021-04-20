@@ -2,7 +2,7 @@ from mpi4py import MPI
 import wntr
 import numpy as np
 import pickle
-from phammer.utils.io import get_root_path
+from ptsnet.utils.io import get_root_path
 
 comm = MPI.COMM_WORLD
 rank = comm.rank

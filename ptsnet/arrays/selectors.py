@@ -1,6 +1,6 @@
 import numpy as np
 
-from phammer.arrays import Row
+from ptsnet.arrays import Row
 
 class SelectorList:
     '''

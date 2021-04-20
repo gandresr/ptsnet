@@ -2,8 +2,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
 
-from phammer.partitioning.network import export_graph
-from phammer.partitioning.partitioning import define_partitions
+from ptsnet.partitioning.network import export_graph
+from ptsnet.partitioning.partitioning import define_partitions
 
 G = nx.Graph()
 G.add_edge('0', '1')
@@ -16,7 +16,7 @@ G.add_edge('N', '6')
 G.add_edge('6', '7')
 G.add_edge('7', '8')
 
-graph_file = '/home/watsup/Documents/Github/phammer/testing/results/test_graph'
+graph_file = '/home/watsup/Documents/Github/ptsnet/testing/results/test_graph'
 nodes = np.array(['0', '1', '2', '3', '4', '5', '6', '7', '8', 'N'])
 labels = np.arange(len(nodes))
 index = {nodes[i] : i+1 for i in labels}

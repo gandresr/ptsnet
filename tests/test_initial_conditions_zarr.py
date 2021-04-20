@@ -2,9 +2,9 @@ import wntr
 import numpy as np
 import matplotlib.pyplot as plt
 
-from phammer.simulation.sim import HammerSimulation
+from ptsnet.simulation.sim import PTSNETSimulation
 
-sim = HammerSimulation()
+sim = PTSNETSimulation()
 
 s_pipes = list(map(str, sim['pipe.start'].labels.values()))
 e_pipes = list(map(str, sim['pipe.end'].labels.values()))

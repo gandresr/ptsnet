@@ -3,14 +3,14 @@ import numpy as np
 import pandas as pd
 import wntr
 
-from phammer.simulation.sim import HammerSimulation
+from ptsnet.simulation.sim import PTSNETSimulation
 from time import time
 from os import getcwd
 
 duration = 200; time_step = 1
 inpfile = getcwd() + '/example_files/LoopedNet_valve.inp'
 
-sim = HammerSimulation(
+sim = PTSNETSimulation(
     inpfile,
     {
         'time_step' : time_step,

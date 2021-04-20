@@ -2,7 +2,7 @@ import os
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
-from phammer.arrays import Table, Table2D
+from ptsnet.arrays import Table, Table2D
 
 folders = os.listdir(os.getcwd())
 p = []
@@ -109,7 +109,7 @@ plt.show()
 # files = os.listdir()
 # size_of_problem = {}
 # for file in files:
-#     if 'test_phammer.o' in file:
+#     if 'test_ptsnet.o' in file:
 #         extra_points = []
 #         with open(file, 'r') as f:
 #             for line in f:

@@ -1,7 +1,7 @@
 import numpy as np
 
 from collections import namedtuple
-from phammer.utils.data import is_array
+from ptsnet.utils.data import is_array
 from functools import lru_cache
 from h5py import Dataset
 

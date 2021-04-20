@@ -4,20 +4,20 @@ import os
 from tqdm import tqdm
 from collections import deque as dq
 from pkg_resources import resource_filename
-from phammer.arrays import ObjArray, Table2D
-from phammer.simulation.constants import COEFF_TOL, STEP_JOBS, INIT_JOBS, COMM_JOBS
-from phammer.epanet.util import EN
-from phammer.utils.data import define_curve, is_array
-from phammer.utils.io import run_shell, get_root_path
-from phammer.simulation.init import Initializator
-from phammer.parallel.comm import CommManager
-from phammer.parallel.worker import Worker
-from phammer.results.storage import StorageManager
-from phammer.results.workspaces import new_workspace_name, list_workspaces, num_workspaces
-from phammer.simulation.constants import NODE_RESULTS, PIPE_END_RESULTS, PIPE_START_RESULTS
-from phammer.profiler import Profiler
+from ptsnet.arrays import ObjArray, Table2D
+from ptsnet.simulation.constants import COEFF_TOL, STEP_JOBS, INIT_JOBS, COMM_JOBS
+from ptsnet.epanet.util import EN
+from ptsnet.utils.data import define_curve, is_array
+from ptsnet.utils.io import run_shell, get_root_path
+from ptsnet.simulation.init import Initializator
+from ptsnet.parallel.comm import CommManager
+from ptsnet.parallel.worker import Worker
+from ptsnet.results.storage import StorageManager
+from ptsnet.results.workspaces import new_workspace_name, list_workspaces, num_workspaces
+from ptsnet.simulation.constants import NODE_RESULTS, PIPE_END_RESULTS, PIPE_START_RESULTS
+from ptsnet.profiler import Profiler
 
-class HammerSettings:
+class PTSNETSettings:
     def __init__(self,
         time_step : float = 0.01,
         duration: float = 20,
@@ -96,7 +96,7 @@ class HammerSettings:
             l[setting] = val
         return l
 
-class HammerCurve:
+class PTSNETCurve:
     CURVE_TYPES = ('valve', 'pump',)
     def __init__(self, X, Y, type_):
         self.elements = []
@@ -178,7 +178,7 @@ class ElementSettings:
             self.activation_indices = dq(self.activation_indices)
         self.is_sorted = True
 
-class HammerSimulation:
+class PTSNETSimulation:
 
     SETTING_TYPES = {
         'valve' : 'valve',
@@ -191,7 +191,7 @@ class HammerSimulation:
         ### Persistance ----------------------------
         if inpfile == None:
             self.router = CommManager()
-            self.settings = HammerSettings()
+            self.settings = PTSNETSettings()
             self.settings.active_persistance = True
             self.results = {}
             self.init_on = init_on
@@ -204,7 +204,7 @@ class HammerSimulation:
         ### New Sim --------------------------------
         if type(settings) != dict:
             raise TypeError("'settings' are not properly defined, use dict object")
-        self.settings = HammerSettings(**settings, _super=self)
+        self.settings = PTSNETSettings(**settings, _super=self)
         self.initializator = Initializator(
             inpfile,
             period = self.settings.period,
@@ -246,7 +246,7 @@ class HammerSimulation:
         self.save_sim_data()
 
     def __repr__(self):
-        return "HammerSimulation <duration = %d [s] | time_steps = %d | num_points = %s>" % \
+        return "PTSNETSimulation <duration = %d [s] | time_steps = %d | num_points = %s>" % \
             (self.settings.duration, self.settings.time_steps, format(self.settings.num_points, ',d'))
 
     def __getitem__(self, index):
@@ -311,7 +311,7 @@ class HammerSimulation:
     def add_curve(self, curve_name, type_, X, Y):
         if len(self.ic[type_].labels) == 0:
             raise ValueError("There are not elements of type '" + type_ + "' in the model")
-        self.curves[curve_name] = HammerCurve(X, Y, type_)
+        self.curves[curve_name] = PTSNETCurve(X, Y, type_)
 
     def assign_curve_to(self, curve_name, elements):
         if type(elements) == str:

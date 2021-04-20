@@ -2,14 +2,14 @@ import os
 import numpy as np
 
 from wntr.epanet.io import InpFile
-from phammer.arrays import Table
-from phammer.epanet.toolkit import ENepanet
-from phammer.epanet.util import EN, FlowUnits, HydParam, to_si
-from phammer.simulation.constants import G, TOL, FLOOR_FFACTOR, CEIL_FFACTOR, DEFAULT_FFACTOR
-from phammer.simulation.constants import NODE_PROPERTIES, PIPE_PROPERTIES, PUMP_PROPERTIES, VALVE_PROPERTIES
-from phammer.simulation.validation import check_compatibility
-from phammer.arrays.selectors import SelectorSet
-from phammer.utils.data import imerge
+from ptsnet.arrays import Table
+from ptsnet.epanet.toolkit import ENepanet
+from ptsnet.epanet.util import EN, FlowUnits, HydParam, to_si
+from ptsnet.simulation.constants import G, TOL, FLOOR_FFACTOR, CEIL_FFACTOR, DEFAULT_FFACTOR
+from ptsnet.simulation.constants import NODE_PROPERTIES, PIPE_PROPERTIES, PUMP_PROPERTIES, VALVE_PROPERTIES
+from ptsnet.simulation.validation import check_compatibility
+from ptsnet.arrays.selectors import SelectorSet
+from ptsnet.utils.data import imerge
 
 from time import time
 

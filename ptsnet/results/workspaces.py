@@ -4,10 +4,10 @@ import pickle
 import pathlib
 
 from datetime import datetime
-from phammer.utils.io import get_root_path, walk
+from ptsnet.utils.io import get_root_path, walk
 from pkg_resources import resource_filename
-from phammer.results.storage import StorageManager
-from phammer.utils.data import is_array
+from ptsnet.results.storage import StorageManager
+from ptsnet.utils.data import is_array
 
 def delete_all_workspaces():
     confirmation = None

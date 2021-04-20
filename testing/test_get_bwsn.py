@@ -4,13 +4,13 @@ import pandas as pd
 import wntr
 #import tsnet
 
-from phammer.simulation.sim import HammerSimulation
+from ptsnet.simulation.sim import PTSNETSimulation
 from time import time
 
 duration = 0.00048259999999999997*3; time_step = 1
-inpfile = '/home/gr24269/Documents/Github/phammer/example_files/BWSN1.inp'
+inpfile = '/home/gr24269/Documents/Github/ptsnet/example_files/BWSN1.inp'
 
-sim = HammerSimulation(
+sim = PTSNETSimulation(
     inpfile,
     {
         'time_step' : time_step,
