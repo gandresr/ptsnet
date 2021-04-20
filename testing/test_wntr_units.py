@@ -2,11 +2,11 @@ import wntr
 from wntr.epanet.toolkit import ENepanet
 from wntr.epanet.util import EN, FlowUnits, HydParam, to_si
 
-from phammer.simulation.ic import get_initial_conditions
+from phammer.simulation.init import get_initial_conditions
 
-inpfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet_leak_us.inp'
-rptfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet_leak_us.rpt'
-outfile = '/home/watsup/Documents/Github/phammer/example_files/LoopedNet_leak_us.out'
+inpfile = '/home/griano/Documents/Github/phammer/example_files/LoopedNet_leak_us.inp'
+rptfile = '/home/griano/Documents/Github/phammer/example_files/LoopedNet_leak_us.rpt'
+outfile = '/home/griano/Documents/Github/phammer/example_files/LoopedNet_leak_us.out'
 
 
 wn = wntr.network.WaterNetworkModel(inpfile)
