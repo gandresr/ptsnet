@@ -10,7 +10,6 @@ dist
 *.pyc
 *.ipynb
 *.mesh
-*.png
 *.egg-info
 *.sim
 *temp
