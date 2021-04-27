@@ -84,7 +84,7 @@ To get a local copy up and running follow these simple steps. PTSNET can be down
 
 ### Prerequisites
 
-We recommend using a conda environment for the installation
+We highly encourage using a conda environment for the installation
 
 * Install conda
 
@@ -96,14 +96,39 @@ We recommend using a conda environment for the installation
   # Windows
   https://conda.io/projects/conda/en/latest/user-guide/install/windows.html
   ```
-* Create a conda environment
+* Basic dependencies
 
   ```sh
   # Open the shell and type
   conda init
-  conda create -n ptsnet python=3
+  conda create -n ptsnet python=3.6 # create conda environment
+  conda activate ptsnet
+  conda install numpy matplotlib pandas scipy
+  conda install -c conda-forge tqdm
+  conda install -c conda-forge wntr
   ```
 
+* Dependencies for parallelization
+  ```sh
+  conda install openmpi
+  conda install openmpi-mpicc
+  conda install -c conda-forge mpi4py
+
+  # Install parallel HDF5
+  wget https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar
+  tar xvf hdf5-1.10.5.tar
+  cd hdf5-1.10.5
+  ./configure --enable-shared --enable-parallel CC=mpicc MPICCc=mpiccmake
+  make install
+
+  # Install h5py
+  CC="mpicc" HDF5_MPI="ON" HDF5_DIR=/path/to/parallel-hdf5 pip install --no-binary=h5py h5py
+  ```
+
+* Install ptsnet
+  ```sh
+  pip install ptsnet
+  ```
 ### Installation
 
 1. Clone the repo
