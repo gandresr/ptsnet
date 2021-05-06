@@ -11,7 +11,7 @@
 <br />
 <p align="center">
   <a href="https://github.com/gandresr/PTSNET">
-    <img src="https://github.com/gandresr/PTSNET/raw/development/docs/ptsnet_logo.png" alt="Logo" width="650" height="100">
+    <img src="https://github.com/gandresr/PTSNET/raw/development/docs/images/ptsnet_logo.png" alt="Logo" width="650" height="100">
   </a>
 
 
