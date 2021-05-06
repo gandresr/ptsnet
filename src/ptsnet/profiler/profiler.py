@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from time import time, clock
+from time import time
 from ptsnet.arrays import Table
 from ptsnet.simulation.constants import COEFF_TOL, STEP_JOBS, INIT_JOBS, COMM_JOBS
 
@@ -13,7 +13,7 @@ class Job:
         self.label = label
 
     def restart(self):
-        self.start_time = clock()
+        self.start_time = time()
         if len(self.time_stamps) % 2 != 0:
             self.time_stamps[-1] = self.start_time
         else:
@@ -21,7 +21,7 @@ class Job:
 
     def stop(self):
         if len(self.time_stamps) % 2 != 0:
-            self.end_time = clock()
+            self.end_time = time()
             self.time_stamps.append(self.end_time)
 
     @property
