@@ -11,6 +11,15 @@ def get_root_path():
     idx = rpath.rfind(token)
     return rpath[:idx+len(token)]
 
+def get_examples_path():
+    return os.path.join(get_root_path(), 'examples')
+
+def get_example_path(example_name):
+    ename = example_name
+    if not example_name.lower().endswith('.inp'):
+        ename += '.inp'
+    return os.path.join(get_examples_path(), ename)
+
 def walk(folder_structure, root_path):
     paths = []
 
