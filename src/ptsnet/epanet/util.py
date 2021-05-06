@@ -553,6 +553,8 @@ class HydParam(enum.Enum):
             data = dict(zip(data_keys, data))
         elif data_type is list:
             data = list(data)
+        elif data_type is float:
+            return data
         else:
             return
         return data
@@ -639,6 +641,8 @@ class HydParam(enum.Enum):
             data = dict(zip(data_keys, data))
         elif data_type is list:
             data = list(data)
+        elif data_type is float:
+            return data
         else:
             return
         return data
