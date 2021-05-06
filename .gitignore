@@ -1,6 +1,8 @@
 __pycache__
 build
 dist
+local
+
 .*/
 !/.gitignore
 *.bin
@@ -12,6 +14,7 @@ dist
 *.mesh
 *.egg-info
 *.sim
+
 *temp
 *workspaces
 *.pickle
