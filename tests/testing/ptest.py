@@ -1,3 +1,0 @@
-import wntr
-
-print(wntr)
