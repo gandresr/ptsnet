@@ -101,4 +101,4 @@ def check_compatibility(wn, ic):
     # Valves cannot have zero head_loss if initial flow is not zero
     non_zero_flow_valves = np.where((ic['valve'].flowrate != 0) & (ic['valve'].head_loss < TOL))[0]
     if len(non_zero_flow_valves) > 0:
-        raise ModelError("valves ['" + "', '".join(ic['valve'].labels[non_zero_flow_valves]) + "'] cannot have zero loss coefficient")
+        raise ModelError("valves ['" + "', '".join(ic['valve'].labels[non_zero_flow_valves]) + "'] cannot have zero (near-zero) loss coefficient")

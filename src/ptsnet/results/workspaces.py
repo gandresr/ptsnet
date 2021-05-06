@@ -79,9 +79,6 @@ def delete_workspace(workspace_id, full_path=True):
         else:
             os.remove(apath)
 
-
-
-
 def list_workspaces():
     wps = [d for d in os.listdir(os.path.join(get_root_path(), 'workspaces')) if '.' not in d]
     # workspace code starts with 'W' and then is followed by a number
