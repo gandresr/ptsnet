@@ -188,6 +188,10 @@ class PTSNETSimulation:
     }
 
     def __init__(self, workspace_id = None, inpfile = None, settings = None, default_wave_speed = None, wave_speed_file = None, delimiter = ',', wave_speed_method = 'critical', init_on = False):
+        # Make sure that workspace folder exists
+        ws_path = os.path.join(get_root_path(), 'workspaces')
+        if not os.path.exists(ws_path):
+            os.mkdir(ws_path)
         ### Persistance ----------------------------
         if inpfile == None:
             self.router = CommManager()
