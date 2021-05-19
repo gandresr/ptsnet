@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-from ptsnet.simulation import PTSNETSimulation
+from ptsnet.simulation.sim import PTSNETSimulation
 from ptsnet.utils.io import get_example_path
 
 def test_initial_conditions():
