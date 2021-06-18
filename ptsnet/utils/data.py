@@ -7,7 +7,7 @@ def define_curve(X, Y):
     return lambda x : splev(x, spl)
 
 def is_array(x):
-    return type(x) != str and hasattr(x, "__iter__")
+    return (not type(x) in (str, np.str_)) and hasattr(x, "__iter__")
 
 def imerge(A, B):
     d1 = len(A)
