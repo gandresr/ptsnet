@@ -91,22 +91,22 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
 
 def run_valve_step(Q1, H1, Cp, Bp, Cm, Bm, setting, coeff, area, where):
     # --- End valves
-    ll = len(where.points['are_single_valve',])
+    ll = len(where.points['single_valve',])
     if ll > 0:
         K0 = np.zeros(ll)
-        for i in where.points['are_single_valve',]:
+        for i in where.points['single_valve',]:
             K0[i] = setting[i] * coeff[i] * area[i]
-        for i, j in enumerate(where.points['are_single_valve']):
+        for i, j in enumerate(where.points['single_valve']):
             K = 2*G*(Bp[j] * K0[i])**2
             H1[j] = ((2*Cp[j] + K) - np.sqrt((2*Cp[j] + K)**2 - 4*Cp[j]**2)) / 2
             Q1[j] = K0[i] * np.sqrt(2 * G * H1[j])
 
     # --- Inline valves
-    ll = len(where.points['start_inline_valve'])
+    ll = len(where.points['start_valve'])
     if ll > 0:
-        for i, h in enumerate(where.points['start_inline_valve',]):
-            j = where.points['start_inline_valve'][i]
-            k = where.points['end_inline_valve'][i]
+        for i, h in enumerate(where.points['start_valve',]):
+            j = where.points['start_valve'][i]
+            k = where.points['end_valve'][i]
 
             S = np.sign(Cp[j] - Cm[k])
             CV = 2 * G * (setting[h] * coeff[h] * area[h]) ** 2
@@ -117,10 +117,10 @@ def run_valve_step(Q1, H1, Cp, Bp, Cm, Bm, setting, coeff, area, where):
             H1[k] = Cm[k] + Bm[k]*Q1[j]
 
 def run_pump_step(source_head, Q1, H1, Cp, Bp, Cm, Bm, a1, a2, Hs, setting, where):
-    ll = len(where.points['are_single_pump'])
+    ll = len(where.points['single_pump'])
     if ll > 0:
-        for i, j in enumerate(where.points['are_single_pump',]):
-            k = where.points['are_single_pump'][i]
+        for i, j in enumerate(where.points['single_pump',]):
+            k = where.points['single_pump'][i]
             BP = 0
             A = a2[j]
             B = a1[j]*setting[j] - Bm[k] - BP
@@ -136,11 +136,11 @@ def run_pump_step(source_head, Q1, H1, Cp, Bp, Cm, Bm, a1, a2, Hs, setting, wher
 
             H1[k] =  source_head[j] + hp
 
-    ll = len(where.points['start_inline_pump'])
+    ll = len(where.points['start_pump'])
     if ll > 0:
-        for i, h in enumerate(where.points['start_inline_pump',]):
-            j = where.points['start_inline_pump'][i]
-            k = where.points['end_inline_pump'][i]
+        for i, h in enumerate(where.points['start_pump',]):
+            j = where.points['start_pump'][i]
+            k = where.points['end_pump'][i]
 
             alpha = setting[h]
             A = a2[h]

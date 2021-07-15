@@ -1,6 +1,7 @@
 from ptsnet.simulation.constants import G
 import numpy as np
 from time import time
+from scipy import optimize
 
 # ------------------ SIM STEPS ------------------
 
@@ -73,74 +74,135 @@ def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
 
 def run_valve_step(Q1, H1, Cp, Bp, Cm, Bm, setting, coeff, area, where):
     # --- End valves
-    if len(where.points['are_single_valve',]) > 0:
-        K0 = setting[where.points['are_single_valve',]] \
-            * coeff[where.points['are_single_valve',]] \
-                * area[where.points['are_single_valve',]]
-        K = 2*G*(Bp[where.points['are_single_valve']] * K0)**2
-        Cp_end = Cp[where.points['are_single_valve']]
+    if len(where.points['single_valve',]) > 0:
+        K0 = setting[where.points['single_valve',]] \
+            * coeff[where.points['single_valve',]] \
+                * area[where.points['single_valve',]] # C = K*sqrt(2g \Delta H)
+        K = 2*G*(Bp[where.points['single_valve']] * K0)**2
+        Cp_end = Cp[where.points['single_valve']]
 
-        H1[where.points['are_single_valve']] =  \
+        H1[where.points['single_valve']] =  \
             ((2*Cp_end + K) - np.sqrt((2*Cp_end + K)**2 - 4*Cp_end**2)) / 2
 
-        Q1[where.points['are_single_valve']] = K0 * np.sqrt(2 * G * H1[where.points['are_single_valve']])
+        Q1[where.points['single_valve']] = K0 * np.sqrt(2 * G * H1[where.points['single_valve']])
 
     # --- Inline valves
-    if len(where.points['start_inline_valve']) > 0:
-        CM = Cm[where.points['end_inline_valve']]
-        BM = Bm[where.points['end_inline_valve']]
-        CP = Cp[where.points['start_inline_valve']]
-        BP = Bp[where.points['start_inline_valve']]
+    if len(where.points['start_valve']) > 0:
+        CM = Cm[where.points['end_valve']]
+        BM = Bm[where.points['end_valve']]
+        CP = Cp[where.points['start_valve']]
+        BP = Bp[where.points['start_valve']]
 
         S = np.sign(CP - CM)
-        CV = 2 * G * (setting[where.points['start_inline_valve',]] \
-            * coeff[where.points['start_inline_valve',]] \
-                * area[where.points['start_inline_valve',]]) ** 2
+        CV = 2 * G * (setting[where.points['start_valve',]] \
+            * coeff[where.points['start_valve',]] \
+                * area[where.points['start_valve',]]) ** 2
         X = CV * (BP + BM)
-        Q1[where.points['start_inline_valve']] = (-S*X + S*np.sqrt(X**2 + S*4*CV*(CP - CM)))/2
-        Q1[where.points['end_inline_valve']] = Q1[where.points['start_inline_valve']]
-        H1[where.points['start_inline_valve']] = CP - BP*Q1[where.points['start_inline_valve']]
-        H1[where.points['end_inline_valve']] = CM + BM*Q1[where.points['start_inline_valve']]
+        Q1[where.points['start_valve']] = (-S*X + S*np.sqrt(X**2 + S*4*CV*(CP - CM)))/2
+        Q1[where.points['end_valve']] = Q1[where.points['start_valve']]
+        H1[where.points['start_valve']] = CP - BP*Q1[where.points['start_valve']]
+        H1[where.points['end_valve']] = CM + BM*Q1[where.points['start_valve']]
 
 def run_pump_step(source_head, Q1, H1, Cp, Bp, Cm, Bm, a1, a2, Hs, setting, where):
-    if len(where.points['are_single_pump']) > 0:
-        CP = source_head[where.points['are_single_pump',]]
-        BP = np.zeros(len(where.points['are_single_pump']))
-        CM = Cm[where.points['are_single_pump']]
-        BM = Bm[where.points['are_single_pump']]
+    if len(where.points['single_pump']) > 0:
+        CP = source_head[where.points['single_pump',]]
+        BP = np.zeros(len(where.points['single_pump']))
+        CM = Cm[where.points['single_pump']]
+        BM = Bm[where.points['single_pump']]
 
-        alpha = setting[where.points['are_single_pump',]]
-        A = a2[where.points['are_single_pump',]]
-        B = a1[where.points['are_single_pump',]]*alpha - BM - BP
-        C = Hs[where.points['are_single_pump',]]*alpha**2 - CM + CP
-
-        root = B ** 2 - 4 * A * C; root[root < 0] = 0
-        Q = (-B - np.sqrt(root)) / (2*A); Q[Q < 0] = 0
-        Q1[where.points['are_single_pump']] = Q
-
-        hp = a2[where.points['are_single_pump',]] * Q**2 + a1[where.points['are_single_pump',]]*alpha * Q + \
-            Hs[where.points['are_single_pump',]]*alpha**2
-
-        H1[where.points['are_single_pump']] =  CP + hp
-
-    if len(where.points['start_inline_pump']) > 0:
-        CP = Cp[where.points['start_inline_pump']]
-        BP = Bp[where.points['start_inline_pump']]
-        CM = Cm[where.points['end_inline_pump']]
-        BM = Bm[where.points['end_inline_pump']]
-
-        alpha = setting[where.points['start_inline_pump',]]
-        A = a2[where.points['start_inline_pump',]]
-        B = a1[where.points['start_inline_pump',]]*alpha - BM - BP
-        C = Hs[where.points['start_inline_pump',]]*alpha**2 - CM + CP
+        alpha = setting[where.points['single_pump',]]
+        A = a2[where.points['single_pump',]]
+        B = a1[where.points['single_pump',]]*alpha - BM - BP
+        C = Hs[where.points['single_pump',]]*alpha**2 - CM + CP
 
         root = B ** 2 - 4 * A * C; root[root < 0] = 0
         Q = (-B - np.sqrt(root)) / (2*A); Q[Q < 0] = 0
-        Q1[where.points['start_inline_pump']] = Q
-        Q1[where.points['end_inline_pump']] = Q
+        Q1[where.points['single_pump']] = Q
 
-        hp = a2[where.points['start_inline_pump',]] * Q**2 + a1[where.points['start_inline_pump',]]*alpha * Q + \
-            Hs[where.points['start_inline_pump',]]*alpha**2
+        hp = a2[where.points['single_pump',]] * Q**2 + a1[where.points['single_pump',]]*alpha * Q + \
+            Hs[where.points['single_pump',]]*alpha**2
 
-        H1[where.points['start_inline_pump']] =  CP - BP * Q
-        H1[where.points['end_inline_pump']] =  H1[where.points['start_inline_pump']] + hp
+        H1[where.points['single_pump']] =  CP + hp
+
+    if len(where.points['start_pump']) > 0:
+        CP = Cp[where.points['start_pump']]
+        BP = Bp[where.points['start_pump']]
+        CM = Cm[where.points['end_pump']]
+        BM = Bm[where.points['end_pump']]
+
+        alpha = setting[where.points['start_pump',]]
+        A = a2[where.points['start_pump',]]
+        B = a1[where.points['start_pump',]]*alpha - BM - BP
+        C = Hs[where.points['start_pump',]]*alpha**2 - CM + CP
+
+        root = B ** 2 - 4 * A * C; root[root < 0] = 0
+        Q = (-B - np.sqrt(root)) / (2*A); Q[Q < 0] = 0
+        Q1[where.points['start_pump']] = Q
+        Q1[where.points['end_pump']] = Q
+
+        hp = a2[where.points['start_pump',]] * Q**2 + a1[where.points['start_pump',]]*alpha * Q + \
+            Hs[where.points['start_pump',]]*alpha**2
+
+        H1[where.points['start_pump']] =  CP - BP * Q
+        H1[where.points['end_pump']] =  H1[where.points['start_pump']] + hp
+        H1[where.points['end_pump']] =  CM + BM * Q1[where.points['end_pump']]
+
+def tflow(QT1, QT0, CP, CM, BM, BP, HT0, tau, aT, VA0, C):
+    CC = CP + CM # Cp/Bp + Cm/Bm
+    BB = BM + BP # 1/Bp + 1/Bm
+    Hb = 10.3 # Barometric pressure
+    k = 0 # air-chamber orifice head loss coefficient
+    m = 1.2 # gas exponent
+    return ((CC - QT1)/BB + Hb - (HT0 + tau*(QT1+QT0)/(2*aT))-k*QT1*abs(QT1))* \
+        (VA0 - aT*((QT1+QT0)*tau/(2*aT)))**m - C
+
+def tflow_prime(QT1, QT0, CP, CM, BM, BP, HT0, tau, aT, VA0, C):
+    CC = CP + CM # Cp/Bp + Cm/Bm
+    BB = BM + BP # 1/Bp + 1/Bm
+    Hb = 10.3 # Barometric pressure
+    k = 0 # air-chamber orifice head loss coefficient
+    m = 1.2 # gas exponent
+    p1 = (-m*aT/(2 * aT/tau) * (VA0 - (QT0+QT1)*aT/(2 * aT/tau))**(m-1)* \
+            ((CC-QT1)/BB + Hb - HT0 - (QT0+QT1)/(2 * aT/tau) - k*QT1*np.abs(QT1)))
+    p2 = (-1/BB -1/(2 * aT/tau) - k*2.*QT1*np.sign(QT1)) * \
+            (VA0 - (QT0+QT1)*aT/(2 * aT/tau))**m
+    return p1+p2
+
+def run_open_protections(H0, H1, Q1, QT, aT, Cp, Bp, Cm, Bm, tau, where):
+
+    CP = Cp[where.points['start_open_protection']]
+    BP = Bp[where.points['start_open_protection']]
+    CM = Cm[where.points['end_open_protection']]
+    BM = Bm[where.points['end_open_protection']]
+    CC = CP + CM # Cp/Bp + Cm/Bm
+    BB = BM + BP # 1/Bp + 1/Bm
+
+    H1[where.points['start_open_protection']] = \
+        (CC + QT + (2*aT*H0[where.points['start_open_protection']]/tau)) / (BB + (2*aT/tau))
+    H1[where.points['end_open_protection']] = H1[where.points['start_open_protection']]
+    Q1[where.points['start_open_protection']] = CP - H1[where.points['start_open_protection']]*BP
+    Q1[where.points['end_open_protection']] = H1[where.points['end_open_protection']]*BM - CM
+    QT = Q1[where.points['start_open_protection']] - Q1[where.points['end_open_protection']]
+
+def run_closed_protections(H0, H1, Q1, QT0, QT1, HT0, HT1, VA, htank, aT, Cp, Bp, Cm, Bm, tau, C, where):
+
+    CP = Cp[where.points['start_closed_protection']]
+    BP = Bp[where.points['start_closed_protection']]
+    CM = Cm[where.points['end_closed_protection']]
+    BM = Bm[where.points['end_closed_protection']]
+    CC = CP + CM # Cp/Bp + Cm/Bm
+    BB = BM + BP # 1/Bp + 1/Bm
+
+    QT1 = optimize.newton(
+            tflow, QT0, fprime=tflow_prime,
+        args =
+            ( QT0, CP, CM, BM, BP, HT0, tau, aT, VA, C), tol=1e-10)
+
+    HT1 = HT0 + (QT0+QT1)/(2 * aT/tau)
+    H1[where.points['start_closed_protection']] = (CC - QT1)/BB
+    H1[where.points['end_closed_protection']] = H1[where.points['start_closed_protection']]
+    Q1[where.points['start_closed_protection']] = CP - H1[where.points['start_closed_protection']]*BP
+    Q1[where.points['end_closed_protection']] = H1[where.points['end_closed_protection']]*BM - CM
+    VA = (htank - HT1) * aT
+    HT0 = HT1
+    QT0 = QT1

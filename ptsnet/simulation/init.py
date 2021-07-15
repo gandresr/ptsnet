@@ -6,7 +6,7 @@ from ptsnet.arrays import Table
 from ptsnet.epanet.toolkit import ENepanet
 from ptsnet.epanet.util import EN, FlowUnits, HydParam, to_si
 from ptsnet.simulation.constants import G, TOL, FLOOR_FFACTOR, CEIL_FFACTOR, DEFAULT_FFACTOR
-from ptsnet.simulation.constants import NODE_PROPERTIES, PIPE_PROPERTIES, PUMP_PROPERTIES, VALVE_PROPERTIES
+from ptsnet.simulation.constants import NODE_PROPERTIES, PIPE_PROPERTIES, PUMP_PROPERTIES, VALVE_PROPERTIES, OPEN_PROTECTION_PROPERTIES, CLOSED_PROTECTION_PROPERTIES
 from ptsnet.simulation.validation import check_compatibility
 from ptsnet.arrays.selectors import SelectorSet
 from ptsnet.utils.data import imerge
@@ -36,6 +36,113 @@ class Initializator:
             if warnings_on:
                 print("Success - Compatible Model")
                 print("Elapsed time (model check): ", time() - t, '[s]')
+
+    def create_secondary_elements(self):
+        # Open Protection Devices
+        num_open_protections = len(self.ic['open_protection'])
+        if num_open_protections > 0:
+            open_protections = Table(OPEN_PROTECTION_PROPERTIES, num_open_protections)
+            open_protection_labels = list(self.ic['open_protection'].keys())
+            open_protections.assign_labels(open_protection_labels)
+            for elem, props in self.ic['open_protection'].items():
+                open_protections.node[elem] = props['node']
+                open_protections.area[elem] = props['area']
+            self.ic['open_protection'] = open_protections
+
+        # Closed Protection Devices
+        num_closed_protections = len(self.ic['closed_protection'])
+        if num_closed_protections > 0:
+            closed_protections = Table(CLOSED_PROTECTION_PROPERTIES, num_closed_protections)
+            closed_protection_labels = list(self.ic['closed_protection'].keys())
+            closed_protections.assign_labels(closed_protection_labels)
+            for elem, props in self.ic['closed_protection'].items():
+                closed_protections.node[elem] = props['node']
+                closed_protections.area[elem] = props['area']
+                closed_protections.height[elem] = props['height']
+                closed_protections.water_level[elem] = props['water_level']
+            self.ic['closed_protection'] = closed_protections
+
+    def create_selectors(self):
+        '''
+        .points
+            ['to_pipes']
+
+            ['are_uboundaries']
+
+            ['are_dboundaries']
+
+            ['are_boundaries']
+
+            ['start_valve']
+
+            ['end_valve']
+
+            ['single_valve']
+
+            ['are_valve']
+
+            ['start_pump']
+
+            ['end_pump']
+
+            ['single_pump']
+
+            ['are_pump']
+
+        .pipes
+            ['to_nodes']
+
+        .nodes
+            ['not_in_pipes']
+
+            ['in_pipes']
+
+            ['to_points']
+
+            ['to_points_are_uboundaries']
+
+        .valves
+            ['are_inline']
+
+        '''
+        self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves', 'pumps', 'surge_protections'])
+
+        self.where.pipes['to_nodes'] = imerge(self.ic['pipe'].start_node, self.ic['pipe'].end_node)
+        pipes_idx = np.cumsum(self.ic['pipe'].segments+1).astype(int)
+        self.where.points['to_pipes'] = np.zeros(pipes_idx[-1], dtype=int)
+        for i in range(1, len(pipes_idx)):
+            start = pipes_idx[i-1]
+            end = pipes_idx[i]
+            self.where.points['to_pipes'][start:end] = i
+        self.where.points['are_uboundaries'] = np.cumsum(self.ic['pipe'].segments.astype(np.int)+1) - 1
+        self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ic['pipe'].segments.astype(np.int)
+        self.where.points['are_boundaries'] = imerge(self.where.points['are_dboundaries'], self.where.points['are_uboundaries'])
+        self.where.points['are_boundaries',] = (np.arange(len(self.where.points['are_boundaries'])) % 2 != 0)
+
+    def create_secondary_selectors(self):
+        node_points_order = np.argsort(self.where.pipes['to_nodes'])
+        self.where.nodes['not_in_pipes'] = np.isin(np.arange(self.wn.num_nodes),
+            np.unique(np.concatenate((
+                self.ic['valve'].start_node, self.ic['valve'].end_node,
+                self.ic['pump'].start_node, self.ic['pump'].end_node)))
+        )
+
+        self.where.nodes['in_pipes'] = np.isin(self.where.pipes['to_nodes'], np.where(self.where.nodes['not_in_pipes'])[0])
+
+        self.where.nodes['to_points'] = self.where.points['are_boundaries'][node_points_order]
+        self.where.nodes['to_points_are_uboundaries'] = np.isin(self.where.nodes['to_points'], self.where.points['are_uboundaries'])
+        self.where.nodes['to_points_are_dboundaries'] = np.isin(self.where.nodes['to_points'], self.where.points['are_dboundaries'])
+        self.where.nodes['to_points',] = self.ic['node'].degree - self.where.nodes['not_in_pipes'] # Real degree
+
+        # # Valve selectors
+        self._create_nonpipe_selectors('valve')
+
+        # # Pump selectors
+        self._create_nonpipe_selectors('pump')
+
+        # # Protection devices
+        self._create_nonpipe_selectors('open_protection')
+        self._create_nonpipe_selectors('closed_protection')
 
     def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter = ',', wave_speed_method = 'critical'):
             if default_wave_speed is None and wave_speed_file is None:
@@ -110,116 +217,49 @@ class Initializator:
         '''
 
         Notes:
-
         - Non-pipe selectors
-        '''
-
-        x1 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].start_node[self.ic[object_type].is_inline])
-        x2 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].end_node[self.ic[object_type].is_inline])
-        if object_type == 'valve':
-            x3 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].start_node[~self.ic[object_type].is_inline])
-        elif object_type == 'pump':
-            x3 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].end_node[~self.ic[object_type].is_inline])
-        self.where.points['start_inline_' + object_type] = np.sort(self.where.points['are_boundaries'][x1])
-        ordered = np.argsort(self.ic[object_type].start_node)
-        ordered_end = np.argsort(self.ic[object_type].end_node)
-        self.where.points['start_inline_' + object_type,] = ordered[self.ic[object_type].is_inline[ordered]]
-        last_order = np.argsort(self.where.points['start_inline_' + object_type,])
-        self.where.points['start_inline_' + object_type][:] = self.where.points['start_inline_' + object_type][last_order]
-        self.where.points['start_inline_' + object_type,][:] = self.where.points['start_inline_' + object_type,][last_order]
-        self.where.points['end_inline_' + object_type] = np.sort(self.where.points['are_boundaries'][x2])
-        self.where.points['end_inline_' + object_type,] = ordered_end[self.ic[object_type].is_inline[ordered_end]]
-        self.where.__dict__[object_type + 's']['are_inline'] = self.ic[object_type].is_inline
-        self.where.__dict__[object_type + 's']['are_inline',] = last_order
-        last_order = np.argsort(self.where.points['end_inline_' + object_type,])
-        self.where.points['end_inline_' + object_type][:] = self.where.points['end_inline_' + object_type][last_order]
-        self.where.points['end_inline_' + object_type,][:] = self.where.points['end_inline_' + object_type,][last_order]
-        self.where.points['are_single_' + object_type] = np.sort(self.where.points['are_boundaries'][x3])
-        self.where.points['are_single_' + object_type,] = ordered[~self.ic[object_type].is_inline[ordered]]
-        last_order = np.argsort(self.where.points['are_single_' + object_type,])
-        self.where.points['are_single_' + object_type][:] = self.where.points['are_single_' + object_type][last_order]
-        self.where.points['are_single_' + object_type,][:] = self.where.points['are_single_' + object_type,][last_order]
-        self.where.points['are_' + object_type] = np.concatenate((
-                self.where.points['are_single_' + object_type],
-                self.where.points['start_inline_' + object_type],
-                self.where.points['end_inline_' + object_type]))
-        self.where.points['are_' + object_type].sort()
-
-    def create_selectors(self):
-        '''
-        .points
-            ['to_pipes']
-
-            ['are_uboundaries']
-
-            ['are_dboundaries']
-
-            ['are_boundaries']
-
-            ['start_inline_valve']
-
-            ['end_inline_valve']
-
-            ['are_single_valve']
-
-            ['are_valve']
-
-            ['start_inline_pump']
-
-            ['end_inline_pump']
-
-            ['are_single_pump']
-
-            ['are_pump']
-
-        .pipes
-            ['to_nodes']
-
-        .nodes
-            ['not_in_pipes']
-
-            ['in_pipes']
-
-            ['to_points']
-
-            ['to_points_are_uboundaries']
-
-        .valves
-            ['are_inline']
 
         '''
-        self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves', 'pumps'])
-
-        self.where.pipes['to_nodes'] = imerge(self.ic['pipe'].start_node, self.ic['pipe'].end_node)
-        pipes_idx = np.cumsum(self.ic['pipe'].segments+1).astype(int)
-        self.where.points['to_pipes'] = np.zeros(pipes_idx[-1], dtype=int)
-        for i in range(1, len(pipes_idx)):
-            start = pipes_idx[i-1]
-            end = pipes_idx[i]
-            self.where.points['to_pipes'][start:end] = i
-        self.where.points['are_uboundaries'] = np.cumsum(self.ic['pipe'].segments.astype(np.int)+1) - 1
-        self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ic['pipe'].segments.astype(np.int)
-        self.where.points['are_boundaries'] = imerge(self.where.points['are_dboundaries'], self.where.points['are_uboundaries'])
-        self.where.points['are_boundaries',] = (np.arange(len(self.where.points['are_boundaries'])) % 2 != 0)
-
-        node_points_order = np.argsort(self.where.pipes['to_nodes'])
-        self.where.nodes['not_in_pipes'] = np.isin(np.arange(self.wn.num_nodes),
-            np.unique(np.concatenate((
-                self.ic['valve'].start_node, self.ic['valve'].end_node,
-                self.ic['pump'].start_node, self.ic['pump'].end_node)))
-        )
-
-        self.where.nodes['in_pipes'] = np.isin(self.where.pipes['to_nodes'], np.where(self.where.nodes['not_in_pipes'])[0])
-
-        self.where.nodes['to_points'] = self.where.points['are_boundaries'][node_points_order]
-        self.where.nodes['to_points_are_uboundaries'] = (np.arange(2*self.wn.num_pipes) % 2 != 0).astype(int)[node_points_order]
-        self.where.nodes['to_points',] = self.ic['node'].degree - self.where.nodes['not_in_pipes'] # Real degree
-
-        # # Valve selectors
-        self._create_nonpipe_selectors('valve')
-
-        # # Pump selectors
-        self._create_nonpipe_selectors('pump')
+        if object_type in ('valve', 'pump'):
+            x1 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].start_node[self.ic[object_type].is_inline])
+            x2 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].end_node[self.ic[object_type].is_inline])
+            if object_type == 'valve':
+                x3 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].start_node[~self.ic[object_type].is_inline])
+            elif object_type == 'pump':
+                x3 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].end_node[~self.ic[object_type].is_inline])
+            self.where.points['start_' + object_type] = np.sort(self.where.points['are_boundaries'][x1])
+            ordered = np.argsort(self.ic[object_type].start_node)
+            ordered_end = np.argsort(self.ic[object_type].end_node)
+            self.where.points['start_' + object_type,] = ordered[self.ic[object_type].is_inline[ordered]]
+            last_order = np.argsort(self.where.points['start_' + object_type,])
+            self.where.points['start_' + object_type][:] = self.where.points['start_' + object_type][last_order]
+            self.where.points['start_' + object_type,][:] = self.where.points['start_' + object_type,][last_order]
+            self.where.points['end_' + object_type] = np.sort(self.where.points['are_boundaries'][x2])
+            self.where.points['end_' + object_type,] = ordered_end[self.ic[object_type].is_inline[ordered_end]]
+            self.where.__dict__[object_type + 's']['are_inline'] = self.ic[object_type].is_inline
+            self.where.__dict__[object_type + 's']['are_inline',] = last_order
+            last_order = np.argsort(self.where.points['end_' + object_type,])
+            self.where.points['end_' + object_type][:] = self.where.points['end_' + object_type][last_order]
+            self.where.points['end_' + object_type,][:] = self.where.points['end_' + object_type,][last_order]
+            self.where.points['single_' + object_type] = np.sort(self.where.points['are_boundaries'][x3])
+            self.where.points['single_' + object_type,] = ordered[~self.ic[object_type].is_inline[ordered]]
+            last_order = np.argsort(self.where.points['single_' + object_type,])
+            self.where.points['single_' + object_type][:] = self.where.points['single_' + object_type][last_order]
+            self.where.points['single_' + object_type,][:] = self.where.points['single_' + object_type,][last_order]
+            self.where.points['are_' + object_type] = np.concatenate((
+            self.where.points['single_' + object_type],
+            self.where.points['start_' + object_type],
+            self.where.points['end_' + object_type]))
+            self.where.points['are_' + object_type].sort()
+        elif object_type in ('open_protection', 'closed_protection'):
+            protection_type = object_type[:object_type.find('_')]
+            if self.ic[f'{protection_type}_protection']:
+                self.where.nodes[f'are_{protection_type}_protection'] = self.ic[f'{protection_type}_protection'].node
+                node_end_idx = np.cumsum(self.where.nodes['to_points',])[self.ic[f'{protection_type}_protection'].node] - 1
+                node_start_idx = node_end_idx - self.where.nodes['to_points',][self.ic[f'{protection_type}_protection'].node] + 1
+                self.where.points[f'start_{protection_type}_protection'] = self.where.nodes['to_points'][node_start_idx]
+                self.where.points[f'end_{protection_type}_protection'] = self.where.nodes['to_points'][node_end_idx]
+                self.where.points[f'are_{protection_type}_protection'] = imerge(self.where.points[f'start_{protection_type}_protection'], self.where.points[f'end_{protection_type}_protection'])
 
 def get_water_network(inpfile):
     ENFile = InpFile()
@@ -257,6 +297,8 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
         'pipe' : pipes,
         'valve' : valves,
         'pump' : pumps,
+        'open_protection' : {},
+        'closed_protection' : {}
     }
 
     # Run EPANET simulation

@@ -15,101 +15,134 @@ COEFF_TOL = 1E-6
 # ----- Initial Conditions -----
 
 NODE_PROPERTIES = {
-    'demand' : np.float, #
-    'head' : np.float, #
-    'pressure' : np.float, #
-    'elevation' : np.float, #
-    'type' : np.int, #
-    'degree' : np.int, #
-    'processor' : np.int,
+    'demand' : float, #
+    'head' : float, #
+    'pressure' : float, #
+    'elevation' : float, #
+    'type' : int, #
+    'degree' : int, #
+    'processor' : int,
     # ----------------------------------------
-    'leak_coefficient' : np.float, #
-    'demand_coefficient' : np.float, #
+    'leak_coefficient' : float, #
+    'demand_coefficient' : float, #
 }
 
 PIPE_PROPERTIES = {
-    'start_node' : np.int, #
-    'end_node' : np.int, #
-    'length' : np.float, #
-    'diameter' : np.float, #
-    'area' : np.float, #
-    'wave_speed' : np.float, #
-    'segments' : np.float, #
-    'flowrate' : np.float, #
-    'velocity' : np.float, #
-    'head_loss' : np.float, #
-    'direction' : np.int, #
-    'ffactor' : np.float, #
-    'dx' : np.float, #
-    'type' : np.int, #
-    'is_inline' : np.bool, #
+    'start_node' : int, #
+    'end_node' : int, #
+    'length' : float, #
+    'diameter' : float, #
+    'area' : float, #
+    'wave_speed' : float, #
+    'segments' : float, #
+    'flowrate' : float, #
+    'velocity' : float, #
+    'head_loss' : float, #
+    'direction' : int, #
+    'ffactor' : float, #
+    'dx' : float, #
+    'type' : int, #
+    'is_inline' : bool, #
 }
 
 PUMP_PROPERTIES = {
-    'start_node' : np.int, #
-    'end_node' : np.int, #
-    'flowrate' : np.float, #
-    'velocity' : np.float, #
-    'head_loss' : np.float, #
-    'direction' : np.int, #
-    'initial_status' : np.int, #
-    'is_inline' : np.bool, #
-    'source_head' : np.float, #
+    'start_node' : int, #
+    'end_node' : int, #
+    'flowrate' : float, #
+    'velocity' : float, #
+    'head_loss' : float, #
+    'direction' : int, #
+    'initial_status' : int, #
+    'is_inline' : bool, #
+    'source_head' : float, #
     # ----------------------------------------
-    'a1' : np.float, #
-    'a2' : np.float, #
-    'Hs' : np.float, #
-    'curve_index' : np.int,
-    'setting' : np.float,
+    'a1' : float, #
+    'a2' : float, #
+    'Hs' : float, #
+    'curve_index' : int,
+    'setting' : float,
 }
 
 VALVE_PROPERTIES = {
-    'start_node' : np.int, #
-    'end_node' : np.int, #
-    'diameter' : np.float, #
-    'area' : np.float, #
-    'head_loss' : np.float, #
-    'flowrate' : np.float, #
-    'velocity' : np.float, #
-    'direction' : np.int, #
-    'initial_status' : np.int, #
-    'type' : np.int, #
-    'is_inline' : np.bool, #
-    'adjustment' : np.float, #
+    'start_node' : int, #
+    'end_node' : int, #
+    'diameter' : float, #
+    'area' : float, #
+    'head_loss' : float, #
+    'flowrate' : float, #
+    'velocity' : float, #
+    'direction' : int, #
+    'initial_status' : int, #
+    'type' : int, #
+    'is_inline' : bool, #
+    'adjustment' : float, #
     # ----------------------------------------
-    'K' : np.float,
-    'setting' : np.float,
-    'curve_index' : np.int,
+    'K' : float,
+    'setting' : float,
+    'curve_index' : int,
+}
+
+OPEN_PROTECTION_PROPERTIES = {
+    'node' : int, #
+    'area' : float, #
+    # ----------------------------------------
+    'QT' : float, # tank inflow
+    'HT0' : float, # tank head t = 0
+    'HT1' : float, # tank head t = 1
+}
+
+CLOSED_PROTECTION_PROPERTIES = {
+    'node' : int, #
+    'area' : float, #
+    'height' : float,
+    'water_level' : float,
+    'C' : float, # ideal gas constant
+    # ----------------------------------------
+    'QT0' : float, # tank inflow t
+    'QT1' : float, # tank inflow t + tau
+    'HT0' : float, # tank head t
+    'HT1' : float, # tank head t + tau
+    'HA' : float, # air head
+    'VA' : float, # air volume
+}
+
+SURGE_PROTECTION_TYPES = {
+    'open' : 0,
+    'closed' : 1
 }
 
 POINT_PROPERTIES = {
-    'B' : np.float,
-    'R' : np.float,
-    'Bm' : np.float,
-    'Bp' : np.float,
-    'Cm' : np.float,
-    'Cp' : np.float,
-    'has_plus' : np.int,
-    'has_minus' : np.int,
+    'B' : float,
+    'R' : float,
+    'Bm' : float,
+    'Bp' : float,
+    'Cm' : float,
+    'Cp' : float,
+    'has_plus' : int,
+    'has_minus' : int,
 }
 
 MEM_POOL_POINTS = {
-    'flowrate' : np.float,
-    'head' : np.float,
+    'flowrate' : float,
+    'head' : float,
 }
 
 NODE_RESULTS = {
-    'head' : np.float,
-    'leak_flow' : np.float,
-    'demand_flow' : np.float,
+    'head' : float,
+    'leak_flow' : float,
+    'demand_flow' : float,
 }
 
 PIPE_START_RESULTS = {
-    'flowrate' : np.float,
+    'flowrate' : float,
 }
 
 PIPE_END_RESULTS = {
-    'flowrate' : np.float,
+    'flowrate' : float,
+}
+
+CLOSED_PROTECTION_RESULTS = {
+    'water_level' : float
 }
 
 STEP_JOBS = (
