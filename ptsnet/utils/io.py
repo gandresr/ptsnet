@@ -17,6 +17,7 @@ def get_examples_path():
 def get_example_path(example_name):
     ename = example_name
     if not example_name.lower().endswith('.inp'):
+        ename = ename.upper()
         ename += '.inp'
     return os.path.join(get_examples_path(), ename)
 

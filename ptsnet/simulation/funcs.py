@@ -2,9 +2,10 @@ from ptsnet.simulation.constants import G
 import numpy as np
 from time import time
 from scipy import optimize
+from numba import jit
 
 # ------------------ SIM STEPS ------------------
-
+@jit(nopython = True)
 def run_interior_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm,
     has_plus, has_minus):
     """Solves flow and head for interior points
@@ -24,12 +25,13 @@ def run_interior_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm,
     # The first and last nodes are skipped in the  loop considering
     # that they are boundary nodes (every interior node requires an
     # upstream and a downstream neighbor)
-    Cm[1:len(Q0)-1] = (H0[1+1:len(Q0)] - B[1:len(Q0)-1]*Q0[1+1:len(Q0)]) * has_minus[1:len(Q0)-1]
-    Bm[1:len(Q0)-1] = (B[1:len(Q0)-1] + R[1:len(Q0)-1]*abs(Q0[1+1:len(Q0)])) * has_minus[1:len(Q0)-1]
-    Cp[1:len(Q0)-1] = (H0[0:len(Q0)-2] + B[1:len(Q0)-1]*Q0[0:len(Q0)-2]) * has_plus[1:len(Q0)-1]
-    Bp[1:len(Q0)-1] = (B[1:len(Q0)-1] + R[1:len(Q0)-1]*abs(Q0[0:len(Q0)-2])) * has_plus[1:len(Q0)-1]
-    H1[1:len(Q0)-1] = (Cp[1:len(Q0)-1]*Bm[1:len(Q0)-1] + Cm[1:len(Q0)-1]*Bp[1:len(Q0)-1]) / (Bp[1:len(Q0)-1] + Bm[1:len(Q0)-1])
-    Q1[1:len(Q0)-1] = (Cp[1:len(Q0)-1] - Cm[1:len(Q0)-1]) / (Bp[1:len(Q0)-1] + Bm[1:len(Q0)-1])
+    for i in range(1, len(Q0)-1):
+        Cm[i] = (H0[i+1] - B[i]*Q0[i+1]) * has_minus[i]
+        Bm[i] = (B[i] + R[i]*abs(Q0[i+1])) * has_minus[i]
+        Cp[i] = (H0[i-1] + B[i]*Q0[i-1]) * has_plus[i]
+        Bp[i] = (B[i] + R[i]*abs(Q0[i-1])) * has_plus[i]
+        H1[i] = (Cp[i]*Bm[i] + Cm[i]*Bp[i]) / (Bp[i] + Bm[i])
+        Q1[i] = (Cp[i] - Cm[i]) / (Bp[i] + Bm[i])
 
 def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
     """Solves flow and head for boundary points attached to nodes

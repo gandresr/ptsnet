@@ -495,7 +495,10 @@ class PTSNETSimulation:
 
         if type(element_name) == np.ndarray:
             if element_name.dtype == np.int:
-                self.ic[ic_type].setting[element_name] = value
+                if (ic_type == 'node' and type_ == 'burst'):
+                    self.ic[ic_type].leak_coefficient[element_name] = value
+                else:
+                    self.ic[ic_type].setting[element_name] = value
         else:
             if type(element_name) != tuple:
                 element_name = tuple(element_name)

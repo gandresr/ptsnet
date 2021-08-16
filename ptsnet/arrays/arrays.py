@@ -17,13 +17,13 @@ class Row(np.ndarray):
         self._super = getattr(obj, '_super', None)
 
     def __getitem__(self, index):
-        if type(index) == str: # label
+        if type(index) in (str, np.str_): # label
             return super().__getitem__(self._super.indexes[index])
         else:
             return super().__getitem__(index)
 
     def __setitem__(self, index, value):
-        if type(index) == str: # label
+        if type(index) in (str, np.str_): # label
             super().__setitem__(self._super.indexes[index], value)
         else:
             super().__setitem__(index, value)
