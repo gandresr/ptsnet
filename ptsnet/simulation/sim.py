@@ -1,3 +1,4 @@
+from re import L
 import numpy as np
 import os
 
@@ -14,7 +15,7 @@ from ptsnet.parallel.comm import CommManager
 from ptsnet.parallel.worker import Worker
 from ptsnet.results.storage import StorageManager
 from ptsnet.results.workspaces import new_workspace_name, list_workspaces, num_workspaces
-from ptsnet.simulation.constants import NODE_RESULTS, PIPE_END_RESULTS, PIPE_START_RESULTS
+from ptsnet.simulation.constants import NODE_RESULTS, PIPE_END_RESULTS, PIPE_START_RESULTS, SURGE_PROTECTION_TYPES
 from ptsnet.profiler import Profiler
 
 class PTSNETSettings:
@@ -317,6 +318,33 @@ class PTSNETSimulation:
             raise ValueError("There are not elements of type '" + type_ + "' in the model")
         self.curves[curve_name] = PTSNETCurve(X, Y, type_)
 
+    def add_surge_protection(self, node_name, protection_type, tank_area, tank_height=None, water_level=None):
+        if node_name in self.ic[f'{protection_type}_protection']:
+            raise ValueError(f"The node '{node_name}' is already a surge protection")
+
+        node_id = self.ic['node'].lloc(node_name)
+        if (self.ic['node'].degree[node_name] != 2 or
+            node_id in self.ic['pump'].start_node or
+            node_id in self.ic['pump'].end_node or
+            node_id in self.ic['valve'].start_node or
+            node_id in self.ic['valve'].end_node):
+            raise ValueError(f"The node '{node_name}' is not between 2 pipes")
+
+        if protection_type == 'open':
+            self.ic['open_protection'][node_name] = {}
+            self.ic['open_protection'][node_name]['node'] = node_id
+            self.ic['open_protection'][node_name]['area'] = tank_area
+        elif protection_type == 'closed':
+            if (tank_height is None) or (water_level is None):
+                raise ValueError("Tank height and water level must be defined for closed protection devices")
+            self.ic['closed_protection'][node_name] = {}
+            self.ic['closed_protection'][node_name]['node'] = node_id
+            self.ic['closed_protection'][node_name]['area'] = tank_area
+            self.ic['closed_protection'][node_name]['height'] = tank_height
+            self.ic['closed_protection'][node_name]['water_level'] = water_level
+        else:
+            raise ValueError(f"Protection devices can only be of type: {SURGE_PROTECTION_TYPES.keys()}")
+
     def assign_curve_to(self, curve_name, elements):
         if type(elements) == str:
             elements = [elements]
@@ -352,6 +380,8 @@ class PTSNETSimulation:
             raise NotImplementedError("it is necessary to assign curves for valves:\n%s" % str(self.ic['valve'].labels[non_assigned_valves]))
         self.settings.set_default()
         self.t = 0
+        self.initializator.create_secondary_elements()
+        self.initializator.create_secondary_selectors()
         self._distribute_work()
         self.t = 1
         self.settings.is_initialized = True
@@ -364,6 +394,7 @@ class PTSNETSimulation:
             where = self.where,
             wn = self.wn,
             ic = self.ic,
+            time_step = self.settings.time_step,
             time_steps = self.settings.time_steps,
             inpfile = self.inpfile,
             profiler_on = self.settings.profiler_on)
@@ -464,7 +495,10 @@ class PTSNETSimulation:
 
         if type(element_name) == np.ndarray:
             if element_name.dtype == np.int:
-                self.ic[ic_type].setting[element_name] = value
+                if (ic_type == 'node' and type_ == 'burst'):
+                    self.ic[ic_type].leak_coefficient[element_name] = value
+                else:
+                    self.ic[ic_type].setting[element_name] = value
         else:
             if type(element_name) != tuple:
                 element_name = tuple(element_name)

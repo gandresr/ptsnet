@@ -1,4 +1,5 @@
 import numpy as np
+
 from collections import defaultdict as ddict
 from ptsnet.utils.data import imerge
 from pkg_resources import resource_filename
@@ -71,8 +72,8 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile):
     nodes = []; node_points_list = []; node_points_context = [0]
     tanks = []; tanks_points_list = []
     reservoirs = []; reservoirs_points_list = []
-    inline_valves = []; start_inline_valves = []; end_inline_valves = []
-    inline_pumps = []; start_inline_pumps = [];  end_inline_pumps = []
+    inline_valves = []; start_valves = []; end_valves = []
+    inline_pumps = []; start_pumps = [];  end_pumps = []
     single_valves = []; single_valve_points = []
     single_pumps = []; single_pump_points = []
 
@@ -164,14 +165,14 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile):
                                 loc = ic['valve'].lloc(nonpipe.name)
                                 if not loc in inline_valves:
                                     inline_valves.append(loc)
-                                    start_inline_valves.append(nonpipe_start_point)
-                                    end_inline_valves.append(nonpipe_end_point)
+                                    start_valves.append(nonpipe_start_point)
+                                    end_valves.append(nonpipe_end_point)
                             elif nonpipe_type == 'pump':
                                 loc = ic['pump'].lloc(nonpipe.name)
                                 if not loc in inline_pumps:
                                     inline_pumps.append(loc)
-                                    start_inline_pumps.append(nonpipe_start_point)
-                                    end_inline_pumps.append(nonpipe_end_point)
+                                    start_pumps.append(nonpipe_start_point)
+                                    end_pumps.append(nonpipe_end_point)
                             visited_nodes.append(node)
                             continue
                         continue
@@ -268,13 +269,13 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile):
             },
             'inline_valves' : {
                 'global_idx' : np.array(inline_valves).astype(int),
-                'start_points' : np.array(start_inline_valves).astype(int),
-                'end_points' : np.array(end_inline_valves).astype(int),
+                'start_points' : np.array(start_valves).astype(int),
+                'end_points' : np.array(end_valves).astype(int),
             },
             'inline_pumps' : {
                 'global_idx' : np.array(inline_pumps).astype(int),
-                'start_points' : np.array(start_inline_pumps).astype(int),
-                'end_points' : np.array(end_inline_pumps).astype(int),
+                'start_points' : np.array(start_pumps).astype(int),
+                'end_points' : np.array(end_pumps).astype(int),
             },
             'single_valves' : {
                 'global_idx' : np.array(single_valves).astype(int),

@@ -64,9 +64,9 @@ class Table:
     def __getitem__(self, indexes):
         if not (is_array(indexes) or type(indexes) == slice):
             raise ValueError("index is not valid, use iterable or slice")
-        slice_indexes = index
-        if type(index) == slice:
-            slice_indexes = range(*index.indices(self.shape[1]))
+        slice_indexes = indexes
+        if type(indexes) == slice:
+            slice_indexes = range(*indexes.indices(self.shape[1]))
         slice_labels = None
         if hasattr(self, 'labels'):
             slice_labels = self.labels[slice_indexes]
