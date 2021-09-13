@@ -50,3 +50,5 @@ def test_initial_conditions():
             1.646e-08,
             2.147e-08,
             5.939e-08]))
+
+test_initial_conditions()
