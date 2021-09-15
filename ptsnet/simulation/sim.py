@@ -1,3 +1,4 @@
+from multiprocessing.sharedctypes import Value
 from re import L
 import numpy as np
 import os
@@ -22,7 +23,7 @@ class PTSNETSettings:
     def __init__(self,
         time_step : float = 0.01,
         duration: float = 20,
-        warnings_on: bool = True,
+        warnings_on: bool = False,
         parallel : bool = False,
         gpu : bool = False,
         skip_compatibility_check : bool = False,
@@ -208,7 +209,8 @@ class PTSNETSimulation:
         ### ----------------------------------------
         ### New Sim --------------------------------
         if type(settings) != dict:
-            raise TypeError("'settings' are not properly defined, use dict object")
+            print("Warning: using default settings")
+            settings = {}
         self.settings = PTSNETSettings(**settings, _super=self)
         self.initializator = Initializator(
             inpfile,
@@ -294,12 +296,66 @@ class PTSNETSimulation:
     def num_segments(self):
         return self.initializator.num_segments
 
+    @property
+    def all_valves(self):
+        return self.ic['valve'].labels
+
+    @property
+    def all_pumps(self):
+        return self.ic['pump'].labels
+
     def _define_element_setting(self, element, type_, X, Y):
         ic_type = self.SETTING_TYPES[type_]
         if X[0] == 0:
             self.element_settings[type_]._dump_settings(self.ic[ic_type].lloc(element), X[1:], Y[1:])
         else:
             self.element_settings[type_]._dump_settings(self.ic[ic_type].lloc(element), X, Y)
+
+    def run(self):
+        while not self.is_over:
+            self.run_step()
+
+    def define_valve_operation(self, valve_names, start_time, end_time, initial_setting, final_setting,
+        valve_type='butterfly', function='linear'):
+
+        compatible_valve_types = ('butterfly',)
+        compatible_transient_functions = ('linear',)
+
+        if not valve_type in compatible_valve_types:
+            raise NotImplementedError("We currently support the following valve types: ", compatible_valve_types)
+        if not function in compatible_transient_functions:
+            raise NotImplementedError("We currently support the following transient function types: ", compatible_transient_functions)
+        if start_time >= end_time:
+            raise ValueError("End time must be greater than start time for valve operation")
+        if not ((0 <= initial_setting <= 1) and (0 <= final_setting <= 1)):
+            raise ValueError("Setting values must be between [0,1]")
+
+        if valve_type == 'butterfly':
+            self.add_curve(valve_type, 'valve',
+                [1, 0.8, 0.6, 0.4, 0.2, 0],
+                [0.067, 0.044, 0.024, 0.011, 0.004, 0.   ])
+            self.assign_curve_to(valve_type, valve_names)
+            NN = int((end_time-start_time)//self.settings.time_step)
+            if function == 'linear':
+                vnames = [valve_names] if type(valve_names) == str else valve_names
+                if len(vnames) > 0:
+                    for valve in vnames:
+                        self.define_valve_settings(valve, np.linspace(start_time, end_time, NN), np.linspace(initial_setting, final_setting,NN))
+
+    def define_pump_operation(self, pump_names, start_time, end_time, initial_setting, final_setting,
+        function='linear'):
+
+        compatible_transient_functions = ('linear',)
+
+        if not function in compatible_transient_functions:
+            NotImplementedError("We currently support the following transient function types: ", compatible_transient_functions)
+
+        NN = int((end_time-start_time)//self.settings.time_step)
+        if function == 'linear':
+            pnames = [pump_names] if type(pump_names) == str else pump_names
+            if len(pnames) > 0:
+                for pump in pnames:
+                    self.define_pump_settings(pump, np.linspace(start_time, end_time, NN), np.linspace(initial_setting, final_setting, NN))
 
     def define_valve_settings(self, valve_name, X, Y):
         self._define_element_setting(valve_name, 'valve', X, Y)
@@ -377,7 +433,11 @@ class PTSNETSimulation:
             self.element_settings[stype]._sort()
         non_assigned_valves = self.ic['valve'].curve_index == -1
         if non_assigned_valves.any():
-            raise NotImplementedError("it is necessary to assign curves for valves:\n%s" % str(self.ic['valve'].labels[non_assigned_valves]))
+            self.add_curve('butterfly', 'valve',
+                [1, 0.8, 0.6, 0.4, 0.2, 0],
+                [0.067, 0.044, 0.024, 0.011, 0.004, 0.   ])
+            self.assign_curve_to('butterfly', self.ic['valve'].labels[non_assigned_valves])
+            print(f"Warning: valves {self.ic['valve'].labels[non_assigned_valves]} are butterfly by default")
         self.settings.set_default()
         self.t = 0
         self.initializator.create_secondary_elements()
@@ -417,7 +477,7 @@ class PTSNETSimulation:
 
     def run_step(self):
         if not self.settings.is_initialized:
-            raise NotImplementedError("it is necessary to initialize the simulation before running it")
+            self.initialize()
         if not self.settings.updated_settings:
             self._update_settings()
 

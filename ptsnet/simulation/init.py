@@ -146,7 +146,8 @@ class Initializator:
 
     def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter = ',', wave_speed_method = 'critical'):
             if default_wave_speed is None and wave_speed_file is None:
-                raise ValueError("wave_speed was not specified")
+                print("Warning: using default wave speed of 1000 m/s for all pipes")
+                default_wave_speed = 1000
 
             if not default_wave_speed is None:
                 self.ic['pipe'].wave_speed[:] = default_wave_speed
