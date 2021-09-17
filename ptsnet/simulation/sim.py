@@ -17,7 +17,7 @@ from ptsnet.parallel.worker import Worker
 from ptsnet.results.storage import StorageManager
 from ptsnet.results.workspaces import new_workspace_name, list_workspaces, num_workspaces
 from ptsnet.simulation.constants import NODE_RESULTS, PIPE_END_RESULTS, PIPE_START_RESULTS, SURGE_PROTECTION_TYPES
-from ptsnet.profiler import Profiler
+from ptsnet.profiler.profiler import Profiler
 
 class PTSNETSettings:
     def __init__(self,

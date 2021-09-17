@@ -7,7 +7,7 @@ from ptsnet.simulation.constants import MEM_POOL_POINTS, PIPE_START_RESULTS, PIP
 from ptsnet.utils.data import is_array
 from ptsnet.arrays.selectors import SelectorSet
 from ptsnet.simulation.funcs import run_boundary_step, run_interior_step, run_pump_step, run_valve_step, run_open_protections, run_closed_protections
-from ptsnet.profiler import Profiler
+from ptsnet.profiler.profiler import Profiler
 
 class Worker:
     def __init__(self, **kwargs):
