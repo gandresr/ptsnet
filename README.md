@@ -82,7 +82,7 @@
 
 To get a local copy up and running follow these simple steps. PTSNET can be downloaded via pip
 
-### Prerequisites
+### Installation
 
 We highly encourage using a conda environment for the installation
 
@@ -96,56 +96,25 @@ We highly encourage using a conda environment for the installation
   # Windows
   https://conda.io/projects/conda/en/latest/user-guide/install/windows.html
   ```
-* Basic dependencies
-
+* Install the conda environment with all the necessary dependencies
+  
+  Download envionment recipe for [Windows](https://github.com/gandresr/ptsnet/blob/development/conda/Windows/ptsnet.yml) or [Linux/Mac](https://github.com/gandresr/ptsnet/blob/development/conda/Linux/ptsnet.yml). Then `cd` to the location of the downloaded ptsnet.yml file. The parallel version of PTSNET can only run on Linux.
+  
   ```sh
   # Open the shell and type
-  conda init
-  conda create -n ptsnet python=3.6 # create conda environment
+  conda env create -f ptsnet.yml
   conda activate ptsnet
-  conda install numpy matplotlib pandas scipy
-  conda install -c conda-forge tqdm
-  conda install -c conda-forge wntr
   ```
-
-* Dependencies for parallelization
-  ```sh
-  conda install openmpi
-  conda install openmpi-mpicc
-  conda install -c conda-forge mpi4py
-
-  # Install parallel HDF5
-  wget https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar
-  tar xvf hdf5-1.10.5.tar
-  cd hdf5-1.10.5
-  ./configure --enable-shared --enable-parallel CC=mpicc MPICCc=mpiccmake
-  make install
-
-  # Install h5py
-  CC="mpicc" HDF5_MPI="ON" HDF5_DIR=/path/to/parallel-hdf5 pip install --no-binary=h5py h5py
-  ```
-
-* Install ptsnet
-  ```sh
-  pip install ptsnet
-  ```
-### Installation
-
-1. Clone the repo
-   ```sh
-   git clone https://github.com/gandresr/PTSNET.git
-   ```
-2. Install NPM packages
-   ```sh
-   npm install
-   ```
-
 
 
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
+Use this [jupyter notebook](https://github.com/gandresr/ptsnet/blob/development/tests/test_functions.ipynb) to run useful examples of transient simulations using PTSNET. You can test the parallel version of PTSNET executing [test_simulation.py](https://github.com/gandresr/ptsnet/blob/development/tests/test_simulation.py) as follows:
+
+```sh
+mpiexec -n 8 python test_simulation.py
+```
 
 _For more examples, please refer to the [Documentation](https://example.com)_
 
