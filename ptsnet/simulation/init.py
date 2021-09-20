@@ -144,17 +144,14 @@ class Initializator:
         self._create_nonpipe_selectors('open_protection')
         self._create_nonpipe_selectors('closed_protection')
 
-    def set_wave_speeds(self, default_wave_speed = None, wave_speed_file = None, delimiter = ',', wave_speed_method = 'critical'):
-            if default_wave_speed is None and wave_speed_file is None:
-                print("Warning: using default wave speed of 1000 m/s for all pipes")
-                default_wave_speed = 1000
+    def set_wave_speeds(self, default_wave_speed = 1000, wave_speed_file_path = None, delimiter = ',', wave_speed_method = 'optimal'):
 
             if not default_wave_speed is None:
                 self.ic['pipe'].wave_speed[:] = default_wave_speed
 
             modified_lines = 0
-            if not wave_speed_file is None:
-                with open(wave_speed_file, 'r') as f:
+            if not wave_speed_file_path is None:
+                with open(wave_speed_file_path, 'r') as f:
                     for line in f:
                         line = line.strip()
                         if len(line) <= 1:

@@ -282,6 +282,15 @@ class Worker:
             self.where.points['end_closed_protection'] = np.array([lpoints[npoint] for npoint in self.partition['nodes']['points'][esprotection]]).astype(int)
             self.num_closed_protections = len(self.where.points['start_closed_protection'])
 
+    def _fix_protection_indexes(self, protection_type):
+        if (self.ic[f'{protection_type}_protection']):
+            for ii in range(self.ic[f'{protection_type}_protection'].shape[1]):
+                p1 = self.where.points[f'start_{protection_type}_protection']
+                p2 = self.where.points[f'end_{protection_type}_protection']
+                if self.point_properties.has_plus[p1] == 0: # p1 is not associated with plus characteristic
+                    self.where.points[f'end_{protection_type}_protection'] = p1
+                    self.where.points[f'start_{protection_type}_protection'] = p2
+
     def define_initial_conditions_for_points(self, points, pipe, start, end):
         q = self.ic['pipe'].flowrate[pipe]
         self.mem_pool_points.flowrate[start:end,0] = q
@@ -320,6 +329,9 @@ class Worker:
         self.point_properties.has_minus[self.where.points['are_dboundaries']] = 1
         self.point_properties.has_plus[self.where.points['are_inner']] = 1
         self.point_properties.has_minus[self.where.points['are_inner']] = 1
+
+        self._fix_protection_indexes('open')
+        self._fix_protection_indexes('closed')
 
         if self.num_start_pipes > 0:
             self.results['pipe.start'].flowrate[:,0] = self.mem_pool_points.flowrate[self.where.points['are_my_dboundaries'], 0]

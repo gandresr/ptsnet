@@ -18,4 +18,5 @@ local*
 *.sim
 *.pickle
 *.zarr
+*.net
 tests/_*
