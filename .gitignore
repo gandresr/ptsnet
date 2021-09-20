@@ -12,7 +12,7 @@ local*
 *.sh
 *.graph
 *.pyc
-*.ipynb
+# *.ipynb
 *.mesh
 *.egg-info
 *.sim
