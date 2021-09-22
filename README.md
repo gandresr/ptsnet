@@ -98,7 +98,7 @@ We highly encourage using a conda environment for the installation
   ```
 * Install the conda environment with all the necessary dependencies
   
-  Download envionment recipe for [Windows](https://github.com/gandresr/ptsnet/blob/development/conda/Windows/ptsnet.yml) or [Linux/Mac](https://github.com/gandresr/ptsnet/blob/development/conda/Linux/ptsnet.yml). Then `cd` to the location of the downloaded ptsnet.yml file. The parallel version of PTSNET can only run on Linux.
+  Download the environment recipe for [Windows](https://github.com/gandresr/ptsnet/blob/development/conda/Windows/ptsnet.yml) or [Linux/Mac](https://github.com/gandresr/ptsnet/blob/development/conda/Linux/ptsnet.yml). Then `cd` to the location of the downloaded ptsnet.yml file. The parallel version of PTSNET can only run on Linux.
   
   ```sh
   # Open the shell and type
