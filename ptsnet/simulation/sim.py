@@ -17,7 +17,7 @@ from ptsnet.parallel.worker import Worker
 from ptsnet.results.storage import StorageManager
 from ptsnet.results.workspaces import new_workspace_name, list_workspaces, num_workspaces
 from ptsnet.simulation.constants import NODE_RESULTS, PIPE_END_RESULTS, PIPE_START_RESULTS, SURGE_PROTECTION_TYPES
-from ptsnet.profiler import Profiler
+from ptsnet.profiler.profiler import Profiler
 
 class PTSNETSettings:
     def __init__(self,
@@ -31,6 +31,10 @@ class PTSNETSettings:
         save_results = True,
         profiler_on = False,
         period = 0,
+        default_wave_speed = 1000,
+        wave_speed_file_path = None,
+        delimiter = ',',
+        wave_speed_method = 'optimal',
         _super = None):
 
         self._super = _super
@@ -49,6 +53,10 @@ class PTSNETSettings:
         self.active_persistance = False
         self.blocked = False
         self.period = period
+        self.default_wave_speed = default_wave_speed
+        self.wave_speed_file_path = wave_speed_file_path
+        self.delimiter = delimiter
+        self.wave_speed_method = wave_speed_method
         self.set_default()
         self.settingsOK = True
         self.num_points = None
@@ -189,7 +197,7 @@ class PTSNETSimulation:
         'demand' : 'node',
     }
 
-    def __init__(self, workspace_id = None, inpfile = None, settings = None, default_wave_speed = None, wave_speed_file = None, delimiter = ',', wave_speed_method = 'critical', init_on = False):
+    def __init__(self, workspace_id = None, inpfile = None, settings = None, init_on = False):
         # Make sure that workspace folder exists
         ws_path = os.path.join(get_root_path(), 'workspaces')
         if not os.path.exists(ws_path):
@@ -220,7 +228,12 @@ class PTSNETSimulation:
             _super = self)
         self.curves = ObjArray()
         self.element_settings = {type_ : ElementSettings(self) for type_ in self.SETTING_TYPES}
-        self.settings.defined_wave_speeds = self.initializator.set_wave_speeds(default_wave_speed, wave_speed_file, delimiter, wave_speed_method)
+        self.settings.defined_wave_speeds = self.initializator.set_wave_speeds(
+            self.settings.default_wave_speed,
+            self.settings.wave_speed_file_path,
+            self.settings.delimiter,
+            self.settings.wave_speed_method
+        )
         if self.settings.time_step > self.settings.duration:
             raise ValueError("Duration has to be larger than time step")
         self.initializator.create_selectors()
@@ -304,6 +317,10 @@ class PTSNETSimulation:
     def all_pumps(self):
         return self.ic['pump'].labels
 
+    @property
+    def time_step(self):
+        return self.settings.time_step
+
     def _define_element_setting(self, element, type_, X, Y):
         ic_type = self.SETTING_TYPES[type_]
         if X[0] == 0:
@@ -315,7 +332,7 @@ class PTSNETSimulation:
         while not self.is_over:
             self.run_step()
 
-    def define_valve_operation(self, valve_names, start_time, end_time, initial_setting, final_setting,
+    def define_valve_operation(self, valve_names, initial_setting, final_setting, start_time=0, end_time=1,
         valve_type='butterfly', function='linear'):
 
         compatible_valve_types = ('butterfly',)
@@ -342,7 +359,7 @@ class PTSNETSimulation:
                     for valve in vnames:
                         self.define_valve_settings(valve, np.linspace(start_time, end_time, NN), np.linspace(initial_setting, final_setting,NN))
 
-    def define_pump_operation(self, pump_names, start_time, end_time, initial_setting, final_setting,
+    def define_pump_operation(self, pump_names, initial_setting, final_setting, start_time=0, end_time=1,
         function='linear'):
 
         compatible_transient_functions = ('linear',)
@@ -351,30 +368,28 @@ class PTSNETSimulation:
             NotImplementedError("We currently support the following transient function types: ", compatible_transient_functions)
 
         NN = int((end_time-start_time)//self.settings.time_step)
+        pnames = [pump_names] if type(pump_names) == str else pump_names
+
         if function == 'linear':
-            pnames = [pump_names] if type(pump_names) == str else pump_names
             if len(pnames) > 0:
                 for pump in pnames:
                     self.define_pump_settings(pump, np.linspace(start_time, end_time, NN), np.linspace(initial_setting, final_setting, NN))
 
-    def define_valve_settings(self, valve_name, X, Y):
-        self._define_element_setting(valve_name, 'valve', X, Y)
+    def add_burst(self, node_names, burst_coeff, start_time=0, end_time=1, function='linear'):
+        compatible_transient_functions = ('linear',)
+        if not function in compatible_transient_functions:
+            NotImplementedError("We currently support the following transient function types: ", compatible_transient_functions)
 
-    def define_pump_settings(self, pump_name, X, Y):
-        self._define_element_setting(pump_name, 'pump', X, Y)
-
-    def define_burst_settings(self, node_name, X, Y):
-        self._define_element_setting(node_name, 'burst', X, Y)
-
-    def define_demand_settings(self, node_name, X, Y):
-        self._define_element_setting(node_name, 'demand', X, Y)
-
-    def add_curve(self, curve_name, type_, X, Y):
-        if len(self.ic[type_].labels) == 0:
-            raise ValueError("There are not elements of type '" + type_ + "' in the model")
-        self.curves[curve_name] = PTSNETCurve(X, Y, type_)
+        NN = int((end_time-start_time)//self.time_step)
+        nnames = [node_names] if type(node_names) == str else node_names
+        if function == 'linear':
+            if len(nnames) > 0:
+                for node in nnames:
+                    self.define_burst_settings(node, np.linspace(start_time, end_time, NN), np.linspace(0, burst_coeff, NN))
 
     def add_surge_protection(self, node_name, protection_type, tank_area, tank_height=None, water_level=None):
+        if not protection_type in ('open', 'closed'):
+            raise ValueError(f"Invalid protection type, use ", ('open', 'closed'))
         if node_name in self.ic[f'{protection_type}_protection']:
             raise ValueError(f"The node '{node_name}' is already a surge protection")
 
@@ -400,6 +415,23 @@ class PTSNETSimulation:
             self.ic['closed_protection'][node_name]['water_level'] = water_level
         else:
             raise ValueError(f"Protection devices can only be of type: {SURGE_PROTECTION_TYPES.keys()}")
+
+    def define_valve_settings(self, valve_name, X, Y):
+        self._define_element_setting(valve_name, 'valve', X, Y)
+
+    def define_pump_settings(self, pump_name, X, Y):
+        self._define_element_setting(pump_name, 'pump', X, Y)
+
+    def define_burst_settings(self, node_name, X, Y):
+        self._define_element_setting(node_name, 'burst', X, Y)
+
+    def define_demand_settings(self, node_name, X, Y):
+        self._define_element_setting(node_name, 'demand', X, Y)
+
+    def add_curve(self, curve_name, type_, X, Y):
+        if len(self.ic[type_].labels) == 0:
+            raise ValueError("There are not elements of type '" + type_ + "' in the model")
+        self.curves[curve_name] = PTSNETCurve(X, Y, type_)
 
     def assign_curve_to(self, curve_name, elements):
         if type(elements) == str:

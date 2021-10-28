@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="ptsnet",
-    version="0.0.11",
+    version="0.0.14",
     author="Gerardo Riano",
     author_email="griano@utexas.edu",
     description="Parallel Transient Simulation in Water Networks",

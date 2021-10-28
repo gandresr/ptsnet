@@ -12,10 +12,11 @@ local*
 *.sh
 *.graph
 *.pyc
-*.ipynb
+# *.ipynb
 *.mesh
 *.egg-info
 *.sim
 *.pickle
 *.zarr
+*.net
 tests/_*
