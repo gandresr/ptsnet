@@ -2,7 +2,7 @@ import numpy as np
 
 from collections import defaultdict as ddict
 from ptsnet.arrays import Table2D, Table, ObjArray
-from ptsnet.parallel.partitioning import even, get_partition
+from ptsnet.parallel.partitioning import get_partition
 from ptsnet.simulation.constants import MEM_POOL_POINTS, PIPE_START_RESULTS, PIPE_END_RESULTS, NODE_RESULTS, CLOSED_PROTECTION_RESULTS, POINT_PROPERTIES, G
 from ptsnet.utils.data import is_array
 from ptsnet.arrays.selectors import SelectorSet
@@ -28,7 +28,7 @@ class Worker:
         self.num_open_protections = 0 # number of open surge protections
         self.num_closed_protections = 0 # number of closed surge protections
         self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves', 'pumps', 'open_protections', 'closed_protections'])
-        self.processors = even(kwargs['num_points'], self.router['main'].size)
+        self.processors = kwargs['processors']
         self.is_innactive = False
         innactive_processors = np.empty(self.router['main'].size, dtype=bool)
         self.results = {}
@@ -128,8 +128,10 @@ class Worker:
             self.results['pipe.end'] = Table2D(PIPE_END_RESULTS, len(ppoints_end), self.time_steps, labels = self.ic['pipe'].labels[pipes_end])
 
         # Root processor gathers indexes to facilitate reading results
-
-        node_indexes = self.router['main'].gather(self.where.nodes['all_to_points',], root = 0)
+        if self.num_nodes > 0:
+            node_indexes = self.router['main'].gather(self.where.nodes['all_to_points',], root = 0)
+        else:
+            node_indexes = self.router['main'].gather(np.array([], dtype=int), root = 0)
         pipe_start_indexes = self.router['main'].gather(pipes_start, root = 0)
         pipe_end_indexes = self.router['main'].gather(pipes_end, root = 0)
 

@@ -133,6 +133,7 @@ class Initializator:
         self.where.nodes['to_points_are_uboundaries'] = np.isin(self.where.nodes['to_points'], self.where.points['are_uboundaries'])
         self.where.nodes['to_points_are_dboundaries'] = np.isin(self.where.nodes['to_points'], self.where.points['are_dboundaries'])
         self.where.nodes['to_points',] = self.ic['node'].degree - self.where.nodes['not_in_pipes'] # Real degree
+        self.where.nodes['end_idx_points'] = np.cumsum(self.where.nodes['to_points',])
 
         # # Valve selectors
         self._create_nonpipe_selectors('valve')
@@ -253,7 +254,7 @@ class Initializator:
             protection_type = object_type[:object_type.find('_')]
             if self.ic[f'{protection_type}_protection']:
                 self.where.nodes[f'are_{protection_type}_protection'] = self.ic[f'{protection_type}_protection'].node
-                node_end_idx = np.cumsum(self.where.nodes['to_points',])[self.ic[f'{protection_type}_protection'].node] - 1
+                node_end_idx = self.where.nodes['end_idx_points'][self.ic[f'{protection_type}_protection'].node] - 1
                 node_start_idx = node_end_idx - self.where.nodes['to_points',][self.ic[f'{protection_type}_protection'].node] + 1
                 self.where.points[f'start_{protection_type}_protection'] = self.where.nodes['to_points'][node_start_idx]
                 self.where.points[f'end_{protection_type}_protection'] = self.where.nodes['to_points'][node_end_idx]

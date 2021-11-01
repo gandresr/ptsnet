@@ -17,6 +17,7 @@ from ptsnet.parallel.worker import Worker
 from ptsnet.results.storage import StorageManager
 from ptsnet.results.workspaces import new_workspace_name, list_workspaces, num_workspaces
 from ptsnet.simulation.constants import NODE_RESULTS, PIPE_END_RESULTS, PIPE_START_RESULTS, SURGE_PROTECTION_TYPES
+from ptsnet.parallel.partitioning import even, bisection
 from ptsnet.profiler.profiler import Profiler
 
 class PTSNETSettings:
@@ -35,6 +36,7 @@ class PTSNETSettings:
         wave_speed_file_path = None,
         delimiter = ',',
         wave_speed_method = 'optimal',
+        partitioning_method = 'bisection',
         _super = None):
 
         self._super = _super
@@ -57,6 +59,7 @@ class PTSNETSettings:
         self.wave_speed_file_path = wave_speed_file_path
         self.delimiter = delimiter
         self.wave_speed_method = wave_speed_method
+        self.partitioning_method = partitioning_method
         self.set_default()
         self.settingsOK = True
         self.num_points = None
@@ -318,6 +321,10 @@ class PTSNETSimulation:
         return self.ic['pump'].labels
 
     @property
+    def num_nodes(self):
+        return len(self.ic['node'].labels)
+
+    @property
     def time_step(self):
         return self.settings.time_step
 
@@ -480,6 +487,14 @@ class PTSNETSimulation:
         self.save_init_data()
 
     def _distribute_work(self):
+        partitioning_methods = ('even', 'bisection')
+        if self.settings.partitioning_method == 'even':
+            processors = even(self, self.router['main'].size)
+        elif self.settings.partitioning_method == 'bisection':
+            processors = bisection(self, self.router['main'].size)
+        else:
+            raise ValueError(f'Invalid partitioning type {self.settings.partitioning_method}, use {partitioning_methods}')
+
         self.worker = Worker(
             router = self.router,
             num_points = self.num_points,
@@ -489,7 +504,8 @@ class PTSNETSimulation:
             time_step = self.settings.time_step,
             time_steps = self.settings.time_steps,
             inpfile = self.inpfile,
-            profiler_on = self.settings.profiler_on)
+            profiler_on = self.settings.profiler_on,
+            processors = processors)
 
         self.results = self.worker.results
 
@@ -632,6 +648,15 @@ class PTSNETSimulation:
             if curve.type == 'valve':
                 self.ic['valve'].K[curve.elements] = \
                     self.ic['valve'].adjustment[curve.elements] * curve(self.ic['valve'].setting[curve.elements])
+
+    def get_node_points(self, node):
+        inode = self.ic['node'].lloc(node)
+        p2 = self.where.nodes['end_idx_points'][inode]
+        if inode == 0:
+            p1 = 0
+        else:
+            p1 = self.where.nodes['end_idx_points'][inode-1]
+        return self.where.nodes['to_points'][p1:p2]
 
     def set_valve_setting(self, valve_name, value, step = None, check_warning = False):
         self._set_element_setting('valve', valve_name, value, step, check_warning)

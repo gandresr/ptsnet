@@ -1,13 +1,15 @@
 import numpy as np
+import networkx as nx
+import nxmetis as nxm
 
 from collections import defaultdict as ddict
 from ptsnet.utils.data import imerge
 from pkg_resources import resource_filename
 
-def even(num_points, num_processors):
-    p = np.ones(num_points, dtype = int)
-    n = num_points // num_processors
-    r = num_points % num_processors
+def even(sim, num_processors):
+    processors = np.ones(sim.num_points, dtype = int)
+    n = sim.num_points // num_processors
+    r = sim.num_points % num_processors
     for i in range(num_processors):
         start = i*n
         end = start + n
@@ -15,8 +17,76 @@ def even(num_points, num_processors):
             start += i; end += i
         elif r > 0:
             start += r; end += r
-        p[start:end+1] = i
-    return p
+        processors[start:end+1] = i
+    return processors
+
+def bisection(sim, num_processors):
+    G = _get_numerical_grid(sim)
+    num_cuts, partitioning = nxm.partition(G, num_processors)
+    processors = -np.ones(sim.num_points)
+    for p, partition in enumerate(partitioning):
+        for node in partition:
+            node_type = G.nodes[node]['node_type']
+            if node_type == 'contracted':
+                expanded_node = G.nodes[node]['expanded_node']
+                if expanded_node:
+                    processors[sim.get_node_points(expanded_node[0])] = p
+                    processors[sim.get_node_points(expanded_node[1])] = p
+            elif node_type == 'interior':
+                processors[node] = p
+            elif node_type == 'junction':
+                processors[sim.get_node_points(node)] = p
+    return processors
+
+def _get_numerical_grid(sim):
+    G = nx.Graph()
+    contracted_nodes = {}
+    for l in sim.wn.links:
+        link = sim.wn.links[l]
+        ltype = link.link_type.lower()
+        if ltype in ('valve', 'pump'):
+            n1 = sim.ic['node'].labels[sim.ic[ltype].start_node[l]]
+            n2 = sim.ic['node'].labels[sim.ic[ltype].end_node[l]]
+            contracted_nodes[n1] = n1
+            contracted_nodes[n2] = n1
+        elif ltype == 'pipe':
+            link = sim.wn.links[l]
+            ilink = sim.ic['pipe'].lloc(l)
+            N = int(sim.ic['pipe'].segments[l])
+            n1 = sim.ic['node'].labels[sim.ic['pipe'].start_node[l]]
+            n2 = sim.ic['node'].labels[sim.ic['pipe'].end_node[l]]
+            p1 = sim.where.points['are_boundaries'][ilink*2]
+            p2 = sim.where.points['are_boundaries'][ilink*2+1]
+            if n1 in contracted_nodes: n1 = contracted_nodes[n1]
+            if n2 in contracted_nodes: n2 = contracted_nodes[n2]
+
+            expanded_n1 = []
+            if n1 in contracted_nodes:
+                n1_type = 'contracted'
+                if contracted_nodes[n1] != n1:
+                    expanded_n1 = [n1, contracted_nodes[n1]]
+            else:
+                n1_type = 'junction'
+
+            expanded_n2 = []
+            if n2 in contracted_nodes:
+                n2_type = 'contracted'
+                if contracted_nodes[n2] != n2:
+                    expanded_n2 = [n2, contracted_nodes[n2]]
+            else:
+                n2_type = 'junction'
+
+            if not n1 in G: G.add_node(n1, node_type=n1_type, expanded_node=expanded_n1)
+            if not n2 in G: G.add_node(n2, node_type=n2_type, expanded_node=expanded_n2)
+            k = p1+1;  G.add_node(k, node_type='interior', expanded_node=[])
+
+            G.add_edge(n1, k)
+            for j in range(N-2):
+                G.add_node(k+1, node_type='interior', expanded_node=[])
+                G.add_edge(k, k+1)
+                k += 1
+            G.add_edge(k, n2)
+    return G
 
 def _get_ghost_points(worker_points, worker_pipes):
     worker_points.sort()
