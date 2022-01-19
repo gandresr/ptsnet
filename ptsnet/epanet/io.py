@@ -1889,7 +1889,7 @@ class InpFile(object):
                 time = current[2]
                 opts.time.start_clocktime = _clock_time_to_sec(time, time_format)
             elif (current[0].upper() == 'STATISTIC'):
-                opts.time.statistic = current[1].upper()
+                opts.time.statistss = current[1].upper()
             else:
                 # Other time options: RULE TIMESTEP, PATTERN TIMESTEP, REPORT TIMESTEP, REPORT START
                 key_string = current[0] + '_' + current[1]

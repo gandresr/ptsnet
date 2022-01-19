@@ -21,13 +21,13 @@ def test_initial_conditions():
 
     sim.initialize()
 
-    assert np.allclose(sim.ic['valve'].flowrate, np.array([0.028]), atol=1e-3)
+    assert np.allclose(sim.ss['valve'].flowrate, np.array([0.028]), atol=1e-3)
 
-    assert np.allclose(sim.ic['valve'].head_loss, np.array([1.388]), atol=1e-3)
+    assert np.allclose(sim.ss['valve'].head_loss, np.array([1.388]), atol=1e-3)
 
-    assert np.allclose(sim.ic['valve'].K, np.array([4.885e-05]))
+    assert np.allclose(sim.ss['valve'].K, np.array([4.885e-05]))
 
-    assert np.allclose(sim.ic['pipe'].flowrate,
+    assert np.allclose(sim.ss['pipe'].flowrate,
         np.array([
             0.286,
             0.135,
@@ -39,7 +39,7 @@ def test_initial_conditions():
             0.037,
             0.102]), atol =  1e-3)
 
-    assert np.allclose(sim.ic['pipe'].head_loss,
+    assert np.allclose(sim.ss['pipe'].head_loss,
         np.array([
             1.662e-07,
             7.835e-08,

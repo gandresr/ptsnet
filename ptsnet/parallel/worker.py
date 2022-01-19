@@ -6,7 +6,7 @@ from ptsnet.parallel.partitioning import even, get_partition
 from ptsnet.simulation.constants import MEM_POOL_POINTS, PIPE_START_RESULTS, PIPE_END_RESULTS, NODE_RESULTS, CLOSED_PROTECTION_RESULTS, POINT_PROPERTIES, G
 from ptsnet.utils.data import is_array
 from ptsnet.arrays.selectors import SelectorSet
-from ptsnet.simulation.funcs import run_boundary_step, run_interior_step, run_pump_step, run_valve_step, run_open_protections, run_closed_protections
+from ptsnet.simulation.funcs import run_general_junction, run_interior_step, run_pump_step, run_valve_step, run_open_protections, run_closed_protections
 from ptsnet.profiler.profiler import Profiler
 
 class Worker:
@@ -15,7 +15,7 @@ class Worker:
         self.recv_queue = None
         self.router = kwargs['router']
         self.wn = kwargs['wn']
-        self.ic = kwargs['ic']
+        self.ss = kwargs['ic']
         self.global_where = kwargs['where']
         self.time_step = kwargs['time_step']
         self.time_steps = kwargs['time_steps']
@@ -38,7 +38,7 @@ class Worker:
         ###
         self.profiler.start('get_partition')
         self.partition = get_partition(
-            self.processors, self.router['main'].rank, self.global_where, self.ic,
+            self.processors, self.router['main'].rank, self.global_where, self.ss,
             self.wn, self.router['main'].size, kwargs['inpfile'])
         self.profiler.stop('get_partition')
         ###
@@ -105,7 +105,7 @@ class Worker:
         self.point_properties = Table(POINT_PROPERTIES, self.num_points)
         if self.num_nodes > 0:
             self.results['node'] = Table2D(NODE_RESULTS, self.num_nodes, self.time_steps,
-                labels = self.ic['node'].labels[self.where.nodes['all_to_points',]])
+                labels = self.ss['node'].labels[self.where.nodes['all_to_points',]])
 
         are_my_uboundaries = self.global_where.points['are_uboundaries'] \
             [self.processors[self.global_where.points['are_uboundaries']] == self.router['main'].rank]
@@ -123,9 +123,9 @@ class Worker:
         self.num_start_pipes = len(ppoints_start)
         self.num_end_pipes = len(ppoints_end)
         if self.num_start_pipes > 0:
-            self.results['pipe.start'] = Table2D(PIPE_START_RESULTS, len(ppoints_start), self.time_steps, labels = self.ic['pipe'].labels[pipes_start])
+            self.results['pipe.start'] = Table2D(PIPE_START_RESULTS, len(ppoints_start), self.time_steps, labels = self.ss['pipe'].labels[pipes_start])
         if self.num_end_pipes > 0:
-            self.results['pipe.end'] = Table2D(PIPE_END_RESULTS, len(ppoints_end), self.time_steps, labels = self.ic['pipe'].labels[pipes_end])
+            self.results['pipe.end'] = Table2D(PIPE_END_RESULTS, len(ppoints_end), self.time_steps, labels = self.ss['pipe'].labels[pipes_end])
 
         # Root processor gathers indexes to facilitate reading results
 
@@ -138,9 +138,9 @@ class Worker:
             pipe_start_indexes = np.concatenate(pipe_start_indexes)
             pipe_end_indexes = np.concatenate(pipe_end_indexes)
 
-            node_labels = self.ic['node'].labels[node_indexes]
-            pipe_start_labels = self.ic['pipe'].labels[pipe_start_indexes]
-            pipe_end_labels = self.ic['pipe'].labels[pipe_end_indexes]
+            node_labels = self.ss['node'].labels[node_indexes]
+            pipe_start_labels = self.ss['pipe'].labels[pipe_start_indexes]
+            pipe_end_labels = self.ss['pipe'].labels[pipe_end_indexes]
 
             self.local_to_global['node'] = {l : i for i, l in enumerate(node_labels)}
             self.local_to_global['pipe.start'] = {l : i for i, l in enumerate(pipe_start_labels)}
@@ -245,17 +245,17 @@ class Worker:
         node_points += list(self.partition['tanks']['points'])
         nodes += list(self.partition['reservoirs']['global_idx'])
         node_points += list(self.partition['reservoirs']['points'])
-        nodes += list(self.ic['valve'].start_node[self.partition['inline_valves']['global_idx']])
+        nodes += list(self.ss['valve'].start_node[self.partition['inline_valves']['global_idx']])
         node_points += list(self.partition['inline_valves']['start_points'])
-        nodes += list(self.ic['valve'].end_node[self.partition['inline_valves']['global_idx']])
+        nodes += list(self.ss['valve'].end_node[self.partition['inline_valves']['global_idx']])
         node_points += list(self.partition['inline_valves']['end_points'])
-        nodes += list(self.ic['pump'].start_node[self.partition['inline_pumps']['global_idx']])
+        nodes += list(self.ss['pump'].start_node[self.partition['inline_pumps']['global_idx']])
         node_points += list(self.partition['inline_pumps']['start_points'])
-        nodes += list(self.ic['pump'].end_node[self.partition['inline_pumps']['global_idx']])
+        nodes += list(self.ss['pump'].end_node[self.partition['inline_pumps']['global_idx']])
         node_points += list(self.partition['inline_pumps']['end_points'])
-        nodes += list(self.ic['valve'].start_node[self.partition['single_valves']['global_idx']])
+        nodes += list(self.ss['valve'].start_node[self.partition['single_valves']['global_idx']])
         node_points += list(self.partition['single_valves']['points'])
-        nodes += list(self.ic['pump'].end_node[self.partition['single_pumps']['global_idx']])
+        nodes += list(self.ss['pump'].end_node[self.partition['single_pumps']['global_idx']])
         node_points += list(self.partition['single_pumps']['points'])
         nodes = np.array(nodes)
         node_points = np.array(node_points)
@@ -269,13 +269,13 @@ class Worker:
             self.where.nodes['all_just_in_pipes'] = self.partition['nodes']['global_idx']
             self.num_jip_nodes = len(self.where.nodes['all_just_in_pipes'])
         # ---------------------------
-        if self.ic['open_protection']:
+        if self.ss['open_protection']:
             ssprotection = np.isin(self.partition['nodes']['points'], self.global_where.points['start_open_protection'])
             esprotection = np.isin(self.partition['nodes']['points'], self.global_where.points['end_open_protection'])
             self.where.points['start_open_protection'] = np.array([lpoints[npoint] for npoint in self.partition['nodes']['points'][ssprotection]]).astype(int)
             self.where.points['end_open_protection'] = np.array([lpoints[npoint] for npoint in self.partition['nodes']['points'][esprotection]]).astype(int)
             self.num_open_protections = len(self.where.points['start_open_protection'])
-        if self.ic['closed_protection']:
+        if self.ss['closed_protection']:
             ssprotection = np.isin(self.partition['nodes']['points'], self.global_where.points['start_closed_protection'])
             esprotection = np.isin(self.partition['nodes']['points'], self.global_where.points['end_closed_protection'])
             self.where.points['start_closed_protection'] = np.array([lpoints[npoint] for npoint in self.partition['nodes']['points'][ssprotection]]).astype(int)
@@ -283,8 +283,8 @@ class Worker:
             self.num_closed_protections = len(self.where.points['start_closed_protection'])
 
     def _fix_protection_indexes(self, protection_type):
-        if (self.ic[f'{protection_type}_protection']):
-            for ii in range(self.ic[f'{protection_type}_protection'].shape[1]):
+        if (self.ss[f'{protection_type}_protection']):
+            for ii in range(self.ss[f'{protection_type}_protection'].shape[1]):
                 p1 = self.where.points[f'start_{protection_type}_protection']
                 p2 = self.where.points[f'end_{protection_type}_protection']
                 if self.point_properties.has_plus[p1] == 0: # p1 is not associated with plus characteristic
@@ -292,18 +292,18 @@ class Worker:
                     self.where.points[f'start_{protection_type}_protection'] = p2
 
     def define_initial_conditions_for_points(self, points, pipe, start, end):
-        q = self.ic['pipe'].flowrate[pipe]
+        q = self.ss['pipe'].flowrate[pipe]
         self.mem_pool_points.flowrate[start:end,0] = q
 
-        start_node = self.ic['pipe'].start_node[pipe]
+        start_node = self.ss['pipe'].start_node[pipe]
         start_point = self.global_where.points['are_boundaries'][pipe*2]
         npoints = points - start_point # normalized
 
-        shead = self.ic['node'].head[start_node]
-        self.point_properties.B[start:end] = self.ic['pipe'].wave_speed[pipe] / (G * self.ic['pipe'].area[pipe])
-        self.point_properties.R[start:end] = self.ic['pipe'].ffactor[pipe] * self.ic['pipe'].dx[pipe] / \
-            (2 * G * self.ic['pipe'].diameter[pipe] * self.ic['pipe'].area[pipe] ** 2)
-        per_unit_hl = self.ic['pipe'].head_loss[pipe] / self.ic['pipe'].segments[pipe]
+        shead = self.ss['node'].head[start_node]
+        self.point_properties.B[start:end] = self.ss['pipe'].wave_speed[pipe] / (G * self.ss['pipe'].area[pipe])
+        self.point_properties.R[start:end] = self.ss['pipe'].ffactor[pipe] * self.ss['pipe'].dx[pipe] / \
+            (2 * G * self.ss['pipe'].diameter[pipe] * self.ss['pipe'].area[pipe] ** 2)
+        per_unit_hl = self.ss['pipe'].head_loss[pipe] / self.ss['pipe'].segments[pipe]
         self.mem_pool_points.head[start:end,0] = shead - per_unit_hl*npoints
 
     def _load_initial_conditions(self):
@@ -340,21 +340,21 @@ class Worker:
         if self.num_nodes > 0:
             self.results['node'].head[:, 0] = self.mem_pool_points.head[self.where.nodes['all_to_points'], 0]
             self.results['node'].leak_flow[:, 0] = \
-                self.ic['node'].leak_coefficient[self.where.nodes['all_to_points',]] * \
-                    np.sqrt(self.ic['node'].pressure[self.where.nodes['all_to_points',]])
+                self.ss['node'].leak_coefficient[self.where.nodes['all_to_points',]] * \
+                    np.sqrt(self.ss['node'].pressure[self.where.nodes['all_to_points',]])
             self.results['node'].demand_flow[:, 0] = \
-                self.ic['node'].demand_coefficient[self.where.nodes['all_to_points',]] * \
-                    np.sqrt(self.ic['node'].pressure[self.where.nodes['all_to_points',]])
+                self.ss['node'].demand_coefficient[self.where.nodes['all_to_points',]] * \
+                    np.sqrt(self.ss['node'].pressure[self.where.nodes['all_to_points',]])
 
         # Define initial conditions for surge protections
         if self.num_closed_protections > 0:
             H0 = self.mem_pool_points.head[:,0]
             m = 1.2
             Hb = 10.3 # barometric pressure [mH2O]
-            self.ic['closed_protection'].HT0[:] = self.ic['closed_protection'].water_level
-            self.ic['closed_protection'].HA[:] = self.ic['node'].head[self.ic['closed_protection'].node] - self.ic['closed_protection'].water_level + Hb # air pressure head
-            self.ic['closed_protection'].VA[:] = self.ic['closed_protection'].area*(self.ic['closed_protection'].height-self.ic['closed_protection'].water_level) # air volume
-            self.ic['closed_protection'].C[:] = self.ic['closed_protection'].HA * self.ic['closed_protection'].VA**m
+            self.ss['closed_protection'].HT0[:] = self.ss['closed_protection'].water_level
+            self.ss['closed_protection'].HA[:] = self.ss['node'].head[self.ss['closed_protection'].node] - self.ss['closed_protection'].water_level + Hb # air pressure head
+            self.ss['closed_protection'].VA[:] = self.ss['closed_protection'].area*(self.ss['closed_protection'].height-self.ss['closed_protection'].water_level) # air volume
+            self.ss['closed_protection'].C[:] = self.ss['closed_protection'].HA * self.ss['closed_protection'].VA**m
             # Allocate space for results
             # self.results['closed_protection'] = Table2D(CLOSED_PROTECTION_RESULTS, self.num_closed_protections, self.time_steps, self)
 
@@ -395,9 +395,9 @@ class Worker:
         ###
 
         ###
-        self.profiler.start('run_boundary_step')
+        self.profiler.start('run_general_junction')
         if 'node' in self.results: # worker has junctions
-            run_boundary_step(
+            run_general_junction(
                 H0, Q1, H1,
                 self.results['node'].leak_flow[:,t],
                 self.results['node'].demand_flow[:,t],
@@ -405,11 +405,11 @@ class Worker:
                 self.point_properties.Bp,
                 self.point_properties.Cm,
                 self.point_properties.Bm,
-                self.ic['node'].leak_coefficient,
-                self.ic['node'].demand_coefficient,
-                self.ic['node'].elevation,
+                self.ss['node'].leak_coefficient,
+                self.ss['node'].demand_coefficient,
+                self.ss['node'].elevation,
                 self.where)
-        self.profiler.stop('run_boundary_step')
+        self.profiler.stop('run_general_junction')
         ###
 
         ###
@@ -420,9 +420,9 @@ class Worker:
             self.point_properties.Bp,
             self.point_properties.Cm,
             self.point_properties.Bm,
-            self.ic['valve'].setting,
-            self.ic['valve'].K,
-            self.ic['valve'].area,
+            self.ss['valve'].setting,
+            self.ss['valve'].K,
+            self.ss['valve'].area,
             self.where)
         self.profiler.stop('run_valve_step')
         ###
@@ -430,16 +430,16 @@ class Worker:
         ###
         self.profiler.start('run_pump_step')
         run_pump_step(
-            self.ic['pump'].source_head,
+            self.ss['pump'].source_head,
             Q1, H1,
             self.point_properties.Cp,
             self.point_properties.Bp,
             self.point_properties.Cm,
             self.point_properties.Bm,
-            self.ic['pump'].a1,
-            self.ic['pump'].a2,
-            self.ic['pump'].Hs,
-            self.ic['pump'].setting,
+            self.ss['pump'].a1,
+            self.ss['pump'].a2,
+            self.ss['pump'].Hs,
+            self.ss['pump'].setting,
             self.where)
         self.profiler.stop('run_pump_step')
         ###
@@ -450,8 +450,8 @@ class Worker:
             run_open_protections(
                 H0, H1,
                 Q1,
-                self.ic['open_protection'].QT,
-                self.ic['open_protection'].area,
+                self.ss['open_protection'].QT,
+                self.ss['open_protection'].area,
                 self.point_properties.Cp,
                 self.point_properties.Bp,
                 self.point_properties.Cm,
@@ -465,18 +465,18 @@ class Worker:
             run_closed_protections(
                 H0, H1,
                 Q1,
-                self.ic['closed_protection'].QT0,
-                self.ic['closed_protection'].QT1,
-                self.ic['closed_protection'].HT0,
-                self.ic['closed_protection'].HT1,
-                self.ic['closed_protection'].VA,
-                self.ic['closed_protection'].height,
-                self.ic['closed_protection'].area,
+                self.ss['closed_protection'].QT0,
+                self.ss['closed_protection'].QT1,
+                self.ss['closed_protection'].HT0,
+                self.ss['closed_protection'].HT1,
+                self.ss['closed_protection'].VA,
+                self.ss['closed_protection'].height,
+                self.ss['closed_protection'].area,
                 self.point_properties.Cp,
                 self.point_properties.Bp,
                 self.point_properties.Cm,
                 self.point_properties.Bm, self.time_step,
-                self.ic['closed_protection'].C, self.where)
+                self.ss['closed_protection'].C, self.where)
             self.profiler.stop('run_closed_protections')
         ###
 

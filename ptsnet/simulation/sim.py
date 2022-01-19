@@ -11,7 +11,7 @@ from ptsnet.simulation.constants import COEFF_TOL, STEP_JOBS, INIT_JOBS, COMM_JO
 from ptsnet.epanet.util import EN
 from ptsnet.utils.data import define_curve, is_array
 from ptsnet.utils.io import run_shell, get_root_path
-from ptsnet.simulation.init import Initializator
+from ptsnet.simulation.init import Initializer
 from ptsnet.parallel.comm import CommManager
 from ptsnet.parallel.worker import Worker
 from ptsnet.results.storage import StorageManager
@@ -38,7 +38,6 @@ class PTSNETSettings:
         _super = None):
 
         self._super = _super
-        self.settingsOK = False
         self.time_step = time_step
         self.duration = duration
         self.time_steps = int(round(duration/time_step))
@@ -220,7 +219,7 @@ class PTSNETSimulation:
             print("Warning: using default settings")
             settings = {}
         self.settings = PTSNETSettings(**settings, _super=self)
-        self.initializator = Initializator(
+        self.initializer = Initializer(
             inpfile,
             period = self.settings.period,
             skip_compatibility_check = self.settings.skip_compatibility_check,
@@ -228,7 +227,7 @@ class PTSNETSimulation:
             _super = self)
         self.curves = ObjArray()
         self.element_settings = {type_ : ElementSettings(self) for type_ in self.SETTING_TYPES}
-        self.settings.defined_wave_speeds = self.initializator.set_wave_speeds(
+        self.settings.defined_wave_speeds = self.initializer.set_wave_speeds(
             self.settings.default_wave_speed,
             self.settings.wave_speed_file_path,
             self.settings.delimiter,
@@ -236,11 +235,11 @@ class PTSNETSimulation:
         )
         if self.settings.time_step > self.settings.duration:
             raise ValueError("Duration has to be larger than time step")
-        self.initializator.create_selectors()
+        self.initializer.create_selectors()
         self.t = 0
         self.time_stamps = np.array([i*self.settings.time_step for i in range(self.settings.time_steps)])
         self.inpfile = inpfile
-        self.settings.num_points = self.initializator.num_points
+        self.settings.num_points = self.initializer.num_points
         # ----------------------------------------
         self.router = CommManager()
         if self.router['main'].size > self.num_points:
@@ -287,11 +286,11 @@ class PTSNETSimulation:
 
     @property
     def wn(self):
-        return self.initializator.wn
+        return self.initializer.wn
 
     @property
-    def ic(self):
-        return self.initializator.ic
+    def ss(self):
+        return self.initializer.ss
 
     @property
     def is_over(self):
@@ -299,23 +298,23 @@ class PTSNETSimulation:
 
     @property
     def where(self):
-        return self.initializator.where
+        return self.initializer.where
 
     @property
     def num_points(self):
-        return self.initializator.num_points
+        return self.initializer.num_points
 
     @property
     def num_segments(self):
-        return self.initializator.num_segments
+        return self.initializer.num_segments
 
     @property
     def all_valves(self):
-        return self.ic['valve'].labels
+        return self.ss['valve'].labels
 
     @property
     def all_pumps(self):
-        return self.ic['pump'].labels
+        return self.ss['pump'].labels
 
     @property
     def time_step(self):
@@ -324,9 +323,9 @@ class PTSNETSimulation:
     def _define_element_setting(self, element, type_, X, Y):
         ic_type = self.SETTING_TYPES[type_]
         if X[0] == 0:
-            self.element_settings[type_]._dump_settings(self.ic[ic_type].lloc(element), X[1:], Y[1:])
+            self.element_settings[type_]._dump_settings(self.ss[ic_type].lloc(element), X[1:], Y[1:])
         else:
-            self.element_settings[type_]._dump_settings(self.ic[ic_type].lloc(element), X, Y)
+            self.element_settings[type_]._dump_settings(self.ss[ic_type].lloc(element), X, Y)
 
     def run(self):
         while not self.is_over:
@@ -390,29 +389,29 @@ class PTSNETSimulation:
     def add_surge_protection(self, node_name, protection_type, tank_area, tank_height=None, water_level=None):
         if not protection_type in ('open', 'closed'):
             raise ValueError(f"Invalid protection type, use ", ('open', 'closed'))
-        if node_name in self.ic[f'{protection_type}_protection']:
+        if node_name in self.ss[f'{protection_type}_protection']:
             raise ValueError(f"The node '{node_name}' is already a surge protection")
 
-        node_id = self.ic['node'].lloc(node_name)
-        if (self.ic['node'].degree[node_name] != 2 or
-            node_id in self.ic['pump'].start_node or
-            node_id in self.ic['pump'].end_node or
-            node_id in self.ic['valve'].start_node or
-            node_id in self.ic['valve'].end_node):
+        node_id = self.ss['node'].lloc(node_name)
+        if (self.ss['node'].degree[node_name] != 2 or
+            node_id in self.ss['pump'].start_node or
+            node_id in self.ss['pump'].end_node or
+            node_id in self.ss['valve'].start_node or
+            node_id in self.ss['valve'].end_node):
             raise ValueError(f"The node '{node_name}' is not between 2 pipes")
 
         if protection_type == 'open':
-            self.ic['open_protection'][node_name] = {}
-            self.ic['open_protection'][node_name]['node'] = node_id
-            self.ic['open_protection'][node_name]['area'] = tank_area
+            self.ss['open_protection'][node_name] = {}
+            self.ss['open_protection'][node_name]['node'] = node_id
+            self.ss['open_protection'][node_name]['area'] = tank_area
         elif protection_type == 'closed':
             if (tank_height is None) or (water_level is None):
                 raise ValueError("Tank height and water level must be defined for closed protection devices")
-            self.ic['closed_protection'][node_name] = {}
-            self.ic['closed_protection'][node_name]['node'] = node_id
-            self.ic['closed_protection'][node_name]['area'] = tank_area
-            self.ic['closed_protection'][node_name]['height'] = tank_height
-            self.ic['closed_protection'][node_name]['water_level'] = water_level
+            self.ss['closed_protection'][node_name] = {}
+            self.ss['closed_protection'][node_name]['node'] = node_id
+            self.ss['closed_protection'][node_name]['area'] = tank_area
+            self.ss['closed_protection'][node_name]['height'] = tank_height
+            self.ss['closed_protection'][node_name]['water_level'] = water_level
         else:
             raise ValueError(f"Protection devices can only be of type: {SURGE_PROTECTION_TYPES.keys()}")
 
@@ -429,7 +428,7 @@ class PTSNETSimulation:
         self._define_element_setting(node_name, 'demand', X, Y)
 
     def add_curve(self, curve_name, type_, X, Y):
-        if len(self.ic[type_].labels) == 0:
+        if len(self.ss[type_].labels) == 0:
             raise ValueError("There are not elements of type '" + type_ + "' in the model")
         self.curves[curve_name] = PTSNETCurve(X, Y, type_)
 
@@ -440,22 +439,22 @@ class PTSNETSimulation:
             raise ValueError("No elements were specified")
         type_ = self.curves[curve_name].type
         for element in elements:
-            if self.ic[type_].curve_index[element] == -1:
+            if self.ss[type_].curve_index[element] == -1:
                 if type_ == 'valve':
-                    Kv = self.ic[type_].K[element]
-                    Kc = self.curves[curve_name](self.ic[type_].setting[element])
+                    Kv = self.ss[type_].K[element]
+                    Kc = self.curves[curve_name](self.ss[type_].setting[element])
                     diff = abs(Kv - Kc)
                     if Kv == 0:
-                        self.ic[type_].adjustment[element] = 1
-                        self.ic[type_].K[element] = Kc
+                        self.ss[type_].adjustment[element] = 1
+                        self.ss[type_].K[element] = Kc
                     else:
-                        self.ic[type_].adjustment[element] = Kv / Kc
+                        self.ss[type_].adjustment[element] = Kv / Kc
                         if diff > COEFF_TOL:
                             if self.settings.warnings_on:
                                 print("Warning: the loss coefficient of valve '%s' is not in the curve, the curve will be adjusted" % element)
                 N = len(self.curves[curve_name])
-                self.ic[type_].curve_index[element] = N
-                element_index = self.ic[type_].lloc(element)
+                self.ss[type_].curve_index[element] = N
+                element_index = self.ss[type_].lloc(element)
                 self.curves[curve_name]._add_element(element_index)
 
     def initialize(self):
@@ -463,17 +462,17 @@ class PTSNETSimulation:
             raise NotImplementedError("wave speed values have not been defined for the pipes")
         for stype in self.SETTING_TYPES:
             self.element_settings[stype]._sort()
-        non_assigned_valves = self.ic['valve'].curve_index == -1
+        non_assigned_valves = self.ss['valve'].curve_index == -1
         if non_assigned_valves.any():
             self.add_curve('butterfly', 'valve',
                 [1, 0.8, 0.6, 0.4, 0.2, 0],
                 [0.067, 0.044, 0.024, 0.011, 0.004, 0.   ])
-            self.assign_curve_to('butterfly', self.ic['valve'].labels[non_assigned_valves])
-            print(f"Warning: valves {self.ic['valve'].labels[non_assigned_valves]} are butterfly by default")
+            self.assign_curve_to('butterfly', self.ss['valve'].labels[non_assigned_valves])
+            print(f"Warning: valves {self.ss['valve'].labels[non_assigned_valves]} are butterfly by default")
         self.settings.set_default()
         self.t = 0
-        self.initializator.create_secondary_elements()
-        self.initializator.create_secondary_selectors()
+        self.initializer.create_secondary_elements()
+        self.initializer.create_secondary_selectors()
         self._distribute_work()
         self.t = 1
         self.settings.is_initialized = True
@@ -485,7 +484,7 @@ class PTSNETSimulation:
             num_points = self.num_points,
             where = self.where,
             wn = self.wn,
-            ic = self.ic,
+            ss = self.ss,
             time_step = self.settings.time_step,
             time_steps = self.settings.time_steps,
             inpfile = self.inpfile,
@@ -588,13 +587,13 @@ class PTSNETSimulation:
         if type(element_name) == np.ndarray:
             if element_name.dtype == np.int:
                 if (ic_type == 'node' and type_ == 'burst'):
-                    self.ic[ic_type].leak_coefficient[element_name] = value
+                    self.ss[ic_type].leak_coefficient[element_name] = value
                 else:
-                    self.ic[ic_type].setting[element_name] = value
+                    self.ss[ic_type].setting[element_name] = value
         else:
             if type(element_name) != tuple:
                 element_name = tuple(element_name)
-            self.ic[ic_type].setting[self.ic[ic_type].lloc(element_name)] = value
+            self.ss[ic_type].setting[self.ss[ic_type].lloc(element_name)] = value
 
     def _update_settings(self):
         if not self.settings.updated_settings:
@@ -630,8 +629,8 @@ class PTSNETSimulation:
     def _update_coefficients(self):
         for curve in self.curves:
             if curve.type == 'valve':
-                self.ic['valve'].K[curve.elements] = \
-                    self.ic['valve'].adjustment[curve.elements] * curve(self.ic['valve'].setting[curve.elements])
+                self.ss['valve'].K[curve.elements] = \
+                    self.ss['valve'].adjustment[curve.elements] * curve(self.ss['valve'].setting[curve.elements])
 
     def set_valve_setting(self, valve_name, value, step = None, check_warning = False):
         self._set_element_setting('valve', valve_name, value, step, check_warning)
@@ -657,7 +656,7 @@ class PTSNETSimulation:
     def save_sim_data(self):
         if self.router['main'].rank == 0:
             self.storer.save_data('inpfile', self.inpfile, comm = 'main')
-            self.storer.save_data('initial_conditions', self.ic, comm = 'main')
+            self.storer.save_data('initial_conditions', self.ss, comm = 'main')
             self.storer.save_data('settings', self.settings.to_dict(), comm = 'main')
 
     def save_init_data(self):
@@ -764,7 +763,7 @@ class PTSNETSimulation:
             self.inpfile = self.storer.load_data('inpfile')
 
             if self.init_on:
-                self.initializator = Initializator(
+                self.initializer = Initializer(
                     self.inpfile,
                     period = self.settings.period,
                     skip_compatibility_check = True,

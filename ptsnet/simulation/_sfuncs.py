@@ -31,7 +31,7 @@ def run_interior_step(Q0, H0, Q1, H1, B, R, Cp, Bp, Cm, Bm,
         H1[i] = (Cp[i]*Bm[i] + Cm[i]*Bp[i]) / (Bp[i] + Bm[i])
         Q1[i] = (Cp[i] - Cm[i]) / (Bp[i] + Bm[i])
 
-def run_boundary_step(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
+def run_general_junction(H0, Q1, H1, E1, D1, Cp, Bp, Cm, Bm, Ke, Kd, Z, where):
     """Solves flow and head for boundary points attached to nodes
 
     All the numpy arrays are passed by reference,

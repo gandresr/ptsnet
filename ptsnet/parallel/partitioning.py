@@ -52,7 +52,7 @@ def _get_ghost_points(worker_points, worker_pipes):
 
     return ghosts
 
-def get_partition(processors, rank, where, ic, wn, num_processors, inpfile):
+def get_partition(processors, rank, where, ss, wn, num_processors, inpfile):
 
     # List of points needs to be sorted
     worker_points = np.where(processors == rank)[0]
@@ -87,10 +87,10 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile):
             node = boundaries_to_nodes[b]
             degree = where.nodes['to_points',][node]
 
-            nnode = wn.get_node(ic['node'].ilabel(node))
-            l = wn.get_link(ic['pipe'].ilabel(where.points['to_pipes'][b]))
-            snode = ic['pipe'].start_node[l.name]
-            enode = ic['pipe'].end_node[l.name]
+            nnode = wn.get_node(ss['node'].ilabel(node))
+            l = wn.get_link(ss['pipe'].ilabel(where.points['to_pipes'][b]))
+            snode = ss['pipe'].start_node[l.name]
+            enode = ss['pipe'].end_node[l.name]
 
             if nnode.node_type in ('Tank', 'Reservoir'):
                 if snode == node:
@@ -118,32 +118,32 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile):
                     l2 = wn.get_link(links[1])
                     nonpipe = l1 if l1.link_type.lower() != 'pipe' else l2
                     nonpipe_type = nonpipe.link_type.lower()
-                    non_pipe_idx = ic[nonpipe_type].lloc(nonpipe.name)
-                    nonpipe_start = ic[nonpipe_type].start_node[non_pipe_idx]
-                    nonpipe_end = ic[nonpipe_type].end_node[non_pipe_idx]
-                    is_inline = ic[nonpipe_type].is_inline[non_pipe_idx]
+                    non_pipe_idx = ss[nonpipe_type].lloc(nonpipe.name)
+                    nonpipe_start = ss[nonpipe_type].start_node[non_pipe_idx]
+                    nonpipe_end = ss[nonpipe_type].end_node[non_pipe_idx]
+                    is_inline = ss[nonpipe_type].is_inline[non_pipe_idx]
 
-                    start_deg, end_deg = ic['node'].degree[[nonpipe_start, nonpipe_end]]
+                    start_deg, end_deg = ss['node'].degree[[nonpipe_start, nonpipe_end]]
                     nonpipe_start_point = None
                     nonpipe_end_point = None
 
                     # Get upstream and downstream pipes
                     if start_deg == 2:
-                        start_links = wn.get_links_for_node(ic['node'].ilabel(nonpipe_start))
+                        start_links = wn.get_links_for_node(ss['node'].ilabel(nonpipe_start))
                         start_links.remove(nonpipe.name)
-                        start_pipe_idx = ic['pipe'].lloc(start_links[0])
-                        if nonpipe_start == ic['pipe'].start_node[start_pipe_idx]:
+                        start_pipe_idx = ss['pipe'].lloc(start_links[0])
+                        if nonpipe_start == ss['pipe'].start_node[start_pipe_idx]:
                             npipe_spoint = 2*start_pipe_idx
-                        elif nonpipe_start == ic['pipe'].end_node[start_pipe_idx]:
+                        elif nonpipe_start == ss['pipe'].end_node[start_pipe_idx]:
                             npipe_spoint = 2*start_pipe_idx + 1
                         nonpipe_start_point = where.points['are_boundaries'][npipe_spoint]
                     if end_deg == 2:
-                        end_links = wn.get_links_for_node(ic['node'].ilabel(nonpipe_end))
+                        end_links = wn.get_links_for_node(ss['node'].ilabel(nonpipe_end))
                         end_links.remove(nonpipe.name)
-                        end_pipe_idx = ic['pipe'].lloc(end_links[0])
-                        if nonpipe_end == ic['pipe'].start_node[end_pipe_idx]:
+                        end_pipe_idx = ss['pipe'].lloc(end_links[0])
+                        if nonpipe_end == ss['pipe'].start_node[end_pipe_idx]:
                             npipe_epoint = 2*end_pipe_idx
-                        elif nonpipe_end == ic['pipe'].end_node[end_pipe_idx]:
+                        elif nonpipe_end == ss['pipe'].end_node[end_pipe_idx]:
                             npipe_epoint = 2*end_pipe_idx + 1
                         nonpipe_end_point = where.points['are_boundaries'][npipe_epoint]
                     if is_inline:
@@ -162,13 +162,13 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile):
                             if processors[nonpipe_end_point + 1] != rank:
                                 points.append(nonpipe_end_point+1)
                             if nonpipe_type == 'valve':
-                                loc = ic['valve'].lloc(nonpipe.name)
+                                loc = ss['valve'].lloc(nonpipe.name)
                                 if not loc in inline_valves:
                                     inline_valves.append(loc)
                                     start_valves.append(nonpipe_start_point)
                                     end_valves.append(nonpipe_end_point)
                             elif nonpipe_type == 'pump':
-                                loc = ic['pump'].lloc(nonpipe.name)
+                                loc = ss['pump'].lloc(nonpipe.name)
                                 if not loc in inline_pumps:
                                     inline_pumps.append(loc)
                                     start_pumps.append(nonpipe_start_point)
@@ -182,13 +182,13 @@ def get_partition(processors, rank, where, ic, wn, num_processors, inpfile):
                         if nonpipe_type == 'valve':
                             if processors[b - 1] != rank:
                                 points.append(b - 1)
-                            single_valves.append(ic['valve'].lloc(nonpipe.name))
+                            single_valves.append(ss['valve'].lloc(nonpipe.name))
                             single_valve_points.append(b)
                             continue
                         if nonpipe_type == 'pump':
                             if processors[b + 1] != rank:
                                 points.append(b + 1)
-                            single_pumps.append(ic['pump'].lloc(nonpipe.name))
+                            single_pumps.append(ss['pump'].lloc(nonpipe.name))
                             single_pump_points.append(b)
                             continue
                         continue

@@ -171,7 +171,7 @@ class FlowUnits(enum.Enum):
         return self in [FlowUnits.CFS, FlowUnits.GPM, FlowUnits.MGD, FlowUnits.IMGD, FlowUnits.AFD]
 
     @property
-    def is_metric(self):
+    def is_metrss(self):
         """bool: True if flow unit is an SI Derived (metric) unit.
 
         Metric units include LPS, LPM, MLD, CMH, and CMD.

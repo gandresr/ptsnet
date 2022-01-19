@@ -148,7 +148,7 @@ CLOSED_PROTECTION_RESULTS = {
 STEP_JOBS = (
     'run_step',
     'run_interior_step',
-    'run_boundary_step',
+    'run_general_junction',
     'run_valve_step',
     'run_pump_step',
     'store_results',

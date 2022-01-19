@@ -13,12 +13,12 @@ from ptsnet.utils.data import imerge
 
 from time import time
 
-class Initializator:
+class Initializer:
 
     def __init__(self, inpfile, period = 0, skip_compatibility_check = False, warnings_on = True, _super = None):
         self.wn = get_water_network(inpfile)
         self.ng = self.wn.get_graph()
-        self.ic = get_initial_conditions(inpfile, period = period, wn = self.wn)
+        self.ss = get_initial_conditions(inpfile, period = period, wn = self.wn)
         self.num_points = 0
         self.num_segments = 0
         self.where = None
@@ -28,7 +28,7 @@ class Initializator:
             if warnings_on:
                 t = time()
             try:
-                check_compatibility(wn=self.wn, ic=self.ic)
+                check_compatibility(wn=self.wn, ss=self.ss)
             except Exception as e:
                 if warnings_on:
                     print("Elapsed time (model check): ", time() - t, '[s]')
@@ -39,28 +39,28 @@ class Initializator:
 
     def create_secondary_elements(self):
         # Open Protection Devices
-        num_open_protections = len(self.ic['open_protection'])
+        num_open_protections = len(self.ss['open_protection'])
         if num_open_protections > 0:
             open_protections = Table(OPEN_PROTECTION_PROPERTIES, num_open_protections)
-            open_protection_labels = list(self.ic['open_protection'].keys())
+            open_protection_labels = list(self.ss['open_protection'].keys())
             open_protections.assign_labels(open_protection_labels)
-            for elem, props in self.ic['open_protection'].items():
+            for elem, props in self.ss['open_protection'].items():
                 open_protections.node[elem] = props['node']
                 open_protections.area[elem] = props['area']
-            self.ic['open_protection'] = open_protections
+            self.ss['open_protection'] = open_protections
 
         # Closed Protection Devices
-        num_closed_protections = len(self.ic['closed_protection'])
+        num_closed_protections = len(self.ss['closed_protection'])
         if num_closed_protections > 0:
             closed_protections = Table(CLOSED_PROTECTION_PROPERTIES, num_closed_protections)
-            closed_protection_labels = list(self.ic['closed_protection'].keys())
+            closed_protection_labels = list(self.ss['closed_protection'].keys())
             closed_protections.assign_labels(closed_protection_labels)
-            for elem, props in self.ic['closed_protection'].items():
+            for elem, props in self.ss['closed_protection'].items():
                 closed_protections.node[elem] = props['node']
                 closed_protections.area[elem] = props['area']
                 closed_protections.height[elem] = props['height']
                 closed_protections.water_level[elem] = props['water_level']
-            self.ic['closed_protection'] = closed_protections
+            self.ss['closed_protection'] = closed_protections
 
     def create_selectors(self):
         '''
@@ -107,15 +107,15 @@ class Initializator:
         '''
         self.where = SelectorSet(['points', 'pipes', 'nodes', 'valves', 'pumps', 'surge_protections'])
 
-        self.where.pipes['to_nodes'] = imerge(self.ic['pipe'].start_node, self.ic['pipe'].end_node)
-        pipes_idx = np.cumsum(self.ic['pipe'].segments+1).astype(int)
+        self.where.pipes['to_nodes'] = imerge(self.ss['pipe'].start_node, self.ss['pipe'].end_node)
+        pipes_idx = np.cumsum(self.ss['pipe'].segments+1).astype(int)
         self.where.points['to_pipes'] = np.zeros(pipes_idx[-1], dtype=int)
         for i in range(1, len(pipes_idx)):
             start = pipes_idx[i-1]
             end = pipes_idx[i]
             self.where.points['to_pipes'][start:end] = i
-        self.where.points['are_uboundaries'] = np.cumsum(self.ic['pipe'].segments.astype(np.int)+1) - 1
-        self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ic['pipe'].segments.astype(np.int)
+        self.where.points['are_uboundaries'] = np.cumsum(self.ss['pipe'].segments.astype(np.int)+1) - 1
+        self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ss['pipe'].segments.astype(np.int)
         self.where.points['are_boundaries'] = imerge(self.where.points['are_dboundaries'], self.where.points['are_uboundaries'])
         self.where.points['are_boundaries',] = (np.arange(len(self.where.points['are_boundaries'])) % 2 != 0)
 
@@ -123,8 +123,8 @@ class Initializator:
         node_points_order = np.argsort(self.where.pipes['to_nodes'])
         self.where.nodes['not_in_pipes'] = np.isin(np.arange(self.wn.num_nodes),
             np.unique(np.concatenate((
-                self.ic['valve'].start_node, self.ic['valve'].end_node,
-                self.ic['pump'].start_node, self.ic['pump'].end_node)))
+                self.ss['valve'].start_node, self.ss['valve'].end_node,
+                self.ss['pump'].start_node, self.ss['pump'].end_node)))
         )
 
         self.where.nodes['in_pipes'] = np.isin(self.where.pipes['to_nodes'], np.where(self.where.nodes['not_in_pipes'])[0])
@@ -132,7 +132,7 @@ class Initializator:
         self.where.nodes['to_points'] = self.where.points['are_boundaries'][node_points_order]
         self.where.nodes['to_points_are_uboundaries'] = np.isin(self.where.nodes['to_points'], self.where.points['are_uboundaries'])
         self.where.nodes['to_points_are_dboundaries'] = np.isin(self.where.nodes['to_points'], self.where.points['are_dboundaries'])
-        self.where.nodes['to_points',] = self.ic['node'].degree - self.where.nodes['not_in_pipes'] # Real degree
+        self.where.nodes['to_points',] = self.ss['node'].degree - self.where.nodes['not_in_pipes'] # Real degree
 
         # # Valve selectors
         self._create_nonpipe_selectors('valve')
@@ -147,7 +147,7 @@ class Initializator:
     def set_wave_speeds(self, default_wave_speed = 1000, wave_speed_file_path = None, delimiter = ',', wave_speed_method = 'optimal'):
 
             if not default_wave_speed is None:
-                self.ic['pipe'].wave_speed[:] = default_wave_speed
+                self.ss['pipe'].wave_speed[:] = default_wave_speed
 
             modified_lines = 0
             if not wave_speed_file_path is None:
@@ -157,14 +157,14 @@ class Initializator:
                         if len(line) <= 1:
                             raise ValueError("The wave_speed file has to have to entries per line 'pipe,wave_speed'")
                         pipe, wave_speed = line.split(delimiter)
-                        self.ic['pipe'].wave_speed[pipe] = float(wave_speed)
+                        self.ss['pipe'].wave_speed[pipe] = float(wave_speed)
                         modified_lines += 1
             else:
                 self._set_segments(wave_speed_method)
                 return True
 
             if modified_lines != self.wn.num_pipes:
-                self.ic['pipe'].wave_speed[:] = 0
+                self.ss['pipe'].wave_speed[:] = 0
                 excep = "The file does not specify wave speed values for all the pipes,\n"
                 excep += "it is necessary to define a default wave speed value"
                 raise ValueError(excep)
@@ -175,40 +175,40 @@ class Initializator:
     def _set_segments(self, wave_speed_method = 'optimal'):
         # method \in {'critical', 'user', 'dt', 'optimal'}
         if wave_speed_method in ('critical', 'dt', 'optimal'):
-            self.ic['pipe'].segments = self.ic['pipe'].length
-            self.ic['pipe'].segments /= self.ic['pipe'].wave_speed
+            self.ss['pipe'].segments = self.ss['pipe'].length
+            self.ss['pipe'].segments /= self.ss['pipe'].wave_speed
             # Maximum time_step in the system to capture waves in all pipes
-            max_dt = min(self.ic['pipe'].segments) / 2 # at least 2 segments in critical pipe
+            max_dt = min(self.ss['pipe'].segments) / 2 # at least 2 segments in critical pipe
             self._super.settings.time_step = min(self._super.settings.time_step, max_dt)
             # The number of segments is defined
-            self.ic['pipe'].segments /= self._super.settings.time_step
+            self.ss['pipe'].segments /= self._super.settings.time_step
         elif wave_speed_method == 'user':
-            self.ic['pipe'].segments = self.ic['pipe'].length
-            self.ic['pipe'].segments /= (self.ic['pipe'].wave_speed * self._super.settings.time_step)
+            self.ss['pipe'].segments = self.ss['pipe'].length
+            self.ss['pipe'].segments /= (self.ss['pipe'].wave_speed * self._super.settings.time_step)
         elif wave_speed_method == 'dt':
-            phi = self.ic['pipe'].length
+            phi = self.ss['pipe'].length
         else:
             raise ValueError("Method is not compatible. Try: ['critical', 'user']")
 
-        int_segments = np.round(self.ic['pipe'].segments)
+        int_segments = np.round(self.ss['pipe'].segments)
         int_segments[int_segments < 2] = 2
 
         if wave_speed_method in ('critical', 'user'):
             # The wave_speed values are adjusted to compensate the truncation error
-            self.ic['pipe'].wave_speed = self.ic['pipe'].wave_speed * self.ic['pipe'].segments/int_segments
-            self.ic['pipe'].segments = int_segments
+            self.ss['pipe'].wave_speed = self.ss['pipe'].wave_speed * self.ss['pipe'].segments/int_segments
+            self.ss['pipe'].segments = int_segments
         elif wave_speed_method == 'dt':
             # The wave_speed is not adjusted when wave_speed_method == 'dt'
             # since the error is absorved by the time step
-            self.ic['pipe'].segments = int_segments
+            self.ss['pipe'].segments = int_segments
         elif wave_speed_method == 'optimal':
-            self.ic['pipe'].segments = int_segments
-            phi = self.ic['pipe'].length / (self.ic['pipe'].wave_speed * self.ic['pipe'].segments)
+            self.ss['pipe'].segments = int_segments
+            phi = self.ss['pipe'].length / (self.ss['pipe'].wave_speed * self.ss['pipe'].segments)
             theta = np.dot(phi,np.ones_like(phi)) / np.dot(phi, phi)
             self._super.settings.time_step = 1/theta
-            self.ic['pipe'].wave_speed = self.ic['pipe'].wave_speed * (phi*theta)
-        self.ic['pipe'].dx = self.ic['pipe'].length / self.ic['pipe'].segments
-        self.num_segments = int(sum(self.ic['pipe'].segments))
+            self.ss['pipe'].wave_speed = self.ss['pipe'].wave_speed * (phi*theta)
+        self.ss['pipe'].dx = self.ss['pipe'].length / self.ss['pipe'].segments
+        self.num_segments = int(sum(self.ss['pipe'].segments))
         self.num_points = self.num_segments + self.wn.num_pipes
 
     def _create_nonpipe_selectors(self, object_type):
@@ -219,28 +219,28 @@ class Initializator:
 
         '''
         if object_type in ('valve', 'pump'):
-            x1 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].start_node[self.ic[object_type].is_inline])
-            x2 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].end_node[self.ic[object_type].is_inline])
+            x1 = np.isin(self.where.pipes['to_nodes'], self.ss[object_type].start_node[self.ss[object_type].is_inline])
+            x2 = np.isin(self.where.pipes['to_nodes'], self.ss[object_type].end_node[self.ss[object_type].is_inline])
             if object_type == 'valve':
-                x3 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].start_node[~self.ic[object_type].is_inline])
+                x3 = np.isin(self.where.pipes['to_nodes'], self.ss[object_type].start_node[~self.ss[object_type].is_inline])
             elif object_type == 'pump':
-                x3 = np.isin(self.where.pipes['to_nodes'], self.ic[object_type].end_node[~self.ic[object_type].is_inline])
+                x3 = np.isin(self.where.pipes['to_nodes'], self.ss[object_type].end_node[~self.ss[object_type].is_inline])
             self.where.points['start_' + object_type] = np.sort(self.where.points['are_boundaries'][x1])
-            ordered = np.argsort(self.ic[object_type].start_node)
-            ordered_end = np.argsort(self.ic[object_type].end_node)
-            self.where.points['start_' + object_type,] = ordered[self.ic[object_type].is_inline[ordered]]
+            ordered = np.argsort(self.ss[object_type].start_node)
+            ordered_end = np.argsort(self.ss[object_type].end_node)
+            self.where.points['start_' + object_type,] = ordered[self.ss[object_type].is_inline[ordered]]
             last_order = np.argsort(self.where.points['start_' + object_type,])
             self.where.points['start_' + object_type][:] = self.where.points['start_' + object_type][last_order]
             self.where.points['start_' + object_type,][:] = self.where.points['start_' + object_type,][last_order]
             self.where.points['end_' + object_type] = np.sort(self.where.points['are_boundaries'][x2])
-            self.where.points['end_' + object_type,] = ordered_end[self.ic[object_type].is_inline[ordered_end]]
-            self.where.__dict__[object_type + 's']['are_inline'] = self.ic[object_type].is_inline
+            self.where.points['end_' + object_type,] = ordered_end[self.ss[object_type].is_inline[ordered_end]]
+            self.where.__dict__[object_type + 's']['are_inline'] = self.ss[object_type].is_inline
             self.where.__dict__[object_type + 's']['are_inline',] = last_order
             last_order = np.argsort(self.where.points['end_' + object_type,])
             self.where.points['end_' + object_type][:] = self.where.points['end_' + object_type][last_order]
             self.where.points['end_' + object_type,][:] = self.where.points['end_' + object_type,][last_order]
             self.where.points['single_' + object_type] = np.sort(self.where.points['are_boundaries'][x3])
-            self.where.points['single_' + object_type,] = ordered[~self.ic[object_type].is_inline[ordered]]
+            self.where.points['single_' + object_type,] = ordered[~self.ss[object_type].is_inline[ordered]]
             last_order = np.argsort(self.where.points['single_' + object_type,])
             self.where.points['single_' + object_type][:] = self.where.points['single_' + object_type][last_order]
             self.where.points['single_' + object_type,][:] = self.where.points['single_' + object_type,][last_order]
@@ -251,10 +251,10 @@ class Initializator:
             self.where.points['are_' + object_type].sort()
         elif object_type in ('open_protection', 'closed_protection'):
             protection_type = object_type[:object_type.find('_')]
-            if self.ic[f'{protection_type}_protection']:
-                self.where.nodes[f'are_{protection_type}_protection'] = self.ic[f'{protection_type}_protection'].node
-                node_end_idx = np.cumsum(self.where.nodes['to_points',])[self.ic[f'{protection_type}_protection'].node] - 1
-                node_start_idx = node_end_idx - self.where.nodes['to_points',][self.ic[f'{protection_type}_protection'].node] + 1
+            if self.ss[f'{protection_type}_protection']:
+                self.where.nodes[f'are_{protection_type}_protection'] = self.ss[f'{protection_type}_protection'].node
+                node_end_idx = np.cumsum(self.where.nodes['to_points',])[self.ss[f'{protection_type}_protection'].node] - 1
+                node_start_idx = node_end_idx - self.where.nodes['to_points',][self.ss[f'{protection_type}_protection'].node] + 1
                 self.where.points[f'start_{protection_type}_protection'] = self.where.nodes['to_points'][node_start_idx]
                 self.where.points[f'end_{protection_type}_protection'] = self.where.nodes['to_points'][node_end_idx]
                 self.where.points[f'are_{protection_type}_protection'] = imerge(self.where.points[f'start_{protection_type}_protection'], self.where.points[f'end_{protection_type}_protection'])
@@ -290,7 +290,7 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     pumps = Table(PUMP_PROPERTIES, wn.num_pumps)
     pump_labels = []
 
-    ic = {
+    ss = {
         'node' : nodes,
         'pipe' : pipes,
         'valve' : valves,
@@ -313,25 +313,25 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     for i in range(1, wn.num_nodes+1):
         node_id = EPANET.ENgetnodeid(i)
         node_labels.append(node_id)
-        ic['node'].leak_coefficient[i-1] = EPANET.ENgetnodevalue(i, EN.EMITTER)
-        ic['node'].demand[i-1] = EPANET.ENgetnodevalue(i, EN.DEMAND)
-        ic['node'].head[i-1] = EPANET.ENgetnodevalue(i, EN.HEAD)
-        ic['node'].pressure[i-1] = EPANET.ENgetnodevalue(i, EN.PRESSURE)
-        ic['node'].type[i-1] = EPANET.ENgetnodetype(i)
+        ss['node'].leak_coefficient[i-1] = EPANET.ENgetnodevalue(i, EN.EMITTER)
+        ss['node'].demand[i-1] = EPANET.ENgetnodevalue(i, EN.DEMAND)
+        ss['node'].head[i-1] = EPANET.ENgetnodevalue(i, EN.HEAD)
+        ss['node'].pressure[i-1] = EPANET.ENgetnodevalue(i, EN.PRESSURE)
+        ss['node'].type[i-1] = EPANET.ENgetnodetype(i)
         z = EPANET.ENgetnodevalue(i, EN.ELEVATION)
-        if ic['node'].type[i-1] == EN.RESERVOIR:
+        if ss['node'].type[i-1] == EN.RESERVOIR:
             z = 0
-        elif ic['node'].type[i-1] == EN.TANK:
-            z = ic['node'].head[i-1] - ic['node'].pressure[i-1]
-        ic['node'].elevation[i-1] = z
-        ic['node'].degree[i-1] = network_graph.degree(node_id)
+        elif ss['node'].type[i-1] == EN.TANK:
+            z = ss['node'].head[i-1] - ss['node'].pressure[i-1]
+        ss['node'].elevation[i-1] = z
+        ss['node'].degree[i-1] = network_graph.degree(node_id)
 
     # Unit conversion
-    to_si(flow_units, ic['node'].leak_coefficient, HydParam.EmitterCoeff)
-    to_si(flow_units, ic['node'].demand, HydParam.Flow)
-    to_si(flow_units, ic['node'].head, HydParam.HydraulicHead)
-    to_si(flow_units, ic['node'].pressure, HydParam.Pressure)
-    to_si(flow_units, ic['node'].elevation, HydParam.Elevation)
+    to_si(flow_units, ss['node'].leak_coefficient, HydParam.EmitterCoeff)
+    to_si(flow_units, ss['node'].demand, HydParam.Flow)
+    to_si(flow_units, ss['node'].head, HydParam.HydraulicHead)
+    to_si(flow_units, ss['node'].pressure, HydParam.Pressure)
+    to_si(flow_units, ss['node'].elevation, HydParam.Elevation)
 
     non_pipe_nodes = []
     p, pp, v = 0, 0, 0 # pipes, pumps, valves
@@ -347,96 +347,96 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
         elif link.link_type == 'Valve':
             k = v; v += 1
 
-        ic[ltype].start_node[k], ic[ltype].end_node[k] = EPANET.ENgetlinknodes(i)
-        ic[ltype].flowrate[k] = EPANET.ENgetlinkvalue(i, EN.FLOW)
-        ic[ltype].velocity[k] = EPANET.ENgetlinkvalue(i, EN.VELOCITY)
+        ss[ltype].start_node[k], ss[ltype].end_node[k] = EPANET.ENgetlinknodes(i)
+        ss[ltype].flowrate[k] = EPANET.ENgetlinkvalue(i, EN.FLOW)
+        ss[ltype].velocity[k] = EPANET.ENgetlinkvalue(i, EN.VELOCITY)
 
         # Indexes are adjusted to fit the new Table / Indexing in EPANET's C code starts in 1
-        ic[ltype].start_node[k] -= 1
-        ic[ltype].end_node[k] -= 1
+        ss[ltype].start_node[k] -= 1
+        ss[ltype].end_node[k] -= 1
 
-        flow = to_si(flow_units, [ic[ltype].flowrate[k]], HydParam.Flow)[0]
+        flow = to_si(flow_units, [ss[ltype].flowrate[k]], HydParam.Flow)[0]
         if abs(flow) < TOL:
-            ic[ltype].direction[k] = 0
-            ic[ltype].flowrate[k] = 0
+            ss[ltype].direction[k] = 0
+            ss[ltype].flowrate[k] = 0
             if link.link_type == 'Pipe':
-                ic[ltype].ffactor[k] = DEFAULT_FFACTOR
+                ss[ltype].ffactor[k] = DEFAULT_FFACTOR
         elif flow > TOL:
-            ic[ltype].direction[k] = 1
+            ss[ltype].direction[k] = 1
         else:
-            ic[ltype].direction[k] = -1
-            ic[ltype].flowrate[k] *= -1
-            ic[ltype].start_node[k], ic[ltype].end_node[k] = ic[ltype].end_node[k], ic[ltype].start_node[k]
+            ss[ltype].direction[k] = -1
+            ss[ltype].flowrate[k] *= -1
+            ss[ltype].start_node[k], ss[ltype].end_node[k] = ss[ltype].end_node[k], ss[ltype].start_node[k]
 
-        if ic['node'].degree[ic[ltype].start_node[k]] >= 2 and \
-            ic['node'].degree[ic[ltype].end_node[k]] >= 2:
-            ic[ltype].is_inline[k] = True
+        if ss['node'].degree[ss[ltype].start_node[k]] >= 2 and \
+            ss['node'].degree[ss[ltype].end_node[k]] >= 2:
+            ss[ltype].is_inline[k] = True
 
         if link.link_type in ('Pipe', 'Valve'):
-            ic[ltype].diameter[k] = link.diameter
-            ic[ltype].area[k] = np.pi * link.diameter ** 2 / 4
-            ic[ltype].type[k] = EPANET.ENgetlinktype(i)
-            ic[ltype].head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
+            ss[ltype].diameter[k] = link.diameter
+            ss[ltype].area[k] = np.pi * link.diameter ** 2 / 4
+            ss[ltype].type[k] = EPANET.ENgetlinktype(i)
+            ss[ltype].head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
 
         if link.link_type == 'Pipe':
             pipe_labels.append(link.name)
-            ic[ltype].length[k] = link.length
+            ss[ltype].length[k] = link.length
         elif link.link_type == 'Pump':
             pump_labels.append(link.name)
-            ic[ltype].initial_status[k] = link.initial_status
-            ic[ltype].setting[k] = ic[ltype].initial_status[k]
-            ic[ltype].head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
+            ss[ltype].initial_status[k] = link.initial_status
+            ss[ltype].setting[k] = ss[ltype].initial_status[k]
+            ss[ltype].head_loss[k] = EPANET.ENgetlinkvalue(i, EN.HEADLOSS)
             # Pump curve parameters
             qp, hp = list(zip(*link.get_pump_curve().points)); qp = list(qp); hp = list(hp)
-            qpp = to_si(flow_units, float(ic[ltype].flowrate[k]), HydParam.Flow)
-            hpp = to_si(flow_units, float(ic[ltype].head_loss[k]), HydParam.HydraulicHead)
+            qpp = to_si(flow_units, float(ss[ltype].flowrate[k]), HydParam.Flow)
+            hpp = to_si(flow_units, float(ss[ltype].head_loss[k]), HydParam.HydraulicHead)
             qp.pop(); hp.pop(); qp.append(qpp); hp.append(abs(hpp))
             order = np.argsort(qp)
             qp = np.array(qp)[order]
             hp = np.array(hp)[order]
-            ic[ltype].a2[k], ic[ltype].a1[k], ic[ltype].Hs[k] = np.polyfit(qp, hp, 2)
+            ss[ltype].a2[k], ss[ltype].a1[k], ss[ltype].Hs[k] = np.polyfit(qp, hp, 2)
             # Source head
-            ic[ltype].source_head[k] = ic['node'].head[ic[ltype].start_node[k]]
-            non_pipe_nodes += [ic[ltype].start_node[k], ic[ltype].end_node[k]]
+            ss[ltype].source_head[k] = ss['node'].head[ss[ltype].start_node[k]]
+            non_pipe_nodes += [ss[ltype].start_node[k], ss[ltype].end_node[k]]
         elif link.link_type == 'Valve':
             valve_labels.append(link.name)
-            ic[ltype].initial_status[k] = EPANET.ENgetlinkvalue(i, EN.INITSTATUS)
-            ic[ltype].setting[k] = ic[ltype].initial_status[k]
-            ic[ltype].flowrate[k] = to_si(flow_units, float(ic[ltype].flowrate[k]), HydParam.Flow)
-            ha = ic['node'].head[ic[ltype].start_node[k]]
-            hb = ic['node'].head[ic[ltype].end_node[k]] if ic['node'].degree[ic[ltype].end_node[k]] > 1 else 0
+            ss[ltype].initial_status[k] = EPANET.ENgetlinkvalue(i, EN.INITSTATUS)
+            ss[ltype].setting[k] = ss[ltype].initial_status[k]
+            ss[ltype].flowrate[k] = to_si(flow_units, float(ss[ltype].flowrate[k]), HydParam.Flow)
+            ha = ss['node'].head[ss[ltype].start_node[k]]
+            hb = ss['node'].head[ss[ltype].end_node[k]] if ss['node'].degree[ss[ltype].end_node[k]] > 1 else 0
             hl = ha - hb
             if hl > 0:
-                ic[ltype].K[k] = ic[ltype].flowrate[k]/(ic[ltype].area[k]*(2*G*hl)**0.5)
-            non_pipe_nodes += [ic[ltype].start_node[k], ic[ltype].end_node[k]]
+                ss[ltype].K[k] = ss[ltype].flowrate[k]/(ss[ltype].area[k]*(2*G*hl)**0.5)
+            non_pipe_nodes += [ss[ltype].start_node[k], ss[ltype].end_node[k]]
 
     EPANET.ENcloseH()
     EPANET.ENclose()
 
     # Unit conversion
-    to_si(flow_units, ic['pipe'].head_loss, HydParam.HydraulicHead)
-    to_si(flow_units, ic['pipe'].flowrate, HydParam.Flow)
-    to_si(flow_units, ic['pump'].flowrate, HydParam.Flow)
-    to_si(flow_units, ic['pipe'].velocity, HydParam.Velocity)
-    to_si(flow_units, ic['pump'].velocity, HydParam.Velocity)
-    to_si(flow_units, ic['pump'].head_loss, HydParam.HydraulicHead)
-    to_si(flow_units, ic['valve'].head_loss, HydParam.HydraulicHead)
-    to_si(flow_units, ic['valve'].velocity, HydParam.Velocity)
+    to_si(flow_units, ss['pipe'].head_loss, HydParam.HydraulicHead)
+    to_si(flow_units, ss['pipe'].flowrate, HydParam.Flow)
+    to_si(flow_units, ss['pump'].flowrate, HydParam.Flow)
+    to_si(flow_units, ss['pipe'].velocity, HydParam.Velocity)
+    to_si(flow_units, ss['pump'].velocity, HydParam.Velocity)
+    to_si(flow_units, ss['pump'].head_loss, HydParam.HydraulicHead)
+    to_si(flow_units, ss['valve'].head_loss, HydParam.HydraulicHead)
+    to_si(flow_units, ss['valve'].velocity, HydParam.Velocity)
 
-    idx = ic['pipe'].ffactor == 0
-    ic['pipe'].ffactor[idx] = \
-        (2*G*ic['pipe'].diameter[idx] * ic['pipe'].head_loss[idx]) \
-            / (ic['pipe'].length[idx] * ic['pipe'].velocity[idx]**2)
+    idx = ss['pipe'].ffactor == 0
+    ss['pipe'].ffactor[idx] = \
+        (2*G*ss['pipe'].diameter[idx] * ss['pipe'].head_loss[idx]) \
+            / (ss['pipe'].length[idx] * ss['pipe'].velocity[idx]**2)
 
-    # ic['pipe'].ffactor[ic['pipe'].ffactor >= CEIL_FFACTOR] = CEIL_FFACTOR
-    # ic['pipe'].ffactor[ic['pipe'].ffactor <= FLOOR_FFACTOR] = FLOOR_FFACTOR
+    # ss['pipe'].ffactor[ss['pipe'].ffactor >= CEIL_FFACTOR] = CEIL_FFACTOR
+    # ss['pipe'].ffactor[ss['pipe'].ffactor <= FLOOR_FFACTOR] = FLOOR_FFACTOR
 
-    ic['valve'].curve_index.fill(-1)
-    ic['pump'].curve_index.fill(-1)
+    ss['valve'].curve_index.fill(-1)
+    ss['pump'].curve_index.fill(-1)
 
-    demanded = np.logical_and(ic['node'].type != EN.RESERVOIR, ic['node'].type != EN.TANK)
-    KeKd = ic['node'].demand[demanded] / np.sqrt(ic['node'].pressure[demanded])
-    ic['node'].demand_coefficient[demanded] = KeKd - ic['node'].leak_coefficient[demanded]
+    demanded = np.logical_and(ss['node'].type != EN.RESERVOIR, ss['node'].type != EN.TANK)
+    KeKd = ss['node'].demand[demanded] / np.sqrt(ss['node'].pressure[demanded])
+    ss['node'].demand_coefficient[demanded] = KeKd - ss['node'].leak_coefficient[demanded]
 
     nodes.assign_labels(node_labels)
     pipes.assign_labels(pipe_labels)
@@ -444,35 +444,35 @@ def get_initial_conditions(inpfile, period = 0, wn = None):
     pumps.assign_labels(pump_labels)
 
     non_pipe_nodes = np.array(non_pipe_nodes)
-    zero_flow_pipes = ic['pipe'].flowrate == 0
-    zf = ic['pipe'].start_node[zero_flow_pipes]
-    zf = np.concatenate((zf, ic['pipe'].end_node[zero_flow_pipes]))
-    _fix_zero_flow_convention('valve', non_pipe_nodes, zf, wn, ic)
-    _fix_zero_flow_convention('pump', non_pipe_nodes, zf, wn, ic)
+    zero_flow_pipes = ss['pipe'].flowrate == 0
+    zf = ss['pipe'].start_node[zero_flow_pipes]
+    zf = np.concatenate((zf, ss['pipe'].end_node[zero_flow_pipes]))
+    _fix_zero_flow_convention('valve', non_pipe_nodes, zf, wn, ss)
+    _fix_zero_flow_convention('pump', non_pipe_nodes, zf, wn, ss)
 
-    return ic
+    return ss
 
-def _fix_zero_flow_convention(ltype, non_pipe_nodes, zf, wn, ic):
+def _fix_zero_flow_convention(ltype, non_pipe_nodes, zf, wn, ss):
     # Define flow convention for zero flow pipes attached to
-    zero_flow = np.where(np.isin(ic[ltype].start_node, zf))[0]
+    zero_flow = np.where(np.isin(ss[ltype].start_node, zf))[0]
     for k in zero_flow:
-        upipe = wn.get_links_for_node(ic['node'].ilabel(ic[ltype].start_node[k]))
-        upipe.remove(ic[ltype].labels[k])
-        upipe = ic['pipe'].lloc(upipe[0])
-        dpipe = wn.get_links_for_node(ic['node'].ilabel(ic[ltype].end_node[k]))
-        dpipe.remove(ic[ltype].labels[k])
-        dpipe = ic['pipe'].lloc(dpipe[0])
+        upipe = wn.get_links_for_node(ss['node'].ilabel(ss[ltype].start_node[k]))
+        upipe.remove(ss[ltype].labels[k])
+        upipe = ss['pipe'].lloc(upipe[0])
+        dpipe = wn.get_links_for_node(ss['node'].ilabel(ss[ltype].end_node[k]))
+        dpipe.remove(ss[ltype].labels[k])
+        dpipe = ss['pipe'].lloc(dpipe[0])
 
-        if ic['pipe'].end_node[upipe] != ic[ltype].start_node[k]:
-            ic['pipe'].direction[upipe] = -1 if ic['pipe'].direction[upipe] != -1 else 1
-            ic['pipe'].start_node[upipe], ic['pipe'].end_node[upipe] = ic['pipe'].end_node[upipe], ic['pipe'].start_node[upipe]
+        if ss['pipe'].end_node[upipe] != ss[ltype].start_node[k]:
+            ss['pipe'].direction[upipe] = -1 if ss['pipe'].direction[upipe] != -1 else 1
+            ss['pipe'].start_node[upipe], ss['pipe'].end_node[upipe] = ss['pipe'].end_node[upipe], ss['pipe'].start_node[upipe]
         else:
-            if ic['pipe'].direction[upipe] == 0:
-                ic['pipe'].direction[upipe] = 1
+            if ss['pipe'].direction[upipe] == 0:
+                ss['pipe'].direction[upipe] = 1
 
-        if ic['pipe'].start_node[dpipe] != ic[ltype].end_node[k]:
-            ic['pipe'].direction[dpipe] = -1 if ic['pipe'].direction[dpipe] != -1 else 1
-            ic['pipe'].start_node[dpipe], ic['pipe'].end_node[dpipe] = ic['pipe'].end_node[dpipe], ic['pipe'].start_node[dpipe]
+        if ss['pipe'].start_node[dpipe] != ss[ltype].end_node[k]:
+            ss['pipe'].direction[dpipe] = -1 if ss['pipe'].direction[dpipe] != -1 else 1
+            ss['pipe'].start_node[dpipe], ss['pipe'].end_node[dpipe] = ss['pipe'].end_node[dpipe], ss['pipe'].start_node[dpipe]
         else:
-            if ic['pipe'].direction[dpipe] == 0:
-                ic['pipe'].direction[dpipe] = 1
+            if ss['pipe'].direction[dpipe] == 0:
+                ss['pipe'].direction[dpipe] = 1
