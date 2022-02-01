@@ -9,10 +9,9 @@ def test_initial_conditions():
     sim = PTSNETSimulation(
         inpfile = get_example_path('B0'),
         settings = {
-            'save_results' : False
-        },
-        default_wave_speed = 1200
-    )
+            'save_results' : False,
+            'default_wave_speed' : 1200
+        })
 
     sim.add_curve('V_BUTTERFLY', 'valve',
         [1, 0.8, 0.6, 0.4, 0.2, 0],

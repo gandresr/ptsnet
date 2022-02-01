@@ -15,7 +15,7 @@ class Worker:
         self.recv_queue = None
         self.router = kwargs['router']
         self.wn = kwargs['wn']
-        self.ss = kwargs['ic']
+        self.ss = kwargs['ss']
         self.global_where = kwargs['where']
         self.time_step = kwargs['time_step']
         self.time_steps = kwargs['time_steps']
