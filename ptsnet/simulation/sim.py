@@ -20,6 +20,22 @@ from ptsnet.simulation.constants import NODE_RESULTS, PIPE_END_RESULTS, PIPE_STA
 from ptsnet.profiler.profiler import Profiler
 
 class PTSNETSettings:
+    simplified_settings = (
+        'time_step',
+        'duration',
+        'warnings_on',
+        'parallel',
+        'gpu',
+        'skip_compatibility_check',
+        'show_progress',
+        'save_results',
+        'profiler_on',
+        'period',
+        'default_wave_speed',
+        'wave_speed_file_path',
+        'delimiter',
+        'wave_speed_method')
+
     def __init__(self,
         time_step : float = 0.01,
         duration: float = 20,
@@ -47,7 +63,7 @@ class PTSNETSettings:
         self.skip_compatibility_check = skip_compatibility_check
         self.show_progress = show_progress
         self.save_results = save_results
-        self.profiler_on = profiler_on,
+        self.profiler_on = profiler_on
         self.defined_wave_speeds = False
         self.active_persistance = False
         self.blocked = False
@@ -97,11 +113,11 @@ class PTSNETSettings:
         self.is_initialized = False
         self.updated_settings = False
 
-    def to_dict(self):
+    def to_dict(self, simplified=False):
         l = {}
         for setting, val in self.__dict__.items():
-            if setting == '_super':
-                continue
+            if setting == '_super': continue
+            if simplified and setting not in self.simplified_settings: continue
             l[setting] = val
         return l
 

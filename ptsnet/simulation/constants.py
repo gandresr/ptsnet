@@ -11,6 +11,10 @@ DEFAULT_FFACTOR = 0.035
 G = 9.807 # SI gravity
 TOL = 1E-6
 COEFF_TOL = 1E-6
+FILE_TEMPLATE = """
+from ptsnet.simulation.sim import PTSNETSimulation
+sim = PTSNETSimulation(inpfile = '{inpfile}', settings = {settings})\n
+"""
 
 # ----- Initial Conditions -----
 
@@ -34,6 +38,7 @@ PIPE_PROPERTIES = {
     'diameter' : float, #
     'area' : float, #
     'wave_speed' : float, #
+    'desired_wave_speed' : float, #
     'segments' : float, #
     'flowrate' : float, #
     'velocity' : float, #

@@ -1,5 +1,7 @@
 import os
 import subprocess
+import shutil
+
 from pkg_resources import resource_filename
 
 def run_shell(command):
@@ -39,3 +41,10 @@ def walk(folder_structure, root_path):
 def get_workspaces():
     return os.listdir(os.path.join(get_root_path(), 'workspaces'))
 
+def get_temp_folder():
+    return os.path.join(get_root_path(), 'tmp')
+
+def create_temp_folder():
+    tmpdir = get_temp_folder()
+    if os.path.exists(tmpdir): shutil.rmtree(tmpdir)
+    os.makedirs(tmpdir)

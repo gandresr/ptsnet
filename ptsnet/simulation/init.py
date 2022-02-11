@@ -146,11 +146,8 @@ class Initializer:
 
     def set_wave_speeds(self, default_wave_speed = 1000, wave_speed_file_path = None, delimiter = ',', wave_speed_method = 'optimal'):
 
-            if not default_wave_speed is None:
-                self.ss['pipe'].wave_speed[:] = default_wave_speed
-
             modified_lines = 0
-            if not wave_speed_file_path is None:
+            if wave_speed_file_path != None:
                 with open(wave_speed_file_path, 'r') as f:
                     for line in f:
                         line = line.strip()
@@ -159,9 +156,10 @@ class Initializer:
                         pipe, wave_speed = line.split(delimiter)
                         self.ss['pipe'].wave_speed[pipe] = float(wave_speed)
                         modified_lines += 1
-            else:
-                self._set_segments(wave_speed_method)
-                return True
+
+            if default_wave_speed != None:
+                self.ss['pipe'].wave_speed[:] = default_wave_speed
+                modified_lines = self.wn.num_pipes
 
             if modified_lines != self.wn.num_pipes:
                 self.ss['pipe'].wave_speed[:] = 0
@@ -169,6 +167,7 @@ class Initializer:
                 excep += "it is necessary to define a default wave speed value"
                 raise ValueError(excep)
 
+            self.ss['pipe'].desired_wave_speed = self.ss['pipe'].wave_speed
             self._set_segments(wave_speed_method)
             return True
 

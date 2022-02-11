@@ -7,11 +7,13 @@ from ptsnet.utils.io import get_example_path
 def test_initial_conditions():
 
     sim = PTSNETSimulation(
-        inpfile = get_example_path('B0'),
+        inpfile = get_example_path('BWSN_F'),
         settings = {
+            'time_step' : 0.0001,
             'save_results' : False,
-            'default_wave_speed' : 1200
-        })
+            'default_wave_speed' : 1000,
+            'wave_speed_method' : 'user'
+    })
 
     sim.add_curve('V_BUTTERFLY', 'valve',
         [1, 0.8, 0.6, 0.4, 0.2, 0],
