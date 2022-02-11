@@ -39,35 +39,35 @@ def plot_times_per_step(duration=20):
     with open(export_path, 'rb') as f:
         data = pickle.load(f)
 
-    init_times = data['init_times']
-    interior_times = data['interior_times']
-    boundary_times = data['boundary_times']
-    comm_times = data['comm_times']
-    totals = data['totals']
-    processors = data['processors']
     time_steps = data['time_steps']
+    num_steps = duration/np.tile(time_steps,(len(time_steps),1))
+    init_times = data['init_times']*num_steps
+    interior_times = data['interior_times']*num_steps
+    boundary_times = data['boundary_times']*num_steps
+    comm_times = data['comm_times']*num_steps
+    totals = data['totals']*num_steps
+    processors = data['processors']
 
     n = init_times.shape[0]
     p = len(processors)
-    bars1_1 = init_times + interior_times
-    bars2_1 = bars1_1 + boundary_times
     matplotlib.rc('ytick', labelsize=22)
     loc = plticker.MultipleLocator(base=20e3)
     fig, ax = plt.subplots(figsize=(18, 8), dpi = 80)
     ax.yaxis.set_major_locator(loc)
     plt.tight_layout()
-    fig.subplots_adjust(top = 0.95, bottom = 0.12, left = 0.04)
+    fig.subplots_adjust(top = 0.95, bottom = 0.05, left = 0.04)
     X = np.arange(p, dtype=int)
+    plt.ylim(0,5000)
     width = 0.8
     patterns = ['','','']
+    bars1_1 = init_times + interior_times
+    bars2_1 = bars1_1 + boundary_times
 
     for i in range(n-1,-1,-1):
-        ts = time_steps[i]
-        num_steps = duration/ts
-        p1 = ax.bar(X-(n-i)*width/n, num_steps*init_times[i], hatch=patterns[i], width = width/n, color = '#000', alpha = 1)
-        p2 = ax.bar(X-(n-i)*width/n, num_steps*interior_times[i], bottom = init_times[i], hatch=patterns[i], width = width/n, color = '#999', alpha = 1)
-        p3 = ax.bar(X-(n-i)*width/n, num_steps*boundary_times[i], bottom = bars1_1[i], hatch=patterns[i], width = width/n, color = '#ccc', alpha = 1)
-        p4 = ax.bar(X-(n-i)*width/n, num_steps*comm_times[i], bottom = bars2_1[i], hatch=patterns[i], width = width/n, color = '#eee', alpha = 1)
+        p1 = ax.bar(X-(n-i)*width/n, init_times[i], hatch=patterns[i], width = width/n, color = '#000', alpha = 1)
+        p2 = ax.bar(X-(n-i)*width/n, interior_times[i], bottom = init_times[i], hatch=patterns[i], width = width/n, color = '#999', alpha = 1)
+        p3 = ax.bar(X-(n-i)*width/n, boundary_times[i], bottom = bars1_1[i], hatch=patterns[i], width = width/n, color = '#ccc', alpha = 1)
+        p4 = ax.bar(X-(n-i)*width/n, comm_times[i], bottom = bars2_1[i], hatch=patterns[i], width = width/n, color = '#eee', alpha = 1)
 
         for r1, r2, r3, r4 in zip(p1, p2, p3, p4):
             h1 = r1.get_height()
@@ -75,7 +75,7 @@ def plot_times_per_step(duration=20):
             h3 = r3.get_height()
             h4 = r4.get_height()
             # plt.text(r1.get_x()+r1.get_width()/2., h1+h2+h3+h4, f'$\\tau_{i+1}$', ha = 'center', va='bottom', fontsize=22)
-            plt.text(r1.get_x()+r1.get_width()/2., h1+h2+h3+h4, '{:,}'.format(int(h1+h2+h3+h4)), ha = 'center', va='bottom', fontsize=16)
+            plt.text(r1.get_x()+r1.get_width()/2., h1+h2+h3+h4, '{:,} s'.format(int(h1+h2+h3+h4)), ha = 'center', va='bottom', fontsize=16)
     plt.xticks(X+width/2-1, processors, fontsize = 22)
     box = ax.get_position()
     ax.set_position([box.x0, box.y0 + box.height * 0.1,
@@ -96,7 +96,7 @@ def plot_times_per_step(duration=20):
         fontsize = 18)
 
     plt.xlabel('Number of processors', fontsize = 20)
-    plt.ticklabel_format(axis="y", style="sci", scilimits=(0,0), useOffset = False)
+    # plt.ticklabel_format(axis="y", style="sci", scilimits=(0,0), useOffset = False)
     ax.get_yaxis().set_major_formatter(
         matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
     plt.ylabel('Time [s]', fontsize = 20)

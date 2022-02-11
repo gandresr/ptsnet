@@ -174,7 +174,7 @@ def compute_simulation_times_per_step(inpfile, time_steps, count=4, nprocessors=
     "        'boundary_times' : boundary_times,\n" + \
     "        'comm_times' : comm_times,\n" + \
     "        'totals' : totals,\n" + \
-    f"        'processors' : processors\n" + \
+    f"        'processors' : processors,\n" + \
     f"        'time_steps' : time_steps\n" + \
     "    }\n" + \
     f"    with open('{export_path}', 'wb') as f:\n" + \
