@@ -13,7 +13,7 @@ TOL = 1E-6
 COEFF_TOL = 1E-6
 FILE_TEMPLATE = """
 from ptsnet.simulation.sim import PTSNETSimulation
-sim = PTSNETSimulation(inpfile = '{inpfile}', settings = {settings})\n
+sim = PTSNETSimulation(workspace_id = {workspace_id}, inpfile = '{inpfile}', settings = {settings})\n
 """
 
 # ----- Initial Conditions -----

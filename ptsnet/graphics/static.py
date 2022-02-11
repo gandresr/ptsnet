@@ -1,10 +1,13 @@
+import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.ticker as plticker
 import networkx.drawing.nx_pylab as nxp
+import bisect, os, pickle
 import numpy as np
-import bisect
 
 from matplotlib.lines import Line2D
 from ptsnet.utils.analytics import compute_wave_speed_error
+from ptsnet.utils.io import get_temp_folder
 
 def plot_wave_speed_error(sim, image_path):
     errors = compute_wave_speed_error(sim)
@@ -28,3 +31,76 @@ def plot_wave_speed_error(sim, image_path):
     ax.legend(custom_lines, percentile_labels, title = 'Relative Error', fontsize = '15', title_fontsize = '17')
     plt.axis('off')
     fig.savefig(image_path)
+
+def plot_times_per_step(duration=20):
+    export_path = os.path.join(get_temp_folder(), "exported_times.pkl")
+    if not os.path.exists(export_path):
+        raise FileExistsError("There's no file with time results. You need to run ptsnet.utils.analytics.compute_simulation_times_per_step first")
+    with open(export_path, 'rb') as f:
+        data = pickle.load(f)
+
+    init_times = data['init_times']
+    interior_times = data['interior_times']
+    boundary_times = data['boundary_times']
+    comm_times = data['comm_times']
+    totals = data['totals']
+    processors = data['processors']
+    time_steps = data['time_steps']
+
+    n = init_times.shape[0]
+    p = len(processors)
+    bars1_1 = init_times + interior_times
+    bars2_1 = bars1_1 + boundary_times
+    matplotlib.rc('ytick', labelsize=22)
+    loc = plticker.MultipleLocator(base=20e3)
+    fig, ax = plt.subplots(figsize=(18, 8), dpi = 80)
+    ax.yaxis.set_major_locator(loc)
+    plt.tight_layout()
+    fig.subplots_adjust(top = 0.95, bottom = 0.12, left = 0.04)
+    X = np.arange(p, dtype=int)
+    width = 0.8
+    patterns = ['','','']
+
+    for i in range(n-1,-1,-1):
+        ts = time_steps[i]
+        num_steps = duration/ts
+        p1 = ax.bar(X-(n-i)*width/n, num_steps*init_times[i], hatch=patterns[i], width = width/n, color = '#000', alpha = 1)
+        p2 = ax.bar(X-(n-i)*width/n, num_steps*interior_times[i], bottom = init_times[i], hatch=patterns[i], width = width/n, color = '#999', alpha = 1)
+        p3 = ax.bar(X-(n-i)*width/n, num_steps*boundary_times[i], bottom = bars1_1[i], hatch=patterns[i], width = width/n, color = '#ccc', alpha = 1)
+        p4 = ax.bar(X-(n-i)*width/n, num_steps*comm_times[i], bottom = bars2_1[i], hatch=patterns[i], width = width/n, color = '#eee', alpha = 1)
+
+        for r1, r2, r3, r4 in zip(p1, p2, p3, p4):
+            h1 = r1.get_height()
+            h2 = r2.get_height()
+            h3 = r3.get_height()
+            h4 = r4.get_height()
+            # plt.text(r1.get_x()+r1.get_width()/2., h1+h2+h3+h4, f'$\\tau_{i+1}$', ha = 'center', va='bottom', fontsize=22)
+            plt.text(r1.get_x()+r1.get_width()/2., h1+h2+h3+h4, '{:,}'.format(int(h1+h2+h3+h4)), ha = 'center', va='bottom', fontsize=16)
+    plt.xticks(X+width/2-1, processors, fontsize = 22)
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0 + box.height * 0.1,
+                    box.width, box.height * 0.9])
+    plt.legend(
+        (p1[0], p2[0], p3[0], p4[0],),
+        (
+            'Initialization',
+            'Interior Points',
+            'Boundary Conditions',
+            'Communication'
+        ),
+        loc = 'upper center',
+        bbox_to_anchor = (0.5, -0.15),
+        fancybox = True,
+        shadow = True,
+        ncol = 4,
+        fontsize = 18)
+
+    plt.xlabel('Number of processors', fontsize = 20)
+    plt.ticklabel_format(axis="y", style="sci", scilimits=(0,0), useOffset = False)
+    ax.get_yaxis().set_major_formatter(
+        matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+    plt.ylabel('Time [s]', fontsize = 20)
+    plt.grid(True)
+    fig.tight_layout()
+    plt.savefig('times_bwsn.pdf')
+    plt.show()
