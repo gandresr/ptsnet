@@ -37,13 +37,15 @@ def compute_num_processors(sim, plot=False, count=4, nprocessors=None):
         f.write(f"echo 'Evaluating Performance (this might take a few minutes)'\n")
         for p in processors:
             f.write(f"mpiexec -n {p} python3 {temp_file_path} &> log.txt\n")
-            f.write(f"echo 'Finished run {i}/{len(processors)}'\n")
+            f.write(f"echo '({int(100*i/len(processors))}%) Finished run {i}/{len(processors)}'\n")
             i += 1
+        f.write(f"rm log.txt\n")
         f.write(f"python3 {compute_file_path}\n")
-        f.write(f"rm log.txt")
 
     # Write Python script to compute number of processors
-    fcontent = \
+    fcontent = "import matplotlib.pyplot as plt\n" if plot else ""
+    fcontent += \
+        "from pprint import pprint\n" + \
         "import numpy as np\n" + \
         "from tqdm import tqdm\n" + \
         "from ptsnet.simulation.sim import PTSNETSimulation\n" + \
@@ -52,21 +54,31 @@ def compute_num_processors(sim, plot=False, count=4, nprocessors=None):
         f"workspaces = [num_workspaces()-1-i for i in range({count})]\n" + \
         "times = {}\n" + \
         "for w in workspaces:\n" + \
-        "   with PTSNETSimulation(w) as sim:\n" + \
-        "       exchange_data_time = np.mean(sim.profiler.summary['comm_jobs'].exchange_data)\n" + \
-        "       barrier1_time = np.mean(sim.profiler.summary['comm_jobs'].barrier1)\n" + \
-        "       barrier2_time = np.mean(sim.profiler.summary['comm_jobs'].barrier2)\n" + \
-        "       run_step_time = np.mean(sim.profiler.summary['step_jobs'].run_step)\n" + \
-        "       total_time = exchange_data_time + barrier1_time + barrier2_time + run_step_time\n" + \
-        "       times[int(sim.settings.num_processors)] = float(total_time)\n" + \
+        "    with PTSNETSimulation(w) as sim:\n" + \
+        "        exchange_data_time = np.mean(sim.profiler.summary['comm_jobs'].exchange_data)\n" + \
+        "        barrier1_time = np.mean(sim.profiler.summary['comm_jobs'].barrier1)\n" + \
+        "        barrier2_time = np.mean(sim.profiler.summary['comm_jobs'].barrier2)\n" + \
+        "        run_step_time = np.mean(sim.profiler.summary['step_jobs'].run_step)\n" + \
+        "        total_time = exchange_data_time + barrier1_time + barrier2_time + run_step_time\n" + \
+        "        times[int(sim.settings.num_processors)] = float(total_time)\n" + \
         "x = list(times.keys()); x.sort()\n" + \
         "y = [times[i] for i in x]\n" + \
+        "optimal = -1; kl = None\n" + \
         "if y[1] > y[0]:\n" + \
-        "   optimal = 1\n" + \
+        "    optimal = 1\n" + \
         "else:\n" + \
-        "   kl = KneeLocator(x, y, 'convex')\n" + \
-        "   optimal = x[-1] if kl.knee is None else kl.knee\n" + \
-        "print(f'Recommended number of processors: {optimal}')\n"
+        "    try:\n" + \
+        "        kl = KneeLocator(x, y, curve='convex', direction='decreasing')\n" + \
+        "        optimal = kl.knee\n" + \
+        "    except:\n" + \
+        "        pass\n" + \
+        "    if optimal == -1: optimal = x[-1]\n" + \
+        "print(f'\\nProcessor Times: \\n')\n" + \
+        "pprint(times)\n" + \
+        "print(f'\\n--> Recommended number of processors: {optimal}\\n')\n"
+
+    if plot:
+        fcontent += "if kl: kl.plot_knee(); plt.show()\n"
 
     with open(compute_file_path, "w") as f:
         f.write(fcontent)

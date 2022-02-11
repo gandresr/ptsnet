@@ -21,3 +21,4 @@ local*
 *.zarr
 *.net
 tests/_*
+log.txt
