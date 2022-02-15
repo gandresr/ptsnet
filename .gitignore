@@ -21,4 +21,6 @@ local*
 *.zarr
 *.net
 tests/_*
+tests/*.pdf
+tests/*.png
 log.txt

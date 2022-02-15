@@ -13,7 +13,7 @@ def compute_wave_speed_error(sim):
     dws = sim.ss['pipe'].desired_wave_speed
     return np.abs(ws - dws)*100 / dws
 
-def compute_nprocessors(sim, plot=False, count=4, nprocessors=None, steps=1000):
+def compute_num_processors(sim, plot=False, count=4, nprocessors=None, steps=2500):
     if type(sim) is not PTSNETSimulation: raise ValueError("'sim' must be a PTSNETSimulation")
     max_processors = psutil.cpu_count(logical=False) if nprocessors is None else nprocessors
     create_temp_folder()
@@ -33,7 +33,7 @@ def compute_nprocessors(sim, plot=False, count=4, nprocessors=None, steps=1000):
     processors = np.linspace(1, max_processors, count, dtype=int)
 
     # Write bash executable
-    bash_path = os.path.join(get_temp_folder(), "compute_nprocessors.sh")
+    bash_path = os.path.join(get_temp_folder(), "compute_num_processors.sh")
     with open(bash_path, "w") as f:
         i = 1
         f.write(f"echo 'Evaluating Performance (this might take a few minutes)'\n")
@@ -47,40 +47,45 @@ def compute_nprocessors(sim, plot=False, count=4, nprocessors=None, steps=1000):
     # Write Python script to compute number of processors
     fcontent = "import matplotlib.pyplot as plt\n" if plot else ""
     fcontent += \
-        "from pprint import pprint\n\n" + \
-        "import numpy as np\n\n" + \
-        "from tqdm import tqdm\n\n" + \
-        "from ptsnet.simulation.sim import PTSNETSimulation\n\n" + \
-        "from ptsnet.results.workspaces import num_workspaces\n\n" + \
-        "from kneed import KneeLocator\n\n" + \
-        f"workspaces = [num_workspaces()-1-i for i in range({count})]\n\n" + \
-        "times = {}\n\n" + \
-        "for w in workspaces:\n\n" + \
-        "    with PTSNETSimulation(w) as sim:\n\n" + \
-        "        exchange_data_time = np.mean(sim.profiler.summary['comm_jobs'].exchange_data)\n\n" + \
-        "        barrier1_time = np.mean(sim.profiler.summary['comm_jobs'].barrier1)\n\n" + \
-        "        barrier2_time = np.mean(sim.profiler.summary['comm_jobs'].barrier2)\n\n" + \
-        "        run_step_time = np.mean(sim.profiler.summary['step_jobs'].run_step)\n\n" + \
-        "        total_time = exchange_data_time + barrier1_time + barrier2_time + run_step_time\n\n" + \
-        "        times[int(sim.settings.nprocessors)] = float(total_time)\n\n" + \
-        "x = list(times.keys()); x.sort()\n\n" + \
-        "y = [times[i] for i in x]\n\n" + \
-        "optimal = -1; kl = None\n\n" + \
-        "if y[1] > y[0]:\n\n" + \
-        "    optimal = 1\n\n" + \
-        "else:\n\n" + \
-        "    try:\n\n" + \
-        "        kl = KneeLocator(x, y, curve='convex', direction='decreasing')\n\n" + \
-        "        optimal = kl.knee\n\n" + \
-        "    except:\n\n" + \
-        "        pass\n\n" + \
-        "    if optimal == -1: optimal = x[-1]\n\n" + \
-        "print(f'\\nProcessor Times: \\n')\n\n" + \
-        "pprint(times)\n\n" + \
+        "import numpy as np\n" + \
+        "from pprint import pprint\n" + \
+        "from ptsnet.simulation.sim import PTSNETSimulation\n" + \
+        "from ptsnet.results.workspaces import num_workspaces\n" + \
+        "from kneed import KneeLocator\n" + \
+        f"workspaces = [num_workspaces()-1-i for i in range({count})]\n" + \
+        "times = {}\n" + \
+        "for w in workspaces:\n" + \
+        "    with PTSNETSimulation(w) as sim:\n" + \
+        "        exchange_data_time = np.mean(sim.profiler.summary['comm_jobs'].exchange_data)\n" + \
+        "        barrier1_time = np.mean(sim.profiler.summary['comm_jobs'].barrier1)\n" + \
+        "        barrier2_time = np.mean(sim.profiler.summary['comm_jobs'].barrier2)\n" + \
+        "        run_step_time = np.mean(sim.profiler.summary['step_jobs'].run_step)\n" + \
+        "        total_time = exchange_data_time + barrier1_time + barrier2_time + run_step_time\n" + \
+        "        times[int(sim.settings.num_processors)] = float(total_time)\n" + \
+        "x = list(times.keys()); x.sort()\n" + \
+        "y = [times[i] for i in x]\n" + \
+        "optimal = -1; kl = None\n" + \
+        "if y[1] > y[0]:\n" + \
+        "    optimal = 1\n" + \
+        "else:\n" + \
+        "    try:\n" + \
+        "        kl = KneeLocator(x, y, curve='convex', direction='decreasing')\n" + \
+        "        optimal = kl.knee\n" + \
+        "    except:\n" + \
+        "        pass\n" + \
+        "    if optimal == -1: optimal = x[-1]\n" + \
+        "print(f'\\nProcessor Times: \\n')\n" + \
+        "pprint(times)\n" + \
         "print(f'\\n--> Recommended number of processors: {optimal}\\n')\n"
 
     if plot:
-        fcontent += "if kl: kl.plot_knee(); plt.show()\n"
+        fcontent += \
+        "plt.plot(x, y, '-o')\n" + \
+        "plt.axvline(x = optimal)\n" + \
+        "plt.xlabel('Number of processors')\n" + \
+        "plt.ylabel('Time [s]')\n" + \
+        "plt.title('Average Time per Step')\n" + \
+        "plt.savefig('knee.pdf')"
 
     with open(compute_file_path, "w") as f:
         f.write(fcontent)
@@ -89,7 +94,7 @@ def compute_nprocessors(sim, plot=False, count=4, nprocessors=None, steps=1000):
     print(f"bash {bash_path}\n")
     exit()
 
-def compute_simulation_times_per_step(inpfile, time_steps, count=4, nprocessors=None, steps=1000):
+def compute_simulation_times_per_step(inpfile, time_steps, duration=20, plot=False, count=4, nprocessors=None, steps=2500):
     create_temp_folder()
     max_processors = psutil.cpu_count(logical=False) if nprocessors is None else nprocessors
     processors = np.linspace(1, max_processors, count, dtype=int)
@@ -156,7 +161,7 @@ def compute_simulation_times_per_step(inpfile, time_steps, count=4, nprocessors=
     "            sim.profiler.summary['_create_selectors'] + \\\n" + \
     "            sim.profiler.summary['_define_dist_graph_comm'] + \\\n" + \
     "            sim.profiler.summary['_allocate_memory'] + \\\n" + \
-    "            sim.profiler.summary['_load_initial_conditions']) / sim.settings.time_steps\n" + \
+    "            sim.profiler.summary['_load_initial_conditions'])\n" + \
     "        interior_times[jj,kk] = \\\n" + \
     "            sim.profiler.summary['run_interior_step'] / sim.settings.time_steps\n" + \
     "        boundary_times[jj,kk] = \\\n" + \
@@ -179,6 +184,14 @@ def compute_simulation_times_per_step(inpfile, time_steps, count=4, nprocessors=
     "    }\n" + \
     f"    with open('{export_path}', 'wb') as f:\n" + \
     "        pickle.dump(times, f)\n"
+    if plot:
+        fcontent += \
+        "# -----------------------------------------------------\n" + \
+        "# | Execute after running the bash generated by\n" + \
+        "# | compute_simulation_times_per_step\n" + \
+        "# v\n" + \
+        "from ptsnet.graphics.static import plot_times_per_step\n" + \
+        f"plot_times_per_step(duration={duration})\n"
 
     with open(compute_file_path, "w") as f:
         f.write(fcontent)

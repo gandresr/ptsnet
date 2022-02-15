@@ -40,24 +40,24 @@ def plot_times_per_step(duration=20):
         data = pickle.load(f)
 
     time_steps = data['time_steps']
-    num_steps = duration/np.tile(time_steps,(len(time_steps),1))
-    init_times = data['init_times']*num_steps
+    processors = data['processors']
+    n = len(time_steps)
+    p = len(processors)
+    num_steps = duration/np.tile(time_steps,(p,1)).T
+    init_times = data['init_times']
     interior_times = data['interior_times']*num_steps
     boundary_times = data['boundary_times']*num_steps
     comm_times = data['comm_times']*num_steps
-    totals = data['totals']*num_steps
-    processors = data['processors']
+    totals = init_times + interior_times + boundary_times + comm_times
 
-    n = init_times.shape[0]
-    p = len(processors)
     matplotlib.rc('ytick', labelsize=22)
     loc = plticker.MultipleLocator(base=20e3)
     fig, ax = plt.subplots(figsize=(18, 8), dpi = 80)
     ax.yaxis.set_major_locator(loc)
-    plt.tight_layout()
-    fig.subplots_adjust(top = 0.95, bottom = 0.05, left = 0.04)
     X = np.arange(p, dtype=int)
-    plt.ylim(0,5000)
+    max_y = 1.2*np.max(np.max(totals))
+    plt.ylim(0, max_y)
+    plt.yticks(np.linspace(0, max_y, 5))
     width = 0.8
     patterns = ['','','']
     bars1_1 = init_times + interior_times
@@ -96,11 +96,11 @@ def plot_times_per_step(duration=20):
         fontsize = 18)
 
     plt.xlabel('Number of processors', fontsize = 20)
-    # plt.ticklabel_format(axis="y", style="sci", scilimits=(0,0), useOffset = False)
     ax.get_yaxis().set_major_formatter(
         matplotlib.ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
     plt.ylabel('Time [s]', fontsize = 20)
     plt.grid(True)
     fig.tight_layout()
+    fig.subplots_adjust(top = 0.95, bottom = 0.2, left = 0.07)
     plt.savefig('times_bwsn.pdf')
     plt.show()
