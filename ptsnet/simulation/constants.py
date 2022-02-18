@@ -15,8 +15,7 @@ FILE_TEMPLATE = """
 from ptsnet.simulation.sim import PTSNETSimulation
 sim = PTSNETSimulation(workspace_id = {workspace_id}, inpfile = '{inpfile}', settings = {settings})\n
 """
-TACC_FILE_TEMPLATE = """
-#!/bin/bash
+TACC_FILE_TEMPLATE = """#!/bin/bash
 #SBATCH -J {job_name}
 #SBATCH -o {job_name}.o%j    # Name of stdout output file
 #SBATCH -e {job_name}.e%j    # Name of stderr error file
