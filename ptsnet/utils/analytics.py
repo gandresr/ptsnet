@@ -54,7 +54,7 @@ def compute_num_processors(
             f.write(f"echo 'Evaluating Performance (this might take a few minutes)'\n")
             for ii, p in enumerate(processors):
                 f.write(f"mpiexec -n {p} python3 {temp_file_path} &> log.txt\n")
-                f.write(f"echo '({int(100*ii/len(processors))}%) Finished run {ii}/{len(processors)}'\n")
+                f.write(f"echo '({int(100*(ii+1)/len(processors))}%) Finished run {ii+1}/{len(processors)}'\n")
             f.write(f"rm log.txt\n")
             f.write(f"python3 {compute_file_path}\n")
     elif environment == 'tacc':

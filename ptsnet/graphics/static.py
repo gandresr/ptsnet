@@ -33,8 +33,8 @@ def plot_wave_speed_error(sim, image_path):
     fig.savefig(image_path)
 
 def plot_estimated_simulation_times(duration=20, fpath=None):
-    export_path = os.fpath.join(get_temp_folder(), "exported_sim_times.pkl") if not fpath else fpath
-    if not os.fpath.exists(export_path):
+    export_path = os.path.join(get_temp_folder(), "exported_sim_times.pkl") if not fpath else fpath
+    if not os.path.exists(export_path):
         raise FileExistsError("There's no file with simulation times. You need to run ptsnet.utils.analytics.compute_simulation_times first")
     with open(export_path, 'rb') as f:
         data = pickle.load(f)
@@ -106,10 +106,10 @@ def plot_estimated_simulation_times(duration=20, fpath=None):
     plt.show()
 
 def plot_knee(fpath=None):
-    export_path = os.fpath.join(get_temp_folder(), "exported_processor_times.pkl") if not fpath else fpath
-    if not os.fpath.exists(export_path):
+    export_path = os.path.join(get_temp_folder(), "exported_processor_times.pkl") if not fpath else fpath
+    if not os.path.exists(export_path):
         raise FileExistsError("There's no file with processor times. You need to run ptsnet.utils.analytics.compute_num_processors first")
-    with open(fpath, 'rb') as f:
+    with open(export_path, 'rb') as f:
         data = pickle.load(f)
     plt.plot(data['processor'], data['time'], '-o')
     plt.axvline(x = data['optimal'])
