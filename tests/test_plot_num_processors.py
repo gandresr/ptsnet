@@ -11,4 +11,4 @@ sim = PTSNETSimulation(
         'wave_speed_method' : 'user'
 })
 
-compute_num_processors(sim, plot=True, count=4, steps=2000, nprocessors=32)
+compute_num_processors(sim, plot=False, count=4, steps=2500, max_num_processors=8, environment='tacc', allocation='LEAP-HI-2021')

@@ -32,10 +32,10 @@ def plot_wave_speed_error(sim, image_path):
     plt.axis('off')
     fig.savefig(image_path)
 
-def plot_times_per_step(duration=20):
-    export_path = os.path.join(get_temp_folder(), "exported_times.pkl")
-    if not os.path.exists(export_path):
-        raise FileExistsError("There's no file with time results. You need to run ptsnet.utils.analytics.compute_simulation_times_per_step first")
+def plot_estimated_simulation_times(duration=20, fpath=None):
+    export_path = os.fpath.join(get_temp_folder(), "exported_sim_times.pkl") if not fpath else fpath
+    if not os.fpath.exists(export_path):
+        raise FileExistsError("There's no file with simulation times. You need to run ptsnet.utils.analytics.compute_simulation_times first")
     with open(export_path, 'rb') as f:
         data = pickle.load(f)
 
@@ -102,5 +102,19 @@ def plot_times_per_step(duration=20):
     plt.grid(True)
     fig.tight_layout()
     fig.subplots_adjust(top = 0.95, bottom = 0.2, left = 0.07)
-    plt.savefig('times_bwsn.pdf')
+    plt.savefig('sim_times.pdf')
+    plt.show()
+
+def plot_knee(fpath=None):
+    export_path = os.fpath.join(get_temp_folder(), "exported_processor_times.pkl") if not fpath else fpath
+    if not os.fpath.exists(export_path):
+        raise FileExistsError("There's no file with processor times. You need to run ptsnet.utils.analytics.compute_num_processors first")
+    with open(fpath, 'rb') as f:
+        data = pickle.load(f)
+    plt.plot(data['processor'], data['time'], '-o')
+    plt.axvline(x = data['optimal'])
+    plt.xlabel('Number of processors')
+    plt.ylabel('Time [s]')
+    plt.title('Average Time per Step')
+    plt.savefig('knee.pdf')
     plt.show()

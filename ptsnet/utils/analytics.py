@@ -1,10 +1,10 @@
 from multiprocessing.sharedctypes import Value
 from time import time
 import numpy as np
-import os, psutil, pickle
+import os, psutil, pickle, datetime
 
-from ptsnet.utils.io import create_temp_folder, get_temp_folder
-from ptsnet.simulation.constants import FILE_TEMPLATE
+from ptsnet.utils.io import create_temp_folder, get_temp_folder, create_tacc_job, submit_tacc_jobs
+from ptsnet.simulation.constants import FILE_TEMPLATE, TACC_FILE_TEMPLATE
 from ptsnet.simulation.sim import PTSNETSimulation, PTSNETSettings
 from ptsnet.results.workspaces import num_workspaces
 
@@ -13,12 +13,27 @@ def compute_wave_speed_error(sim):
     dws = sim.ss['pipe'].desired_wave_speed
     return np.abs(ws - dws)*100 / dws
 
-def compute_num_processors(sim, plot=False, count=4, nprocessors=None, steps=2500):
+def compute_num_processors(
+    sim,
+    plot = False,
+    count = 4,
+    max_num_processors = None,
+    steps = 2500,
+    environment = 'pc',
+    queue = 'normal',
+    processors_per_node = 64,
+    run_time = 30, # minutes
+    allocation = None):
+
+    if environment not in ('pc', 'tacc'): raise ValueError("Environment can only be ('pc', 'tacc')")
+    if environment == 'tacc' and not allocation: raise ValueError("Specify your TACC allocation")
+
     if type(sim) is not PTSNETSimulation: raise ValueError("'sim' must be a PTSNETSimulation")
-    max_processors = psutil.cpu_count(logical=False) if nprocessors is None else nprocessors
+    nprocessors = psutil.cpu_count(logical=False) if max_num_processors is None else max_num_processors
     create_temp_folder()
     temp_file_path = os.path.join(get_temp_folder(), "temp_sim.py")
     compute_file_path = os.path.join(get_temp_folder(), "compute_processors_sim.py")
+    export_path = os.path.join(get_temp_folder(), "exported_processor_times.pkl")
 
     # Modify settings for performance simulation only
     sim.settings.profiler_on = True
@@ -30,23 +45,39 @@ def compute_num_processors(sim, plot=False, count=4, nprocessors=None, steps=250
         f.write(FILE_TEMPLATE.format(workspace_id=None, inpfile=sim.inpfile, settings=sim.settings.to_dict(simplified=True)))
         f.write("sim.run()")
     cwd = os.getcwd()
-    processors = np.linspace(1, max_processors, count, dtype=int)
+    processors = np.linspace(1, nprocessors, count, dtype=int)
 
     # Write bash executable
-    bash_path = os.path.join(get_temp_folder(), "compute_num_processors.sh")
-    with open(bash_path, "w") as f:
-        i = 1
-        f.write(f"echo 'Evaluating Performance (this might take a few minutes)'\n")
-        for p in processors:
-            f.write(f"mpiexec -n {p} python3 {temp_file_path} &> log.txt\n")
-            f.write(f"echo '({int(100*i/len(processors))}%) Finished run {i}/{len(processors)}'\n")
-            i += 1
-        f.write(f"rm log.txt\n")
-        f.write(f"python3 {compute_file_path}\n")
+    if environment == 'pc':
+        bash_path = os.path.join(get_temp_folder(), "compute_num_processors.sh")
+        with open(bash_path, "w") as f:
+            f.write(f"echo 'Evaluating Performance (this might take a few minutes)'\n")
+            for ii, p in enumerate(processors):
+                f.write(f"mpiexec -n {p} python3 {temp_file_path} &> log.txt\n")
+                f.write(f"echo '({int(100*ii/len(processors))}%) Finished run {ii}/{len(processors)}'\n")
+            f.write(f"rm log.txt\n")
+            f.write(f"python3 {compute_file_path}\n")
+    elif environment == 'tacc':
+        for ii, p in enumerate(processors):
+            create_tacc_job(
+                fpath = temp_file_path,
+                job_name = f"j_{ii}",
+                num_processors = p,
+                allocation = allocation,
+                run_time = 30,
+                queue = queue,
+                processors_per_node = processors_per_node)
+        submit_tacc_jobs()
+        print('\n-----------------------------------------------------\n')
+        print(f'{len(processors)} jobs have been submitted to TACC\n')
+        print("After running your jobs ('squeue -u <user>') execute the following command on the terminal:")
+        print(f"python3 {compute_file_path}")
+        print('\n-----------------------------------------------------\n')
 
     # Write Python script to compute number of processors
     fcontent = "import matplotlib.pyplot as plt\n" if plot else ""
     fcontent += \
+        "import pickle\n" + \
         "import numpy as np\n" + \
         "from pprint import pprint\n" + \
         "from ptsnet.simulation.sim import PTSNETSimulation\n" + \
@@ -76,28 +107,50 @@ def compute_num_processors(sim, plot=False, count=4, nprocessors=None, steps=250
         "    if optimal == -1: optimal = x[-1]\n" + \
         "print(f'\\nProcessor Times: \\n')\n" + \
         "pprint(times)\n" + \
-        "print(f'\\n--> Recommended number of processors: {optimal}\\n')\n"
+        "print(f'\\n--> Recommended number of processors: {optimal}\\n')\n" + \
+        f"with open('{export_path}', 'wb') as f:\n" + \
+        "    pickle.dump({'processor': x, 'time': y, 'optimal': optimal}, f)\n"
 
     if plot:
         fcontent += \
-        "plt.plot(x, y, '-o')\n" + \
-        "plt.axvline(x = optimal)\n" + \
-        "plt.xlabel('Number of processors')\n" + \
-        "plt.ylabel('Time [s]')\n" + \
-        "plt.title('Average Time per Step')\n" + \
-        "plt.savefig('knee.pdf')"
+        "from ptsnet.graphics.static import plot_knee\n" + \
+        f"plot_knee()\n"
+    else:
+        fcontent += \
+        "print('-----------------------------------------------------\\n')\n" + \
+        'print("Average times per step' + " {'processor': x, 'time': y, 'optimal': optimal}" + ' have been pickled to:")\n' + \
+        f"print('export_path = {export_path}\\n')\n" + \
+        "print('-----------------------------------------------------\\n')\n"
 
     with open(compute_file_path, "w") as f:
         f.write(fcontent)
 
-    print("\nExecute the following command on your terminal:")
-    print(f"bash {bash_path}\n")
+    if environment == 'pc':
+        print("\nExecute the following command on your terminal:")
+        print(f"bash {bash_path}\n")
+
     exit()
 
-def compute_simulation_times_per_step(inpfile, time_steps, duration=20, plot=False, count=4, nprocessors=None, steps=2500):
+def compute_simulation_times(
+    inpfile,
+    time_steps,
+    duration = 20,
+    plot = False,
+    count = 4,
+    max_num_processors = None,
+    steps = 2500,
+    environment = 'pc',
+    queue = 'normal',
+    processors_per_node = 64,
+    run_time = 30, # minutes
+    allocation = None):
+
+    if environment not in ('pc', 'tacc'): raise ValueError("Environment can only be ('pc', 'tacc')")
+    if environment == 'tacc' and not allocation: raise ValueError("Specify your TACC allocation")
+
     create_temp_folder()
-    max_processors = psutil.cpu_count(logical=False) if nprocessors is None else nprocessors
-    processors = np.linspace(1, max_processors, count, dtype=int)
+    nprocessors = psutil.cpu_count(logical=False) if max_num_processors is None else max_num_processors
+    processors = np.linspace(1, nprocessors, count, dtype=int)
     compute_file_path = os.path.join(get_temp_folder(), "compute_times_per_step.py")
 
     ii = 0
@@ -108,6 +161,7 @@ def compute_simulation_times_per_step(inpfile, time_steps, duration=20, plot=Fal
             time_step = ts,
             duration = steps*ts,
             warnings_on = False,
+            show_progress = True,
             skip_compatibility_check = True,
             save_results = True,
             profiler_on = True,
@@ -120,23 +174,39 @@ def compute_simulation_times_per_step(inpfile, time_steps, duration=20, plot=Fal
         ii += 1
 
     sims = {(processors[ii], time_steps[jj]) : (ii, jj)  for ii in range(len(processors)) for jj in range(len(time_steps))}
+    bash_path = os.path.join(get_temp_folder(), "compute_times_per_step.sh")
 
     # Write bash executable
-    bash_path = os.path.join(get_temp_folder(), "compute_times_per_step.sh")
-    with open(bash_path, "w") as f:
-        jj = 1
-        f.write(f"echo 'Executing Simulations to Evaluate Performance'\n")
-        f.write(f"echo '[This might take a few minutes]'\n")
+    if environment == 'pc':
+        with open(bash_path, "w") as f:
+            f.write(f"echo 'Executing Simulations to Evaluate Performance'\n")
+            f.write(f"echo '[This might take a few minutes]'\n")
+            for ii, (p, ts) in enumerate(sims):
+                temp_file_path = os.path.join(get_temp_folder(), f"temp_sim_{ii%len(time_steps)}.py")
+                f.write(f"mpiexec -n {p} python3 {temp_file_path} &> log.txt\n")
+                f.write(f"echo '({int(100*(1+ii)/len(sims))}%) Finished Simulation {1+ii}/{len(sims)} -> {p} processor(s) | time_step = {ts} s'\n")
+            f.write(f"rm log.txt\n")
+            f.write(f"python3 {compute_file_path}\n")
+    elif environment == 'tacc':
         for ii, (p, ts) in enumerate(sims):
             temp_file_path = os.path.join(get_temp_folder(), f"temp_sim_{ii%len(time_steps)}.py")
-            f.write(f"mpiexec -n {p} python3 {temp_file_path} &> log.txt\n")
-            f.write(f"echo '({int(100*(1+ii)/len(sims))}%) Finished Simulation {1+ii}/{len(sims)} -> {p} processor(s) | time_step = {ts} s'\n")
-            jj += 1
-        f.write(f"rm log.txt\n")
-        f.write(f"python3 {compute_file_path}\n")
+            create_tacc_job(
+                fpath = temp_file_path,
+                job_name = f"j_{ii}",
+                num_processors = p,
+                allocation = allocation,
+                run_time = 30,
+                processors_per_node = processors_per_node,
+                queue = queue)
+        submit_tacc_jobs()
+        print('\n-----------------------------------------------------\n')
+        print(f'{len(sims)} jobs have been submitted to TACC\n')
+        print("After running your jobs ('squeue -u <user>') execute the following command on the terminal:")
+        print(f"python3 {compute_file_path}")
+        print('\n-----------------------------------------------------\n')
 
     # Write Python script to compute simulation times
-    export_path = os.path.join(get_temp_folder(), "exported_times.pkl")
+    export_path = os.path.join(get_temp_folder(), "exported_sim_times.pkl")
     fcontent = \
     "import numpy as np\n" + \
     "import pickle\n" + \
@@ -190,12 +260,23 @@ def compute_simulation_times_per_step(inpfile, time_steps, duration=20, plot=Fal
         "# | Execute after running the bash generated by\n" + \
         "# | compute_simulation_times_per_step\n" + \
         "# v\n" + \
-        "from ptsnet.graphics.static import plot_times_per_step\n" + \
-        f"plot_times_per_step(duration={duration})\n"
+        "from ptsnet.graphics.static import plot_estimated_simulation_times\n" + \
+        f"plot_estimated_simulation_times(duration={duration})\n"
+    else:
+        fcontent += \
+        "print('-----------------------------------------------------\\n')\n" + \
+        "print('Simulation times have been exported to:')\n" + \
+        f"print('export_path = {export_path}\\n')\n" + \
+        "print('Plot your results executing:\\n')\n" + \
+        "print('>>> from ptsnet.graphics.static import plot_estimated_simulation_times')\n" + \
+        f"print('>>> plot_estimated_simulation_times(duration={duration}, path=export_path)\\n')\n" + \
+        "print('-----------------------------------------------------\\n')\n"
 
     with open(compute_file_path, "w") as f:
         f.write(fcontent)
 
-    print("\nExecute the following command on your terminal:")
-    print(f"bash {bash_path}\n")
+    if environment == 'pc':
+        print("\nExecute the following command on your terminal:")
+        print(f"bash {bash_path}\n")
+
     exit()

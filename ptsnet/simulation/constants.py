@@ -15,6 +15,17 @@ FILE_TEMPLATE = """
 from ptsnet.simulation.sim import PTSNETSimulation
 sim = PTSNETSimulation(workspace_id = {workspace_id}, inpfile = '{inpfile}', settings = {settings})\n
 """
+TACC_FILE_TEMPLATE = """
+#!/bin/bash
+#SBATCH -J {job_name}
+#SBATCH -o {job_name}.o%j    # Name of stdout output file
+#SBATCH -e {job_name}.e%j    # Name of stderr error file
+#SBATCH -p {queue}           # Queue (partition) name
+#SBATCH -N {num_nodes}       # Total # of nodes (must be 1 for serial)
+#SBATCH -n {num_processors}  # Total # of mpi tasks (should be 1 for serial)
+#SBATCH -t {run_time}        # Run time (hh:mm:ss)
+#SBATCH -A {allocation}       # Allocation name (req'd if you have more than 1)\n
+"""
 
 # ----- Initial Conditions -----
 
