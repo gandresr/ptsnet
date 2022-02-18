@@ -18,8 +18,8 @@ def delete_all_workspaces():
     if confirmation == 'no':
         return
     ROOT = get_root_path()
-    for d in os.listdir(os.path.join(ROOT, 'workspaces')):
-        abs_path = os.path.join(get_root_path(), 'workspaces', d)
+    for d in os.listdir(os.path.join(os.getcwd(), 'workspaces')):
+        abs_path = os.path.join(os.getcwd(), 'workspaces', d)
         if os.path.isdir(abs_path):
             shutil.rmtree(abs_path)
         else:
@@ -37,11 +37,11 @@ def delete_workspace(workspace_id, full_path=True):
     wids = workspace_id
     if not is_array(workspace_id):
         wids = [workspace_id]
-        apaths = [os.path.join(get_root_path(), 'workspaces', wpl[workspace_id])]
+        apaths = [os.path.join(os.getcwd(), 'workspaces', wpl[workspace_id])]
     else:
         apaths = \
             [os.path.join(
-                get_root_path(),
+                os.getcwd(),
                 'workspaces',
                 wpl[wp_id]) for wp_id in workspace_id]
 
@@ -80,7 +80,7 @@ def delete_workspace(workspace_id, full_path=True):
             os.remove(apath)
 
 def list_workspaces():
-    wps = [d for d in os.listdir(os.path.join(get_root_path(), 'workspaces')) if '.' not in d]
+    wps = [d for d in os.listdir(os.path.join(os.getcwd(), 'workspaces')) if '.' not in d]
     # workspace code starts with 'W' and then is followed by a number
     wps.sort(key = lambda x: int(x[1:]))
     return wps
@@ -88,7 +88,7 @@ def list_workspaces():
 def print_workspaces(full_path = False):
     txt = {}
     for d in list_workspaces():
-        abs_path = os.path.join(get_root_path(), 'workspaces', d)
+        abs_path = os.path.join(os.getcwd(), 'workspaces', d)
         with open(os.path.join(abs_path, 'settings.pkl'), 'rb') as f:
             s = pickle.load(f)
         with open(os.path.join(abs_path, 'fname.pkl'), 'rb') as f:
@@ -109,7 +109,7 @@ def num_workspaces():
     return len(list_workspaces())
 
 def get_count_path():
-    return os.path.join(get_root_path(), 'workspaces', 'count.pkl')
+    return os.path.join(os.getcwd(), 'workspaces', 'count.pkl')
 
 def new_workspace_name(is_root = True):
     if is_root:

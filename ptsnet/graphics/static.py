@@ -112,9 +112,6 @@ def plot_knee(fpath=None):
     with open(export_path, 'rb') as f:
         data = pickle.load(f)
     plt.plot(data['processor'], data['time'], '-o')
-    plt.axvline(x = data['optimal'])
     plt.xlabel('Number of processors')
     plt.ylabel('Time [s]')
     plt.title('Average Time per Step')
-    plt.savefig('knee.pdf')
-    plt.show()

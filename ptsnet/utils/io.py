@@ -39,7 +39,7 @@ def walk(folder_structure, root_path):
     return paths
 
 def get_workspaces():
-    return os.listdir(os.path.join(get_root_path(), 'workspaces'))
+    return os.listdir(os.path.join(os.getcwd(), 'workspaces'))
 
 def get_temp_folder():
     return os.path.join(get_root_path(), 'tmp')

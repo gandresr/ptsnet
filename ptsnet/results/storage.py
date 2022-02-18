@@ -15,7 +15,7 @@ from ptsnet.utils.io import get_root_path, walk
 class StorageManager:
 
     def __init__(self, workspace_name, router = None):
-        self.root = os.path.join(get_root_path(), 'workspaces')
+        self.root = os.path.join(os.getcwd(), 'workspaces')
         self.workspace_path = os.path.join(self.root, workspace_name)
         self._module_path = resource_filename(__name__, '')
         with open( os.path.join(self._module_path,  'metadata.json'), 'r' ) as f:

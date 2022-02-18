@@ -214,7 +214,7 @@ class PTSNETSimulation:
 
     def __init__(self, workspace_id = None, inpfile = None, settings = None, init_on = False):
         # Make sure that workspace folder exists
-        ws_path = os.path.join(get_root_path(), 'workspaces')
+        ws_path = os.path.join(os.getcwd(), 'workspaces')
         if not os.path.exists(ws_path):
             os.mkdir(ws_path)
         ### Persistance ----------------------------
