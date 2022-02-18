@@ -1,2 +1,2 @@
-graft ptsnet\examples
-recursive-include ptsnet\results *.json
+graft ptsnet/examples
+recursive-include ptsnet/results *.json
