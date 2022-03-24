@@ -29,7 +29,7 @@
   </p>
 </p>
 
-
+[![DOI](https://zenodo.org/badge/359951639.svg)](https://zenodo.org/badge/latestdoi/359951639)
 
 <!-- TABLE OF CONTENTS -->
 <!-- <details open="open">
