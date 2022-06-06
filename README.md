@@ -139,6 +139,21 @@ _For more examples, please refer to the [Documentation](https://example.com)_
 <!-- 5. Open a Pull Request -->
 
 
+<!-- Cite Us -->
+## Cite Us
+
+If PTSNET has been useful for your research and you are ready to publish your paper, please cite the paper below:
+
+[Distributed and Vectorized Method of Characteristics for Fast Transient Simulations in Water Distribution Systems](https://onlinelibrary.wiley.com/doi/full/10.1111/mice.12709)
+```
+@article{riano2022distributed,
+  title={Distributed and vectorized method of characteristics for fast transient simulations in water distribution systems},
+  author={Ria{\~n}o-Brice{\~n}o, Gerardo and Sela, Lina and Hodges, Ben R},
+  journal={Computer-Aided Civil and Infrastructure Engineering},
+  year={2022},
+  publisher={Wiley Online Library}
+}
+```
 
 <!-- LICENSE -->
 ## License
