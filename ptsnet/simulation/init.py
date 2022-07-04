@@ -18,11 +18,17 @@ class Initializer:
     def __init__(self, inpfile, period = 0, skip_compatibility_check = False, warnings_on = True, _super = None):
         self.wn = get_water_network(inpfile)
         self.ng = self.wn.get_graph()
-        self.ss = get_initial_conditions(inpfile, period = period, wn = self.wn)
+        self._super = _super
+        if self._super.router['main'].rank == 0:
+            self.ss = get_initial_conditions(inpfile, period = period, wn = self.wn)
+        else:
+            self.ss = None
+        self._super.router['main'].barrier() # Synchronize
+        if self._super.router['main'].size > 1:
+            self.ss = self._super.router['main'].bcast(self.ss, root=0)
         self.num_points = 0
         self.num_segments = 0
         self.where = None
-        self._super = _super
 
         if not skip_compatibility_check:
             if warnings_on:
@@ -187,7 +193,7 @@ class Initializer:
         elif wave_speed_method == 'dt':
             phi = self.ss['pipe'].length
         else:
-            raise ValueError("Method is not compatible. Try: ['critical', 'user']")
+            raise ValueError("Method is not compatible. Try: ['critical', 'user', 'dt']")
 
         int_segments = np.round(self.ss['pipe'].segments)
         int_segments[int_segments < 2] = 2

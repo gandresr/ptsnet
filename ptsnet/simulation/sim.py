@@ -217,9 +217,10 @@ class PTSNETSimulation:
         ws_path = os.path.join(os.getcwd(), 'workspaces')
         if not os.path.exists(ws_path):
             os.mkdir(ws_path)
+        ### Initialize router ----------------------
+        self.router = CommManager()
         ### Persistance ----------------------------
         if inpfile == None:
-            self.router = CommManager()
             self.settings = PTSNETSettings()
             self.settings.active_persistance = True
             self.results = {}
@@ -257,7 +258,6 @@ class PTSNETSimulation:
         self.inpfile = inpfile
         self.settings.num_points = self.initializer.num_points
         # ----------------------------------------
-        self.router = CommManager()
         if self.router['main'].size > self.num_points:
             raise ValueError("The number of cores is higher than the number of simulation points")
         self.settings.num_processors = self.router['main'].size
