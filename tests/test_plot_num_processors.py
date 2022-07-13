@@ -5,7 +5,7 @@ from ptsnet.utils.analytics import compute_num_processors
 sim = PTSNETSimulation(
     inpfile = get_example_path('BWSN_F'),
     settings = {
-        'time_step' : 0.00025,
+        'time_step' : 0.0005,
         'save_results' : True,
         'default_wave_speed' : 1000,
         'wave_speed_method' : 'user'

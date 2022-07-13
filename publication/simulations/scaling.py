@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from ptsnet.simulation.sim import PTSNETSimulation
 from ptsnet.utils.io import get_example_path
 
-inpfile = '/home/gandresr/Documents/GitHub/ptsnet/ptsnet/examples/TNET3_HAMMER.inp'
+inpfile = '/home/gandresr/Documents/GitHub/ptsnet/ptsnet/examples/TNET3.inp'
 
 # These are time step values necessary to compite weak scaling
 dt = [0.03955, 0.03955, 0.03955, 0.039648, 0.039748, 0.04, 0.04043, 0.0414, 0.04358, 0.051359]
