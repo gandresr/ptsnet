@@ -84,7 +84,7 @@ To get a local copy up and running follow these simple steps. PTSNET can be down
 
 ### Installation
 
-We highly encourage using a conda environment for the installation
+We highly encourage using a conda environment for the installation, so that dependencies such as OpenMPI don't have to be manually installed.
 
 * Install conda
 
@@ -97,26 +97,47 @@ We highly encourage using a conda environment for the installation
   https://conda.io/projects/conda/en/latest/user-guide/install/windows.html
   ```
 * Install the conda environment with all the necessary dependencies
-  
-  Download the environment recipe for [Windows](https://github.com/gandresr/ptsnet/blob/development/conda/Windows/ptsnet.yml) or [Linux/Mac](https://github.com/gandresr/ptsnet/blob/development/conda/Linux/ptsnet.yml). Then `cd` to the location of the downloaded ptsnet.yml file. The parallel version of PTSNET can only run on Linux.
-  
-  ```sh
-  # Open the shell and type
-  conda env create -f ptsnet.yml
-  conda activate ptsnet
-  ```
+
+  1. Download the [requirements.txt](https://raw.githubusercontent.com/gandresr/ptsnet/development/requirements.txt)
+  2. In the command line `cd` to the location where the requirements.txt file was downloaded
+  3. Execute `conda create -n ptsnet` to create a new conda environment
+  4. Activate the environment with `conda activate ptsnet`
+  5. Install the requirements using `conda install --file requirements.txt`
+  6. Install h5py
+      - For __Linux/Mac__: `conda install "h5py>=2.9=mpi*"`
+      - For __Windows__: `conda install h5py`
+  7. Install PTSNET: `pip install ptsnet`
 
 
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-Use this [jupyter notebook](https://github.com/gandresr/ptsnet/blob/development/tests/test_functions.ipynb) to run useful examples of transient simulations using PTSNET. You can test the parallel version of PTSNET executing [test_simulation.py](https://github.com/gandresr/ptsnet/blob/development/tests/test_simulation.py) as follows:
+Create a file called named `simulation.py` with the following contents:
 
-```sh
-mpiexec -n 8 python test_simulation.py
+```python
+from ptsnet.simulation.sim import PTSNETSimulation
+from ptsnet.utils.io import get_example_path
+
+sim = PTSNETSimulation(
+  workspace_name = 'TNET3_VALVE',
+  inpfile = get_example_path('TNET3'))
+sim.define_valve_operation('VALVE-179', initial_setting=1, final_setting=0, start_time=1, end_time=2)
+sim.run()
 ```
 
-_For more examples, please refer to the [Documentation](https://example.com)_
+After creating the file, you can execute the code from the command line.
+
+<span style="color:red">To execute the parallel version of PTSNET it is necessary to have __Linux/Mac__</span>. If you have __Linux/Mac__ execute following command on the terminal:
+```sh
+mpiexec -n 4 python simulation.py
+```
+The number of processors is defined by the parameter `-p` in the command, in this case 4.
+
+If you have __Windows__ you can still run the simulation as shown below, but you will not have access to PTSNET's parallel capabilities:
+```sh
+python simulation.py
+```
+For more examples, please refer to the [jupyter notebooks](https://github.com/gandresr/ptsnet/tree/development/publication).
 
 
 
