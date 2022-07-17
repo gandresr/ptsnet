@@ -90,3 +90,15 @@ def submit_tacc_jobs():
     with open(submit_path, "w") as f:
         f.write(fcontent)
     os.system(f'bash {submit_path}')
+
+def export_time_series(times, data, path):
+    '''
+        data is a dictionary
+    '''
+    labels = ['Time']; results = []
+
+    for label in data:
+        labels.append(label)
+        results.append(data[label])
+    header = ','.join(labels)
+    np.savetxt(path, list(zip(times, *results)), delimiter=',', header=header, comments='')

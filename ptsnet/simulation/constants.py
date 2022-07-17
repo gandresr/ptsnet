@@ -13,7 +13,7 @@ TOL = 1E-6
 COEFF_TOL = 1E-6
 FILE_TEMPLATE = """
 from ptsnet.simulation.sim import PTSNETSimulation
-sim = PTSNETSimulation(workspace_id = {workspace_id}, inpfile = '{inpfile}', settings = {settings})\n
+sim = PTSNETSimulation(workspace_name = {workspace_name}, inpfile = '{inpfile}', settings = {settings})\n
 """
 TACC_FILE_TEMPLATE = """#!/bin/bash
 #SBATCH -J {job_name}

@@ -55,6 +55,10 @@ class Profiler:
         self.jobs[label].stop()
 
     def summarize_step_times(self):
+        '''
+            If the Profiler is off then there's nothing to summarize
+        '''
+        if not self.is_on: return
         if self.storer.exists('summary'):
             self.summary = self.storer.load_data('summary')
         else:

@@ -1,4 +1,5 @@
 from multiprocessing.sharedctypes import Value
+import pdb
 from re import L
 import numpy as np
 import os
@@ -15,7 +16,7 @@ from ptsnet.simulation.init import Initializer
 from ptsnet.parallel.comm import CommManager
 from ptsnet.parallel.worker import Worker
 from ptsnet.results.storage import StorageManager
-from ptsnet.results.workspaces import new_workspace_name, list_workspaces, num_workspaces
+from ptsnet.results.workspaces import create_workspaces_folder, list_workspaces, new_workspace_name, get_num_tmp_workspaces
 from ptsnet.simulation.constants import NODE_RESULTS, PIPE_END_RESULTS, PIPE_START_RESULTS, SURGE_PROTECTION_TYPES
 from ptsnet.profiler.profiler import Profiler
 
@@ -56,23 +57,22 @@ class PTSNETSettings:
         self._super = _super
         self.time_step = time_step
         self.duration = duration
-        self.time_steps = int(round(duration/time_step))
         self.warnings_on = warnings_on
-        self.parallel = parallel
-        self.gpu = gpu
         self.skip_compatibility_check = skip_compatibility_check
         self.show_progress = show_progress
         self.save_results = save_results
         self.profiler_on = profiler_on
-        self.defined_wave_speeds = False
-        self.active_persistance = False
-        self.blocked = False
         self.period = period
         self.default_wave_speed = default_wave_speed
         self.wave_speed_file_path = wave_speed_file_path
         self.delimiter = delimiter
         self.wave_speed_method = wave_speed_method
-        self.set_default()
+        # -----------------------------------------------------
+        self.time_steps = int(round(duration/time_step))
+        self.defined_wave_speeds = False
+        self.active_persistance = False
+        self.is_initialized = False
+        self.updated_settings = False
         self.settingsOK = True
         self.num_points = None
 
@@ -108,10 +108,6 @@ class PTSNETSettings:
                     self.time_steps = int(round(self.duration/value))
 
         object.__setattr__(self, name, value)
-
-    def set_default(self):
-        self.is_initialized = False
-        self.updated_settings = False
 
     def to_dict(self, simplified=False):
         l = {}
@@ -150,7 +146,7 @@ class PTSNETCurve:
     def __len__(self):
         return len(self.elements)
 
-class ElementSettings:
+class PTSNETElementSettings:
     ERROR_MSG = "the simulation has started, settings can not be added/modified"
     def __init__(self, _super):
         self.values = []
@@ -212,73 +208,17 @@ class PTSNETSimulation:
         'demand' : 'node',
     }
 
-    def __init__(self, workspace_id = None, inpfile = None, settings = None, init_on = False):
-        # Make sure that workspace folder exists
-        ws_path = os.path.join(os.getcwd(), 'workspaces')
-        if not os.path.exists(ws_path):
-            os.mkdir(ws_path)
-        ### Initialize router ----------------------
-        self.router = CommManager()
-        ### Persistance ----------------------------
-        if inpfile == None:
-            self.settings = PTSNETSettings()
-            self.settings.active_persistance = True
-            self.results = {}
-            self.init_on = init_on
-            if workspace_id is None:
-                self.workspace_id = num_workspaces() - 1
-            else:
-                self.workspace_id = workspace_id
-            return
-        ### ----------------------------------------
-        ### New Sim --------------------------------
-        if type(settings) != dict:
-            print("Warning: using default settings")
-            settings = {}
-        self.settings = PTSNETSettings(**settings, _super=self)
-        self.initializer = Initializer(
-            inpfile,
-            period = self.settings.period,
-            skip_compatibility_check = self.settings.skip_compatibility_check,
-            warnings_on = self.settings.warnings_on,
-            _super = self)
-        self.curves = ObjArray()
-        self.element_settings = {type_ : ElementSettings(self) for type_ in self.SETTING_TYPES}
-        self.settings.defined_wave_speeds = self.initializer.set_wave_speeds(
-            self.settings.default_wave_speed,
-            self.settings.wave_speed_file_path,
-            self.settings.delimiter,
-            self.settings.wave_speed_method
-        )
-        if self.settings.time_step > self.settings.duration:
-            raise ValueError("Duration has to be larger than time step")
-        self.initializer.create_selectors()
-        self.t = 0
-        self.time_stamps = np.array([i*self.settings.time_step for i in range(self.settings.time_steps)])
-        self.inpfile = inpfile
-        self.settings.num_points = self.initializer.num_points
-        # ----------------------------------------
-        if self.router['main'].size > self.num_points:
-            raise ValueError("The number of cores is higher than the number of simulation points")
-        self.settings.num_processors = self.router['main'].size
-        self.worker = None
-        self.results = None
-        if self.router['main'].size > 1:
-            is_root = self.router['main'].rank == 0
-            worspace_name = new_workspace_name(is_root)
-            worspace_name = self.router['main'].bcast(worspace_name, root = 0)
-            self.storer = StorageManager(worspace_name, router = self.router)
-        else:
-            self.storer = StorageManager(new_workspace_name())
-        # ----------------------------------------
-        if (not self.settings.warnings_on) and (self.router['main'].rank == 0) and self.settings.show_progress:
-            self.progress = tqdm(total = self.settings.time_steps, position = 0)
-            self.progress.update(1)
-        # ----------------------------------------
-        if self.router['main'].rank == 0:
-            self.storer.create_workspace_folders()
-        self.router['main'].Barrier()
+    def __init__(self, workspace_name, inpfile = None, settings = {}, init_on = False):
+        self.init_parameters(workspace_name, inpfile, settings, init_on)
+        self.init_raw_simulation()
+
+        if self.settings.active_persistance: return
+
+        self.init_wave_speeds()
+        self.init_progress_bar()
         self.save_sim_data()
+
+        self.router['main'].Barrier()
 
     def __repr__(self):
         return "PTSNETSimulation <duration = %d [s] | time_steps = %d | num_points = %s>" % \
@@ -293,7 +233,7 @@ class PTSNETSimulation:
         return self.results[index]
 
     def __enter__(self):
-        self.load(self.workspace_id)
+        self.load(self.workspace_name)
         self.time_stamps = np.array([i*self.settings.time_step for i in range(self.settings.time_steps)])
         return self
 
@@ -335,6 +275,68 @@ class PTSNETSimulation:
     @property
     def time_step(self):
         return self.settings.time_step
+
+    def init_raw_simulation(self):
+        if self.workspace_name is None:
+            if self.router['main'].size > 1:
+                is_root = self.router['main'].rank == 0
+                self.workspace_name = new_workspace_name(is_root)
+                self.workspace_name = self.router['main'].bcast(self.workspace_name, root = 0)
+                self.storer = StorageManager(self.workspace_name, router = self.router)
+            else:
+                self.storer = StorageManager(new_workspace_name())
+        else:
+            self.storer = StorageManager(self.workspace_name, router = self.router)
+
+    def init_parameters(self, workspace_name, inpfile, settings, init_on):
+        self.inpfile = inpfile
+        assert type(workspace_name) is str
+        self.workspace_name = workspace_name
+        self.workspaces_dir = create_workspaces_folder()
+        self.workspace_path = lambda x : os.path.join(self.workspaces_dir, x)
+        self.settings = PTSNETSettings(**settings)
+        self.init_on = init_on
+        self.results = {}
+        if settings is {}: print("Warning: using default settings")
+        self.settings = PTSNETSettings(**settings, _super=self)
+        self.settings.active_persistance = False
+        if inpfile is None:
+            if not os.path.isdir(self.workspace_path(self.workspace_name)):
+                raise ValueError(f"You didn't specify an inpfile, PTSNet is trying to load the workspace: '{workspace_name}' but it does not exists")
+            self.settings.active_persistance = True
+        self.router = CommManager() # Initialize router
+        self.curves = ObjArray()
+        self.element_settings = {type_ : PTSNETElementSettings(self) for type_ in self.SETTING_TYPES}
+        if self.settings.time_step > self.settings.duration:
+            raise ValueError("Duration has to be larger than time step")
+        self.t = 0
+        self.worker = None
+        self.results = None
+
+    def init_wave_speeds(self):
+        self.initializer = Initializer(
+            self.inpfile,
+            period = self.settings.period,
+            skip_compatibility_check = self.settings.skip_compatibility_check,
+            warnings_on = self.settings.warnings_on,
+            _super = self)
+        self.settings.defined_wave_speeds = self.initializer.set_wave_speeds(
+            self.settings.default_wave_speed,
+            self.settings.wave_speed_file_path,
+            self.settings.delimiter,
+            self.settings.wave_speed_method
+        )
+        self.initializer.create_selectors()
+        self.settings.num_points = self.initializer.num_points
+        if self.router['main'].size > self.num_points:
+            raise ValueError("The number of cores is higher than the number of simulation points")
+        self.settings.num_processors = self.router['main'].size
+        self.time_stamps = np.array([i*self.settings.time_step for i in range(self.settings.time_steps)])
+
+    def init_progress_bar(self):
+        if (not self.settings.warnings_on) and (self.router['main'].rank == 0) and self.settings.show_progress:
+            self.progress = tqdm(total = self.settings.time_steps, position = 0)
+            self.progress.update(1)
 
     def _define_element_setting(self, element, type_, X, Y):
         ic_type = self.SETTING_TYPES[type_]
@@ -485,7 +487,8 @@ class PTSNETSimulation:
                 [0.067, 0.044, 0.024, 0.011, 0.004, 0.   ])
             self.assign_curve_to('butterfly', self.ss['valve'].labels[non_assigned_valves])
             print(f"Warning: valves {self.ss['valve'].labels[non_assigned_valves]} are butterfly by default")
-        self.settings.set_default()
+        self.settings.is_initialized = False
+        self.settings.updated_settings = False
         self.t = 0
         self.initializer.create_secondary_elements()
         self.initializer.create_secondary_selectors()
@@ -671,6 +674,7 @@ class PTSNETSimulation:
 
     def save_sim_data(self):
         if self.router['main'].rank == 0:
+            self.storer.create_workspace_folders()
             self.storer.save_data('inpfile', self.inpfile, comm = 'main')
             self.storer.save_data('initial_conditions', self.ss, comm = 'main')
             self.storer.save_data('settings', self.settings.to_dict(), comm = 'main')
@@ -761,20 +765,20 @@ class PTSNETSimulation:
                 comm = 'main')
             self.router['main'].Barrier()
 
-    def load(self, workspace_id):
+    def load(self, workspace_name):
         if self.router['main'].rank == 0:
+            if not os.path.isdir(self.workspace_path(workspace_name)):
+                raise ValueError(f"The workspace '{workspace_name}' does not exist")
             wps = list_workspaces()
-            if len(wps) < workspace_id:
-                raise ValueError(f'The workspace with ID ({workspace_id}) does not exist')
-
-            self.storer = StorageManager(wps[workspace_id], router = self.router)
+            self.storer = StorageManager(workspace_name, router = self.router)
             settings = self.storer.load_data('settings')
             for i, j in settings.items():
                 if not i == 'settingsOK':
                     self.settings.__setattr__(i, j)
                 else:
                     continue
-            self.profiler = Profiler(_super = self)
+            self.settings.active_persistance = True
+            self.profiler = Profiler(is_on=self.settings.profiler_on, _super = self)
             self.profiler.summarize_step_times()
             self.inpfile = self.storer.load_data('inpfile')
 
@@ -786,7 +790,7 @@ class PTSNETSimulation:
                     warnings_on = self.settings.warnings_on,
                     _super = self)
 
-            if self.settings.save_results:
+            if self.settings.save_results and self.settings.is_initialized:
                 local_to_global = self.storer.load_data('local_to_global')
 
                 node_labels = local_to_global['node']
