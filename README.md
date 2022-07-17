@@ -98,7 +98,7 @@ We highly encourage using a conda environment for the installation, so that depe
   ```
 * Install the conda environment with all the necessary dependencies
 
-  1. Download the [requirements.txt](https://raw.githubusercontent.com/gandresr/ptsnet/development/requirements.txt)
+  1. Download the [requirements.txt](https://github.com/gandresr/ptsnet/blob/development/requirements.txt)
   2. In the command line `cd` to the location where the requirements.txt file was downloaded
   3. Execute `conda create -n ptsnet` to create a new conda environment
   4. Activate the environment with `conda activate ptsnet`
@@ -127,7 +127,9 @@ sim.run()
 
 After creating the file, you can execute the code from the command line.
 
-<span style="color:red">To execute the parallel version of PTSNET it is necessary to have __Linux/Mac__</span>. If you have __Linux/Mac__ execute following command on the terminal:
+#### To execute the parallel version of PTSNET it is necessary to have __Linux/Mac__</span>. 
+
+If you have __Linux/Mac__ execute the following command on the terminal:
 ```sh
 mpiexec -n 4 python simulation.py
 ```
