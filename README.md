@@ -137,7 +137,7 @@ If you have __Linux/Mac__ execute the following command on the terminal:
 ```sh
 mpiexec -n 4 python simulation.py
 ```
-The number of processors is defined by the parameter `-p` in the command, in this case 4.
+The number of processors is defined by the parameter `-n` in the command, in this case 4.
 
 If you have __Windows__ you can still run the simulation as shown below, but you will not have access to PTSNET's parallel capabilities:
 ```sh
