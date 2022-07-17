@@ -115,6 +115,7 @@ We highly encourage using a conda environment for the installation, so that depe
 Create a file called named `simulation.py` with the following contents:
 
 ```python
+import matplotlib.pyplot as plt
 from ptsnet.simulation.sim import PTSNETSimulation
 from ptsnet.utils.io import get_example_path
 
@@ -122,7 +123,10 @@ sim = PTSNETSimulation(
   workspace_name = 'TNET3_VALVE',
   inpfile = get_example_path('TNET3'))
 sim.define_valve_operation('VALVE-179', initial_setting=1, final_setting=0, start_time=1, end_time=2)
-sim.run()
+sim.run(); print(sim)
+
+plt.plot(sim['time'], sim['node'].head['JUNCTION-73'])
+plt.show()
 ```
 
 After creating the file, you can execute the code from the command line.
