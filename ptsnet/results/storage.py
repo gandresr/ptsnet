@@ -46,7 +46,7 @@ class StorageManager:
         shape[0] : rows associated with elements
         shape[1] : rows associated with time steps
         '''
-        b1 = self.router is None
+        b1 = self.router['main'].size == 1
         b2 = False
         if not b1: b2 = self.router[comm].rank == 0
 
