@@ -38,10 +38,11 @@ def new_uuid_workspace_name(size=1):
         wnames.append(f"W{wname}")
     return wnames
 
-def create_workspaces_folder():
+def create_workspaces_folder(root=False):
     ws_path = os.path.join(os.getcwd(), 'workspaces')
-    if not os.path.exists(ws_path):
-        os.mkdir(ws_path)
+    if root:
+        if not os.path.exists(ws_path):
+            os.mkdir(ws_path)
     return ws_path
 
 def get_workspaces():
@@ -50,10 +51,11 @@ def get_workspaces():
 def get_tmp_folder():
     return os.path.join(create_workspaces_folder(), 'tmp')
 
-def create_temp_folder():
+def create_temp_folder(root=False):
     tmpdir = os.path.join(create_workspaces_folder(), 'tmp')
-    if os.path.exists(tmpdir): shutil.rmtree(tmpdir)
-    os.makedirs(tmpdir)
+    if root:
+        if os.path.exists(tmpdir): shutil.rmtree(tmpdir)
+        os.makedirs(tmpdir)
     return tmpdir
 
 def list_workspaces():

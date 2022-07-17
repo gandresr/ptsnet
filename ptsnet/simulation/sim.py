@@ -278,7 +278,8 @@ class PTSNETSimulation:
         self.inpfile = inpfile
         assert type(workspace_name) is str
         self.workspace_name = workspace_name
-        self.workspaces_dir = create_workspaces_folder()
+        self.router = CommManager() # Initialize router
+        self.workspaces_dir = create_workspaces_folder(root = self.router['main'].rank == 0)
         self.workspace_path = lambda x : os.path.join(self.workspaces_dir, x)
         self.settings = PTSNETSettings(**settings)
         self.init_on = init_on
@@ -290,7 +291,6 @@ class PTSNETSimulation:
             if not os.path.isdir(self.workspace_path(self.workspace_name)):
                 raise ValueError(f"You didn't specify an inpfile, PTSNet is trying to load the workspace: '{workspace_name}' but it does not exists")
             self.settings.active_persistance = True
-        self.router = CommManager() # Initialize router
         self.curves = ObjArray()
         self.element_settings = {type_ : PTSNETElementSettings(self) for type_ in self.SETTING_TYPES}
         if self.settings.time_step > self.settings.duration:
@@ -473,7 +473,8 @@ class PTSNETSimulation:
                 [1, 0.8, 0.6, 0.4, 0.2, 0],
                 [0.067, 0.044, 0.024, 0.011, 0.004, 0.   ])
             self.assign_curve_to('butterfly', self.ss['valve'].labels[non_assigned_valves])
-            print(f"Warning: valves {self.ss['valve'].labels[non_assigned_valves]} are butterfly by default")
+            if self.settings.warnings_on:
+                print(f"Warning: valves {self.ss['valve'].labels[non_assigned_valves]} are butterfly by default")
         self.settings.is_initialized = False
         self.settings.updated_settings = False
         self.t = 0
