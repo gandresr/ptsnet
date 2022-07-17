@@ -8,14 +8,15 @@ import numpy as np
 import pdb
 from matplotlib.lines import Line2D
 from ptsnet.utils.analytics import compute_wave_speed_error
-from ptsnet.utils.io import get_temp_folder
+from ptsnet.results.workspaces import get_tmp_folder
 
 def plot_wave_speed_error(sim, image_path, intervals=[0,25,50,75,100]):
+    if any(np.diff(intervals) < 0): raise ValueError(f"The sequence 'intervals' = {intervals} must be increasing")
+    if len(intervals) > 5: raise ValueError("You can only specify an array with 5 increasing entries for intervals at most ")
     errors = compute_wave_speed_error(sim)
-    intervals = [0,10,100]
     percentile_labels = [("%.1f%%" + " - " + "%.1f%%") % (intervals[i], intervals[i+1],)  for i in range(len(intervals)-1)]
     error_intervals = {sim.ss['pipe'].labels[i] : bisect.bisect_left(intervals, errors[i]) for i in range(len(sim.ss['pipe'].labels))}
-    colors = ['#cccccc', '#000000', '#FF9500', '#FF3830']
+    colors = ['#cccccc', '#FFFBBD', '#E6AA68', '#CA3C25']
     widths = [1, 2, 2, 2.5]
     custom_lines = [Line2D([0], [0], color = colors[i], lw = widths[i]) for i in range(len(widths))]
     start_nodes = sim.ss['node'].labels[sim.ss['pipe'].start_node]
@@ -33,21 +34,28 @@ def plot_wave_speed_error(sim, image_path, intervals=[0,25,50,75,100]):
     plt.axis('off')
     fig.savefig(image_path)
 
-def plot_estimated_simulation_times(duration=20, fpath=None):
-    export_path = os.path.join(get_temp_folder(), "exported_sim_times.pkl") if not fpath else fpath
+def plot_estimated_simulation_times(duration=20, select_processors=None, fpath=None):
+    export_path = os.path.join(get_tmp_folder(), "exported_sim_times.pkl") if not fpath else fpath
     if not os.path.exists(export_path):
         raise FileExistsError("There's no file with simulation times. You need to run ptsnet.utils.analytics.compute_simulation_times first")
     with open(export_path, 'rb') as f:
         data = pickle.load(f)
     time_steps = data['time_steps']
-    processors = [1,22,64] #data['processors']
+    if select_processors:
+        processors = select_processors
+        dp = list(data['processors'])
+        selection = [dp.index(sp) for sp in select_processors]
+    else:
+        processors = data['processors']
+        selection = [ii for ii in range(len(processors))]
+
     n = len(time_steps)
     p = len(processors)
     num_steps = duration/np.tile(time_steps,(p,1)).T
-    init_times = data['init_times'][:,[0,1,3]]
-    interior_times = data['interior_times'][:,[0,1,3]]*num_steps
-    boundary_times = data['boundary_times'][:,[0,1,3]]*num_steps
-    comm_times = data['comm_times'][:,[0,1,3]]*num_steps
+    init_times = data['init_times'][:,selection]
+    interior_times = data['interior_times'][:,selection]*num_steps
+    boundary_times = data['boundary_times'][:,selection]*num_steps
+    comm_times = data['comm_times'][:,selection]*num_steps
     totals = init_times + interior_times + boundary_times + comm_times
 
     matplotlib.rc('ytick', labelsize=22)
@@ -56,8 +64,7 @@ def plot_estimated_simulation_times(duration=20, fpath=None):
     ax.yaxis.set_major_locator(loc)
     X = np.arange(p, dtype=int)
     max_y = 1.2*np.max(np.max(totals))
-    plt.ylim(0, 13000)
-    plt.yticks([3000*i for i in range(5)], fontsize=32)
+    plt.ylim(0, max_y)
     width = 0.8
     patterns = ['','','']
     bars1_1 = init_times + interior_times
@@ -106,7 +113,7 @@ def plot_estimated_simulation_times(duration=20, fpath=None):
     plt.show()
 
 def plot_knee(fpath=None, style='-o', color=None):
-    export_path = os.path.join(get_temp_folder(), "exported_processor_times.pkl") if not fpath else fpath
+    export_path = os.path.join(get_tmp_folder(), "exported_processor_times.pkl") if not fpath else fpath
     if not os.path.exists(export_path):
         raise FileExistsError("There's no file with processor times. You need to run ptsnet.utils.analytics.compute_num_processors first")
     with open(export_path, 'rb') as f:

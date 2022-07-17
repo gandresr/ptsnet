@@ -29,17 +29,32 @@ def new_workspace_name(is_root = True):
         return f'W{count}'
     return None
 
-def new_uuid_workspace_name():
-    wname = uuid.uuid4().hex[:8]
-    while os.path.isdir(os.path.join(os.getcwd(), 'workspaces', wname)):
+def new_uuid_workspace_name(size=1):
+    wnames = []
+    for i in range(size):
         wname = uuid.uuid4().hex[:8]
-    return wname
+        while os.path.isdir(os.path.join(os.getcwd(), 'workspaces', wname)):
+            wname = uuid.uuid4().hex[:8]
+        wnames.append(f"W{wname}")
+    return wnames
 
 def create_workspaces_folder():
     ws_path = os.path.join(os.getcwd(), 'workspaces')
     if not os.path.exists(ws_path):
         os.mkdir(ws_path)
     return ws_path
+
+def get_workspaces():
+    return os.listdir(os.path.join(os.getcwd(), 'workspaces'))
+
+def get_tmp_folder():
+    return os.path.join(create_workspaces_folder(), 'tmp')
+
+def create_temp_folder():
+    tmpdir = os.path.join(create_workspaces_folder(), 'tmp')
+    if os.path.exists(tmpdir): shutil.rmtree(tmpdir)
+    os.makedirs(tmpdir)
+    return tmpdir
 
 def list_workspaces():
     wps = [d for d in os.listdir(os.path.join(os.getcwd(), 'workspaces')) if '.' not in d].sort()

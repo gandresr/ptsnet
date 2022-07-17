@@ -1,4 +1,5 @@
 import os
+import pdb
 import numpy as np
 
 from wntr.epanet.io import InpFile
@@ -19,13 +20,7 @@ class Initializer:
         self.wn = get_water_network(inpfile)
         self.ng = self.wn.get_graph()
         self._super = _super
-        if self._super.router['main'].rank == 0:
-            self.ss = get_initial_conditions(inpfile, period = period, wn = self.wn)
-        else:
-            self.ss = None
-        self._super.router['main'].barrier() # Synchronize
-        if self._super.router['main'].size > 1:
-            self.ss = self._super.router['main'].bcast(self.ss, root=0)
+        self.ss = get_initial_conditions(inpfile, period = period, wn = self.wn)
         self.num_points = 0
         self.num_segments = 0
         self.where = None

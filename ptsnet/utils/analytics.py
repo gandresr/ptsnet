@@ -1,12 +1,13 @@
 from multiprocessing.sharedctypes import Value
 from time import time
+from sys import exit
 import numpy as np
 import os, psutil, pickle, datetime
 
-from ptsnet.utils.io import create_temp_folder, get_temp_folder, create_tacc_job, submit_tacc_jobs
+from ptsnet.utils.io import create_tacc_job, submit_tacc_jobs
 from ptsnet.simulation.constants import FILE_TEMPLATE, TACC_FILE_TEMPLATE
 from ptsnet.simulation.sim import PTSNETSimulation, PTSNETSettings
-from ptsnet.results.workspaces import delete_workspace, get_workspace_uuid, get_num_tmp_workspaces
+from ptsnet.results.workspaces import delete_workspace, get_num_tmp_workspaces, new_uuid_workspace_name, create_temp_folder
 
 def compute_wave_speed_error(sim):
     ws = sim.ss['pipe'].wave_speed
@@ -23,18 +24,18 @@ def compute_num_processors(
     queue = 'normal',
     processors_per_node = 64,
     run_time = 30, # minutes
-    allocation = None,
-    clean_files = True):
+    allocation = None):
 
     if environment not in ('pc', 'tacc'): raise ValueError("Environment can only be ('pc', 'tacc')")
     if environment == 'tacc' and not allocation: raise ValueError("Specify your TACC allocation")
 
     if type(sim) is not PTSNETSimulation: raise ValueError("'sim' must be a PTSNETSimulation")
     nprocessors = psutil.cpu_count(logical=False) if max_num_processors is None else max_num_processors
-    create_temp_folder()
-    temp_file_path = os.path.join(get_temp_folder(), "temp_sim.py")
-    compute_file_path = os.path.join(get_temp_folder(), "compute_processors_sim.py")
-    export_path = os.path.join(get_temp_folder(), "exported_processor_times.pkl")
+    temp_folder_path = create_temp_folder()
+    workspaces = new_uuid_workspace_name(count)
+    temp_file_paths = [os.path.join(temp_folder_path, f"temp_sim_{i}.py") for i in range(count)]
+    compute_file_path = os.path.join(temp_folder_path, "compute_processors_sim.py")
+    export_path = os.path.join(temp_folder_path, "exported_processor_times.pkl")
 
     # Modify settings for performance simulation only
     sim.settings.profiler_on = True
@@ -42,26 +43,27 @@ def compute_num_processors(
     sim.settings.save_results = True
 
     # Write Python script to run simulations
-    with open(temp_file_path, "w") as f:
-        f.write(FILE_TEMPLATE.format(workspace_name=None, inpfile=sim.inpfile, settings=sim.settings.to_dict(simplified=True)))
-        f.write("sim.run()")
-    cwd = os.getcwd()
+    for ii in range(count):
+        with open(temp_file_paths[ii], "w") as f:
+            f.write(FILE_TEMPLATE.format(workspace_name="tmp"+os.path.sep+f"{workspaces[ii]}", inpfile=sim.inpfile, settings=sim.settings.to_dict(simplified=True)))
+            f.write("sim.run()")
+
     processors = np.linspace(1, nprocessors, count, dtype=int)
 
     # Write bash executable
     if environment == 'pc':
-        bash_path = os.path.join(get_temp_folder(), "compute_num_processors.sh")
+        bash_path = os.path.join(temp_folder_path, "compute_num_processors.sh")
         with open(bash_path, "w") as f:
             f.write(f"echo 'Evaluating Performance (this might take a few minutes)'\n")
             for ii, p in enumerate(processors):
-                f.write(f"mpiexec -n {p} python3 {temp_file_path} &> log.txt\n")
+                f.write(f"mpiexec -n {p} python3 {temp_file_paths[ii]} &> log.txt\n")
                 f.write(f"echo '({int(100*(ii+1)/len(processors))}%) Finished run {ii+1}/{len(processors)}'\n")
             f.write(f"rm log.txt\n")
             f.write(f"python3 {compute_file_path}\n")
     elif environment == 'tacc':
         for ii, p in enumerate(processors):
             create_tacc_job(
-                fpath = temp_file_path,
+                fpath = temp_file_paths[ii],
                 job_name = f"j_{ii}",
                 num_processors = p,
                 allocation = allocation,
@@ -78,16 +80,17 @@ def compute_num_processors(
     # Write Python script to compute number of processors
     fcontent = "import matplotlib.pyplot as plt\n" if plot else ""
     fcontent += \
+        "import os\n" + \
         "import pickle\n" + \
         "import numpy as np\n" + \
         "from pprint import pprint\n" + \
         "from ptsnet.simulation.sim import PTSNETSimulation\n" + \
-        "from ptsnet.results.workspaces import get_num_tmp_workspaces\n" + \
+        "from ptsnet.results.workspaces import get_tmp_folder\n" + \
         "from kneed import KneeLocator\n" + \
-        f"workspaces = [get_num_tmp_workspaces()-1-i for i in range({count})]\n" + \
+        f"workspaces = {workspaces}\n" + \
         "times = {}\n" + \
         "for w in workspaces:\n" + \
-        "    with PTSNETSimulation(w) as sim:\n" + \
+        f"    with PTSNETSimulation('tmp'+os.path.sep+w) as sim:\n" + \
         "        exchange_data_time = np.mean(sim.profiler.summary['comm_jobs'].exchange_data)\n" + \
         "        barrier1_time = np.mean(sim.profiler.summary['comm_jobs'].barrier1)\n" + \
         "        barrier2_time = np.mean(sim.profiler.summary['comm_jobs'].barrier2)\n" + \
@@ -127,10 +130,11 @@ def compute_num_processors(
         f.write(fcontent)
 
     if environment == 'pc':
-        print("\nExecute the following command on your terminal:")
+        print("\nExecute the following commands on your terminal:")
+        print(f"cd {os.getcwd()}")
         print(f"bash {bash_path}\n")
 
-    exit()
+    return
 
 def compute_simulation_times(
     inpfile,
@@ -150,14 +154,16 @@ def compute_simulation_times(
     if environment not in ('pc', 'tacc'): raise ValueError("Environment can only be ('pc', 'tacc')")
     if environment == 'tacc' and not allocation: raise ValueError("Specify your TACC allocation")
 
-    create_temp_folder()
+    temp_folder_path = create_temp_folder()
     nprocessors = psutil.cpu_count(logical=False) if max_num_processors is None else max_num_processors
     processors = np.linspace(1, nprocessors, count, dtype=int)
-    compute_file_path = os.path.join(get_temp_folder(), "compute_times_per_step.py")
+    compute_file_path = os.path.join(temp_folder_path, "compute_times_per_step.py")
+    workspace_name = new_uuid_workspace_name(1)[0]
+    sims = {(processors[ii], time_steps[jj]) : (ii, jj)  for ii in range(len(processors)) for jj in range(len(time_steps))}
+    bash_path = os.path.join(temp_folder_path, "compute_times_per_step.sh")
 
-    ii = 0
-    for ts in time_steps:
-        temp_file_path = os.path.join(get_temp_folder(), f"temp_sim_{ii}.py")
+    kk = 0
+    for ii, ts in enumerate(time_steps):
         # Write Python script to run simulations
         settings = PTSNETSettings(
             time_step = ts,
@@ -169,14 +175,12 @@ def compute_simulation_times(
             profiler_on = True,
             wave_speed_method = 'user'
         )
-        with open(temp_file_path, "w") as f:
-            f.write(FILE_TEMPLATE.format(workspace_name=None, inpfile=inpfile, settings=settings.to_dict(simplified=True)))
-            f.write("sim.run()")
-        cwd = os.getcwd()
-        ii += 1
-
-    sims = {(processors[ii], time_steps[jj]) : (ii, jj)  for ii in range(len(processors)) for jj in range(len(time_steps))}
-    bash_path = os.path.join(get_temp_folder(), "compute_times_per_step.sh")
+        for jj in range(count):
+            temp_file_path = os.path.join(temp_folder_path, f"temp_sim_{ii}_{jj}.py")
+            with open(temp_file_path, "w") as f:
+                f.write(FILE_TEMPLATE.format(workspace_name='tmp'+os.path.sep+workspace_name+f'_{ii}_{jj}', inpfile=inpfile, settings=settings.to_dict(simplified=True)))
+                f.write("sim.run()")
+            kk += 1
 
     # Write bash executable
     if environment == 'pc':
@@ -184,14 +188,14 @@ def compute_simulation_times(
             f.write(f"echo 'Executing Simulations to Evaluate Performance'\n")
             f.write(f"echo '[This might take a few minutes]'\n")
             for ii, (p, ts) in enumerate(sims):
-                temp_file_path = os.path.join(get_temp_folder(), f"temp_sim_{ii%len(time_steps)}.py")
+                temp_file_path = os.path.join(temp_folder_path, f"temp_sim_{ii%len(time_steps)}_{ii%count}.py")
                 f.write(f"mpiexec -n {p} python3 {temp_file_path} &> log.txt\n")
                 f.write(f"echo '({int(100*(1+ii)/len(sims))}%) Finished Simulation {1+ii}/{len(sims)} -> {p} processor(s) | time_step = {ts} s'\n")
             f.write(f"rm log.txt\n")
             f.write(f"python3 {compute_file_path}\n")
     elif environment == 'tacc':
         for ii, (p, ts) in enumerate(sims):
-            temp_file_path = os.path.join(get_temp_folder(), f"temp_sim_{ii%len(time_steps)}.py")
+            temp_file_path = os.path.join(temp_folder_path, f"temp_sim_{ii%len(time_steps)}_{ii%count}.py")
             create_tacc_job(
                 fpath = temp_file_path,
                 job_name = f"j_{ii}",
@@ -208,9 +212,10 @@ def compute_simulation_times(
         print('\n-----------------------------------------------------\n')
 
     # Write Python script to compute simulation times
-    export_path = os.path.join(get_temp_folder(), "exported_sim_times.pkl")
+    export_path = os.path.join(temp_folder_path, "exported_sim_times.pkl")
     fcontent = \
     "import numpy as np\n" + \
+    "import os\n" + \
     "import pickle\n" + \
     "from ptsnet.simulation.sim import PTSNETSimulation\n" + \
     "from ptsnet.results.workspaces import get_num_tmp_workspaces\n" + \
@@ -226,7 +231,7 @@ def compute_simulation_times(
     "for ii, (p, ts) in enumerate(sims):\n" + \
     f"    jj = time_steps.index(ts) # index for time step\n" + \
     "    kk = processors.index(p)\n" + \
-    "    workspace_name = f'W{get_num_tmp_workspaces() - len(sims) + ii}'\n" + \
+    f"    workspace_name = 'tmp'+os.path.sep+'{workspace_name}'+f'_"+"{jj}_{kk}'\n" + \
     "    with PTSNETSimulation(workspace_name) as sim:\n" + \
     "        init_times[jj, kk] = \\\n" + \
     "            (sim.profiler.summary['get_partition'] + \\\n" + \
@@ -278,11 +283,7 @@ def compute_simulation_times(
         f.write(fcontent)
 
     if environment == 'pc':
-        print("\nExecute the following command on your terminal:")
+        print("\nExecute the following commands on your terminal:")
+        print(f"cd {os.getcwd()}")
         print(f"bash {bash_path}\n")
-
-    if clean_files:
-        for ii, (p, ts) in enumerate(sims):
-            workspace_name = f'W{get_num_tmp_workspaces() - len(sims) + ii}'
-            delete_workspace(workspace_name, verbose=True)
-    exit()
+    return

@@ -210,10 +210,7 @@ class PTSNETSimulation:
 
     def __init__(self, workspace_name, inpfile = None, settings = {}, init_on = False):
         self.init_parameters(workspace_name, inpfile, settings, init_on)
-        self.init_raw_simulation()
-
         if self.settings.active_persistance: return
-
         self.init_wave_speeds()
         self.init_progress_bar()
         self.save_sim_data()
@@ -276,19 +273,8 @@ class PTSNETSimulation:
     def time_step(self):
         return self.settings.time_step
 
-    def init_raw_simulation(self):
-        if self.workspace_name is None:
-            if self.router['main'].size > 1:
-                is_root = self.router['main'].rank == 0
-                self.workspace_name = new_workspace_name(is_root)
-                self.workspace_name = self.router['main'].bcast(self.workspace_name, root = 0)
-                self.storer = StorageManager(self.workspace_name, router = self.router)
-            else:
-                self.storer = StorageManager(new_workspace_name())
-        else:
-            self.storer = StorageManager(self.workspace_name, router = self.router)
-
     def init_parameters(self, workspace_name, inpfile, settings, init_on):
+        if workspace_name == 'tmp': raise ValueError(f"The workspace name '{workspace_name}' cannot be used, it is reserved")
         self.inpfile = inpfile
         assert type(workspace_name) is str
         self.workspace_name = workspace_name
@@ -312,6 +298,7 @@ class PTSNETSimulation:
         self.t = 0
         self.worker = None
         self.results = None
+        self.storer = StorageManager(self.workspace_name, router = self.router)
 
     def init_wave_speeds(self):
         self.initializer = Initializer(

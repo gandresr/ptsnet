@@ -38,17 +38,6 @@ def walk(folder_structure, root_path):
 
     return paths
 
-def get_workspaces():
-    return os.listdir(os.path.join(os.getcwd(), 'workspaces'))
-
-def get_temp_folder():
-    return os.path.join(get_root_path(), 'tmp')
-
-def create_temp_folder():
-    tmpdir = get_temp_folder()
-    if os.path.exists(tmpdir): shutil.rmtree(tmpdir)
-    os.makedirs(tmpdir)
-
 def create_tacc_job(
     fpath,
     job_name,
