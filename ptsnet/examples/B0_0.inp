@@ -2,7 +2,7 @@
 
 
 [JUNCTIONS]
-;ID              	Elev        	Demand      	Pattern         
+;ID              	Elev        	Demand      	Pattern
  N1              	0           	0           	                	;
  N2              	0           	0           	                	;
  N3              	0           	0           	                	;
@@ -14,7 +14,7 @@
  V1-B            	0           	0           	                	;
 
 [RESERVOIRS]
-;ID              	Head        	Pattern         
+;ID              	Head        	Pattern
  R1              	191         	                	;
 
 [TANKS]
@@ -37,9 +37,9 @@
 ;ID              	Node1           	Node2           	Parameters
 
 [VALVES]
-;ID              	Node1           	Node2           	Diameter    	Type	Setting     	MinorLoss   
- V-END           	N6              	N7              	184         	FCV 	1           	0           	;
- V1              	V1-A            	V1-B            	750         	FCV 	3           	0           	;
+;ID              	Node1           	Node2           	Diameter    	Type	Setting     	MinorLoss
+ V-END           	N6              	N7              	184         	FCV 	1           	0.5           	;
+ V1              	V1-A            	V1-B            	750         	FCV 	3           	0.5           	;
 
 [TAGS]
 
@@ -98,13 +98,13 @@
 ;Tank            	Model
 
 [TIMES]
- Duration           	0:00 
- Hydraulic Timestep 	1:00 
- Quality Timestep   	0:05 
- Pattern Timestep   	1:00 
- Pattern Start      	0:00 
- Report Timestep    	1:00 
- Report Start       	0:00 
+ Duration           	0:00
+ Hydraulic Timestep 	1:00
+ Quality Timestep   	0:05
+ Pattern Timestep   	1:00
+ Pattern Start      	0:00
+ Report Timestep    	1:00
+ Report Start       	0:00
  Start ClockTime    	12 am
  Statistic          	NONE
 
@@ -133,16 +133,16 @@
 
 [COORDINATES]
 ;Node            	X-Coord         	Y-Coord
- N1              	65.36           	6536.05         
- N2              	961.93          	5658.44         
- N3              	2649.18         	5658.44         
- N4              	1414.36         	6965.59         
- N5              	2361.11         	6965.02         
- N6              	3750.55         	5656.40         
- N7              	4091.79         	5653.12         
- V1-A            	559.38          	6692.69         
- V1-B            	795.85          	6766.49         
- R1              	-529.84         	7427.98         
+ N1              	65.36           	6536.05
+ N2              	961.93          	5658.44
+ N3              	2649.18         	5658.44
+ N4              	1414.36         	6965.59
+ N5              	2361.11         	6965.02
+ N6              	3750.55         	5656.40
+ N7              	4091.79         	5653.12
+ V1-A            	559.38          	6692.69
+ V1-B            	795.85          	6766.49
+ R1              	-529.84         	7427.98
 
 [VERTICES]
 ;Link            	X-Coord         	Y-Coord
@@ -151,9 +151,9 @@
 ;X-Coord           Y-Coord          Label & Anchor Node
 
 [BACKDROP]
- DIMENSIONS     	0.00            	0.00            	10000.00        	10000.00        
+ DIMENSIONS     	0.00            	0.00            	10000.00        	10000.00
  UNITS          	None
- FILE           	
- OFFSET         	0.00            	0.00            
+ FILE
+ OFFSET         	0.00            	0.00
 
 [END]
