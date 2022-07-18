@@ -96,7 +96,7 @@ We highly encourage using a conda environment for the installation, so that depe
   # Windows
   https://conda.io/projects/conda/en/latest/user-guide/install/windows.html
   ```
-* Install the conda environment with all the necessary dependencies
+* Install the conda environment with all the necessary dependencies, by opening a terminal and running the following commands
 
   1. Execute `conda activate` to start conda
   2. Execute `conda config --add channels conda-forge` to add the `conda-forge` channel
