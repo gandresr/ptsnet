@@ -98,15 +98,17 @@ We highly encourage using a conda environment for the installation, so that depe
   ```
 * Install the conda environment with all the necessary dependencies
 
-  1. Download the [requirements.txt](https://github.com/gandresr/ptsnet/blob/development/requirements.txt)
-  2. In the command line `cd` to the location where the requirements.txt file was downloaded
-  3. Execute `conda create -n ptsnet` to create a new conda environment
-  4. Activate the environment with `conda activate ptsnet`
-  5. Install the requirements using `conda install --file requirements.txt`
-  6. Install h5py
+  1. Execute `conda activate` to start conda
+  2. Execute `conda config --add channels conda-forge` to add the `conda-forge` channel
+  3. Download the [requirements.txt](https://github.com/gandresr/ptsnet/blob/development/requirements.txt)
+  4. In the command line `cd` to the location where the requirements.txt file was downloaded
+  5. Execute `conda create -n ptsnet` to create a new conda environment
+  6. Activate the environment with `conda activate ptsnet`
+  7. Install the requirements using `conda install --file requirements.txt`
+  8. Install h5py
       - For __Linux/Mac__: `conda install "h5py>=2.9=mpi*"`
       - For __Windows__: `conda install h5py`
-  7. Install PTSNET: `pip install ptsnet`
+  9. Install PTSNET: `pip install ptsnet`
 
 
 <!-- USAGE EXAMPLES -->
