@@ -96,17 +96,19 @@ We highly encourage using a conda environment for the installation, so that depe
   # Windows
   https://conda.io/projects/conda/en/latest/user-guide/install/windows.html
   ```
-* Install the conda environment with all the necessary dependencies
+* Install the conda environment with all the necessary dependencies, by opening a terminal and running the following commands
 
-  1. Download the [requirements.txt](https://github.com/gandresr/ptsnet/blob/development/requirements.txt)
-  2. In the command line `cd` to the location where the requirements.txt file was downloaded
-  3. Execute `conda create -n ptsnet` to create a new conda environment
-  4. Activate the environment with `conda activate ptsnet`
-  5. Install the requirements using `conda install --file requirements.txt`
-  6. Install h5py
+  1. Execute `conda activate` to start conda
+  2. Execute `conda config --add channels conda-forge` to add the `conda-forge` channel
+  3. Download the [requirements.txt](https://github.com/gandresr/ptsnet/blob/development/requirements.txt)
+  4. In the command line `cd` to the location where the requirements.txt file was downloaded
+  5. Execute `conda create -n ptsnet` to create a new conda environment
+  6. Activate the environment with `conda activate ptsnet`
+  7. Install the requirements using `conda install --file requirements.txt`
+  8. Install h5py
       - For __Linux/Mac__: `conda install "h5py>=2.9=mpi*"`
       - For __Windows__: `conda install h5py`
-  7. Install PTSNET: `pip install ptsnet`
+  9. Install PTSNET: `pip install ptsnet`
 
 
 <!-- USAGE EXAMPLES -->
@@ -115,6 +117,7 @@ We highly encourage using a conda environment for the installation, so that depe
 Create a file called named `simulation.py` with the following contents:
 
 ```python
+import matplotlib.pyplot as plt
 from ptsnet.simulation.sim import PTSNETSimulation
 from ptsnet.utils.io import get_example_path
 
@@ -122,7 +125,10 @@ sim = PTSNETSimulation(
   workspace_name = 'TNET3_VALVE',
   inpfile = get_example_path('TNET3'))
 sim.define_valve_operation('VALVE-179', initial_setting=1, final_setting=0, start_time=1, end_time=2)
-sim.run()
+sim.run(); print(sim)
+
+plt.plot(sim['time'], sim['node'].head['JUNCTION-73'])
+plt.show()
 ```
 
 After creating the file, you can execute the code from the command line.
@@ -133,7 +139,7 @@ If you have __Linux/Mac__ execute the following command on the terminal:
 ```sh
 mpiexec -n 4 python simulation.py
 ```
-The number of processors is defined by the parameter `-p` in the command, in this case 4.
+The number of processors is defined by the parameter `-n` in the command, in this case 4.
 
 If you have __Windows__ you can still run the simulation as shown below, but you will not have access to PTSNET's parallel capabilities:
 ```sh
