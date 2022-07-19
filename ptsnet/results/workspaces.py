@@ -48,11 +48,11 @@ def create_workspaces_folder(root=False):
 def get_workspaces():
     return os.listdir(os.path.join(os.getcwd(), 'workspaces'))
 
-def get_tmp_folder():
-    return os.path.join(create_workspaces_folder(), 'tmp')
+def get_tmp_folder(root=False):
+    return os.path.join(create_workspaces_folder(root), 'tmp')
 
 def create_temp_folder(root=False):
-    tmpdir = os.path.join(create_workspaces_folder(), 'tmp')
+    tmpdir = os.path.join(create_workspaces_folder(root), 'tmp')
     if root:
         if os.path.exists(tmpdir): shutil.rmtree(tmpdir)
         os.makedirs(tmpdir)

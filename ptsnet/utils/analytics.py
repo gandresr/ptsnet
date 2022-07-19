@@ -5,9 +5,9 @@ import numpy as np
 import os, psutil, pickle, datetime
 
 from ptsnet.utils.io import create_tacc_job, submit_tacc_jobs
-from ptsnet.simulation.constants import FILE_TEMPLATE, TACC_FILE_TEMPLATE
+from ptsnet.simulation.constants import FILE_TEMPLATE
 from ptsnet.simulation.sim import PTSNETSimulation, PTSNETSettings
-from ptsnet.results.workspaces import delete_workspace, get_num_tmp_workspaces, new_uuid_workspace_name, create_temp_folder
+from ptsnet.results.workspaces import new_uuid_workspace_name, create_temp_folder
 
 def compute_wave_speed_error(sim):
     ws = sim.ss['pipe'].wave_speed
@@ -31,7 +31,7 @@ def compute_num_processors(
 
     if type(sim) is not PTSNETSimulation: raise ValueError("'sim' must be a PTSNETSimulation")
     nprocessors = psutil.cpu_count(logical=False) if max_num_processors is None else max_num_processors
-    temp_folder_path = create_temp_folder()
+    temp_folder_path = create_temp_folder(root=True)
     workspaces = new_uuid_workspace_name(count)
     temp_file_paths = [os.path.join(temp_folder_path, f"temp_sim_{i}.py") for i in range(count)]
     compute_file_path = os.path.join(temp_folder_path, "compute_processors_sim.py")
@@ -154,7 +154,7 @@ def compute_simulation_times(
     if environment not in ('pc', 'tacc'): raise ValueError("Environment can only be ('pc', 'tacc')")
     if environment == 'tacc' and not allocation: raise ValueError("Specify your TACC allocation")
 
-    temp_folder_path = create_temp_folder()
+    temp_folder_path = create_temp_folder(root=True)
     nprocessors = psutil.cpu_count(logical=False) if max_num_processors is None else max_num_processors
     processors = np.linspace(1, nprocessors, count, dtype=int)
     compute_file_path = os.path.join(temp_folder_path, "compute_times_per_step.py")

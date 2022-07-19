@@ -595,7 +595,7 @@ class PTSNETSimulation:
             if element_name.dtype == np.int:
                 if (ic_type == 'node' and type_ == 'burst'):
                     self.ss[ic_type].leak_coefficient[element_name] = value
-                if (ic_type == 'node' and type_ == 'demand'):
+                elif (ic_type == 'node' and type_ == 'demand'):
                     self.ss[ic_type].demand_coefficient[element_name] = value
                 else:
                     self.ss[ic_type].setting[element_name] = value
