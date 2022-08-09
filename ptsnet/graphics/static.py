@@ -56,6 +56,7 @@ def plot_estimated_simulation_times(duration=20, select_processors=None, fpath=N
     interior_times = data['interior_times'][:,selection]*num_steps
     boundary_times = data['boundary_times'][:,selection]*num_steps
     comm_times = data['comm_times'][:,selection]*num_steps
+    pdb.set_trace()
     totals = init_times + interior_times + boundary_times + comm_times
 
     matplotlib.rc('ytick', labelsize=22)
@@ -81,8 +82,8 @@ def plot_estimated_simulation_times(duration=20, select_processors=None, fpath=N
             h2 = r2.get_height()
             h3 = r3.get_height()
             h4 = r4.get_height()
-            plt.text(r1.get_x()+r1.get_width()/2., h1+h2+h3+h4, f'$\\tau_{i+1}$', ha = 'center', va='bottom', fontsize=36)
-            # plt.text(r1.get_x()+r1.get_width()/2., h1+h2+h3+h4, '{:,} s'.format(int(h1+h2+h3+h4)), ha = 'center', va='bottom', fontsize=16)
+            # plt.text(r1.get_x()+r1.get_width()/2., h1+h2+h3+h4, f'$\\tau_{i+1}$', ha = 'center', va='bottom', fontsize=36)
+            plt.text(r1.get_x()+r1.get_width()/2., h1+h2+h3+h4, '{:,} s'.format(int(h1+h2+h3+h4)), ha = 'center', va='bottom', fontsize=16)
     plt.xticks(X+width/2-1, processors, fontsize = 32)
     box = ax.get_position()
     ax.set_position([box.x0, box.y0 + box.height * 0.1,

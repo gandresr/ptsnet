@@ -2,6 +2,7 @@ import os, subprocess, shutil, datetime
 import numpy as np
 
 from pkg_resources import resource_filename
+from ptsnet.results.workspaces import create_temp_folder
 from ptsnet.simulation.constants import TACC_FILE_TEMPLATE
 
 def run_shell(command):
@@ -48,7 +49,8 @@ def create_tacc_job(
     queue = 'normal',
     file_args = ''):
 
-    jobs_path = os.path.join(get_temp_folder(), "jobs")
+    temp_folder_path = create_temp_folder(root=True)
+    jobs_path = os.path.join(temp_folder_path, "jobs")
     os.makedirs(jobs_path, exist_ok=True)
     job_path = os.path.join(jobs_path, f'{job_name}.sh')
 
@@ -69,8 +71,9 @@ def create_tacc_job(
         f.write(job_content)
 
 def submit_tacc_jobs():
-    submit_path = os.path.join(get_temp_folder(), 'submit_jobs.sh')
-    jobs_path = os.path.join(get_temp_folder(), "jobs")
+    temp_folder_path = create_temp_folder(root=True)
+    submit_path = os.path.join(temp_folder_path, 'submit_jobs.sh')
+    jobs_path = os.path.join(temp_folder_path, "jobs")
     fcontent = \
         "#!/bin/bash\n" + \
         f"for f in {jobs_path}/*.sh;\n" + \
