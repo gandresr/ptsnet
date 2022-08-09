@@ -5,9 +5,7 @@ import pathlib
 import uuid
 
 from datetime import datetime
-from ptsnet.utils.io import get_root_path, walk
-from pkg_resources import resource_filename
-from ptsnet.results.storage import StorageManager
+from ptsnet.utils.io import get_root_path
 from ptsnet.utils.data import is_array
 
 def get_num_tmp_workspaces():

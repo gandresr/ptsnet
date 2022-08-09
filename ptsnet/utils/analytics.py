@@ -1,10 +1,7 @@
-from multiprocessing.sharedctypes import Value
-from time import time
-from sys import exit
 import numpy as np
-import os, psutil, pickle, datetime
+import os, psutil
 
-from ptsnet.utils.io import create_tacc_job, submit_tacc_jobs
+from ptsnet.utils.tacc import create_tacc_job, submit_tacc_jobs
 from ptsnet.simulation.constants import FILE_TEMPLATE
 from ptsnet.simulation.sim import PTSNETSimulation, PTSNETSettings
 from ptsnet.results.workspaces import new_uuid_workspace_name, create_temp_folder
