@@ -64,7 +64,7 @@ def compute_num_processors(
                 job_name = f"j_{ii}",
                 num_processors = p,
                 allocation = allocation,
-                run_time = 30,
+                run_time = run_time,
                 queue = queue,
                 processors_per_node = processors_per_node)
         submit_tacc_jobs()
@@ -185,14 +185,18 @@ def compute_simulation_times(
             f.write(f"echo 'Executing Simulations to Evaluate Performance'\n")
             f.write(f"echo '[This might take a few minutes]'\n")
             for ii, (p, ts) in enumerate(sims):
-                temp_file_path = os.path.join(temp_folder_path, f"temp_sim_{ii%len(time_steps)}_{ii%count}.py")
+                jj = list(time_steps).index(ts)
+                kk = list(processors).index(p)
+                temp_file_path = os.path.join(temp_folder_path, f"temp_sim_{jj}_{kk}.py")
                 f.write(f"mpiexec -n {p} python3 {temp_file_path} &> log.txt\n")
                 f.write(f"echo '({int(100*(1+ii)/len(sims))}%) Finished Simulation {1+ii}/{len(sims)} -> {p} processor(s) | time_step = {ts} s'\n")
             f.write(f"rm log.txt\n")
             f.write(f"python3 {compute_file_path}\n")
     elif environment == 'tacc':
         for ii, (p, ts) in enumerate(sims):
-            temp_file_path = os.path.join(temp_folder_path, f"temp_sim_{ii%len(time_steps)}_{ii%count}.py")
+            jj = list(time_steps).index(ts)
+            kk = list(processors).index(p)
+            temp_file_path = os.path.join(temp_folder_path, f"temp_sim_{jj}_{kk}.py")
             create_tacc_job(
                 fpath = temp_file_path,
                 job_name = f"j_{ii}",
