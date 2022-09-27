@@ -6,11 +6,6 @@ from ptsnet.simulation.constants import FILE_TEMPLATE
 from ptsnet.simulation.sim import PTSNETSimulation, PTSNETSettings
 from ptsnet.results.workspaces import new_uuid_workspace_name, create_temp_folder
 
-def compute_wave_speed_error(sim):
-    ws = sim.ss['pipe'].wave_speed
-    dws = sim.ss['pipe'].desired_wave_speed
-    return np.abs(ws - dws)*100 / dws
-
 def compute_num_processors(
     sim,
     plot = False,
