@@ -16,18 +16,18 @@ The folder *SI_results* contains summarized results to compare transient simulat
 
 Below you can find a comprehensive list of all the properties and results that can be extracted from the model. All the numerical variables representing a physical property of the object are expressed in SI units.
 
-**Node results**: can be extracted through `PTSNETSimulation['node'].<result_name>
+**Node results**: can be extracted through `PTSNETSimulation['node'].<result_name>['<node_name>']`
 - 'head'
 - 'leak_flow': leaking flowrate
 - 'demand_flow': demand flowrate
 
-**Pipe start results**: can be extracted through `PTSNETSimulation['pipe.start'].<result_name>
+**Pipe start results**: can be extracted through `PTSNETSimulation['pipe.start'].<result_name>['<pipe_name>']`
 - 'flowrate'
 
-**Pipe end results**: can be extracted through `PTSNETSimulation['pipe.end'].<result_name>
+**Pipe end results**: can be extracted through `PTSNETSimulation['pipe.end'].<result_name>['<pipe_name>']`
 - 'flowrate'
 
-**Closed protection results**: can be extracted through `PTSNETSimulation['closed_protection'].<result_name>
+**Closed protection results**: can be extracted through `PTSNETSimulation['closed_protection'].<result_name>['<node_name>']`
 - 'water_level': level of water inside of the surge tank
 
 **Node properties**: can be extracted through `PTSNETSimulation.ss['node'].<property_name>['<node_name>']`
