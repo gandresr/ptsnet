@@ -170,6 +170,8 @@ class Initializer:
 
             self.ss['pipe'].desired_wave_speed = self.ss['pipe'].wave_speed
             self._set_segments(wave_speed_method)
+            self.ss['pipe'].wave_speed_adjustment = \
+                np.abs(self.ss['pipe'].wave_speed - self.ss['pipe'].desired_wave_speed)*100 / self.ss['pipe'].desired_wave_speed
             return True
 
     def _set_segments(self, wave_speed_method = 'optimal'):
