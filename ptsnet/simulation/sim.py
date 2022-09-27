@@ -313,6 +313,7 @@ class PTSNETSimulation:
             self.settings.delimiter,
             self.settings.wave_speed_method
         )
+
         self.initializer.create_selectors()
         self.settings.num_points = self.initializer.num_points
         if self.router['main'].size > self.num_points:
@@ -772,15 +773,15 @@ class PTSNETSimulation:
             self.profiler.summarize_step_times()
             self.inpfile = self.storer.load_data('inpfile')
 
-            if self.init_on:
-                self.initializer = Initializer(
-                    self.inpfile,
-                    period = self.settings.period,
-                    skip_compatibility_check = True,
-                    warnings_on = self.settings.warnings_on,
-                    _super = self)
+            self.initializer = Initializer(
+                self.inpfile,
+                period = self.settings.period,
+                skip_compatibility_check = True,
+                warnings_on = self.settings.warnings_on,
+                _super = self)
 
-            if self.settings.save_results and self.settings.is_initialized:
+            self.results = {}
+            if self.settings.save_results:
                 local_to_global = self.storer.load_data('local_to_global')
 
                 node_labels = local_to_global['node']

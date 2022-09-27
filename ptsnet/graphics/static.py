@@ -7,13 +7,12 @@ import bisect, os, pickle
 import numpy as np
 import pdb
 from matplotlib.lines import Line2D
-from ptsnet.utils.analytics import compute_wave_speed_error
 from ptsnet.results.workspaces import get_tmp_folder
 
 def plot_wave_speed_error(sim, image_path, intervals=[0,25,50,75,100]):
     if any(np.diff(intervals) < 0): raise ValueError(f"The sequence 'intervals' = {intervals} must be increasing")
     if len(intervals) > 5: raise ValueError("You can only specify an array with 5 increasing entries for intervals at most ")
-    errors = compute_wave_speed_error(sim)
+    errors = sim.ss['pipe'].wave_speed_adjustment
     percentile_labels = [("%.1f%%" + " - " + "%.1f%%") % (intervals[i], intervals[i+1],)  for i in range(len(intervals)-1)]
     error_intervals = {sim.ss['pipe'].labels[i] : bisect.bisect_left(intervals, errors[i]) for i in range(len(sim.ss['pipe'].labels))}
     colors = ['#cccccc', '#FFFBBD', '#E6AA68', '#CA3C25']

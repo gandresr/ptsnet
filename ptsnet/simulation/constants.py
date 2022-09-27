@@ -49,6 +49,7 @@ PIPE_PROPERTIES = {
     'area' : float, #
     'wave_speed' : float, #
     'desired_wave_speed' : float, #
+    'wave_speed_adjustment' : float, #
     'segments' : float, #
     'flowrate' : float, #
     'velocity' : float, #
