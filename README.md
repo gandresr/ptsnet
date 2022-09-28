@@ -29,7 +29,6 @@
   </p>
 </p>
 
-[![DOI](https://zenodo.org/badge/359951639.svg)](https://zenodo.org/badge/latestdoi/359951639)
 [![Downloads](https://static.pepy.tech/personalized-badge/ptsnet?period=total&units=international_system&left_color=black&right_color=orange&left_text=Downloads)](https://pepy.tech/project/ptsnet)
 <!-- TABLE OF CONTENTS -->
 <!-- <details open="open">
@@ -196,6 +195,8 @@ Distributed under the Unlicense License. See `LICENSE` for more information.
 
 Gerardo Riano - griano@utexas.edu
 
+Lina Sela - linasela@utexas.edu
+
 Project Link: [https://github.com/gandresr/PTSNET](https://github.com/gandresr/PTSNET)
 
 
@@ -203,10 +204,7 @@ Project Link: [https://github.com/gandresr/PTSNET](https://github.com/gandresr/P
 <!-- ACKNOWLEDGEMENTS -->
 ## Acknowledgements
 
-This publication was developed under Cooperative Agreement No. 83595001 awarded by the U.S. Environmental Protection Agency to The University of Texas at Austin. It has not been formally reviewed by EPA. The views expressed in this document are solely those of the authors, and do not necessarily reflect those of the Agency. EPA does not endorse any products or commercial services mentioned in this publication. The authors acknowledge the Texas Advanced Computing Center (TACC) at The University of Texas at Austin for providing HPC resources that have contributed to the research results reported within this paper. URL: http://www.tacc.utexas.edu
-
-
-
+The authors acknowledge the Texas Advanced Computing Center (TACC) at The University of Texas at Austin for providing HPC resources that have contributed to the research results reported within this publication. This work was supported in part by NSF under award 2015658 and Cooperative Agreement No. 83595001 awarded by the U.S. Environmental Protection Agency to The University of Texas at Austin. It has not been formally reviewed by EPA. The views expressed in this presentation are solely those of the authors, and do not necessarily reflect those of the Agency. EPA does not endorse any products or commercial services mentioned in this publication.
 
 
 <!-- MARKDOWN LINKS & IMAGES -->
