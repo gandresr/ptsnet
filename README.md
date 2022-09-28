@@ -29,7 +29,6 @@
   </p>
 </p>
 
-[![DOI](https://zenodo.org/badge/359951639.svg)](https://zenodo.org/badge/latestdoi/359951639)
 [![Downloads](https://static.pepy.tech/personalized-badge/ptsnet?period=total&units=international_system&left_color=black&right_color=orange&left_text=Downloads)](https://pepy.tech/project/ptsnet)
 <!-- TABLE OF CONTENTS -->
 <!-- <details open="open">
