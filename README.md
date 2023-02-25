@@ -170,7 +170,22 @@ For more examples, please refer to the [jupyter notebooks](https://github.com/ga
 <!-- Cite Us -->
 ## Cite Us
 
-If PTSNET has been useful for your research and you are ready to publish your paper, please cite the paper below:
+If the PTSNET package has been useful for your research, please cite the paper below:
+
+[PTSNet: A Parallel Transient Simulator for Water Transport Networks based on vectorization and distributed computing](https://www.sciencedirect.com/science/article/pii/S1364815222002547)
+```
+@article{riano2022ptsnet,
+  title={PTSNet: A Parallel Transient Simulator for Water Transport Networks based on vectorization and distributed computing},
+  author={Ria{\~n}o-Brice{\~n}o, Gerardo and Hodges, Ben R and Sela, Lina},
+  journal={Environmental Modelling \& Software},
+  volume={158},
+  pages={105554},
+  year={2022},
+  publisher={Elsevier}
+}
+```
+
+If the PTSNET algorithm was useful for you, please cite the paper below:
 
 [Distributed and Vectorized Method of Characteristics for Fast Transient Simulations in Water Distribution Systems](https://onlinelibrary.wiley.com/doi/full/10.1111/mice.12709)
 ```
