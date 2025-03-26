@@ -1,8 +1,0 @@
-numpy
-tqdm
-scipy
-pandas
-wntr
-mpi4py
-numba
-jupyter

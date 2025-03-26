@@ -1,0 +1,21 @@
+name: ptsnet
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  - pip
+  - numpy=1.23.0
+  - tqdm
+  - scipy
+  - pandas
+  - mpi4py
+  - numba
+  - jupyter
+  - matplotlib
+  - networkx
+  - h5py>=2.9=mpi*
+  # Add your conda-specific packages here
+  - pip:
+    - wntr==0.5.0
+    - ptsnet
+    # Add your pip-specific packages here
