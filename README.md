@@ -99,6 +99,7 @@ We highly encourage using a conda environment for the installation, so that depe
   1. Download [environment.yml](https://raw.githubusercontent.com/gandresr/ptsnet/refs/heads/development/environment.yml)
   2. Execute `conda activate` to start conda
   3. Execute `conda env create -f environment.yml`
+  4. Execute `conda activate ptsnet`
 
 <!-- USAGE EXAMPLES -->
 ## Usage
