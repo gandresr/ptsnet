@@ -55,7 +55,6 @@ def plot_estimated_simulation_times(duration=20, select_processors=None, fpath=N
     interior_times = data['interior_times'][:,selection]*num_steps
     boundary_times = data['boundary_times'][:,selection]*num_steps
     comm_times = data['comm_times'][:,selection]*num_steps
-    pdb.set_trace()
     totals = init_times + interior_times + boundary_times + comm_times
 
     matplotlib.rc('ytick', labelsize=22)

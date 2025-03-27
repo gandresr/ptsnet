@@ -269,7 +269,7 @@ def compute_simulation_times(
         fcontent += \
         "print('-----------------------------------------------------\\n')\n" + \
         "print('Simulation times have been exported to:')\n" + \
-        f"print('export_path = " + "'{export_path}'" + "\\n')\n" + \
+        f"print('export_path = {export_path}\\n')\n" + \
         "print('Plot your results executing:\\n')\n" + \
         "print('>>> from ptsnet.graphics.static import plot_estimated_simulation_times')\n" + \
         f"print('>>> plot_estimated_simulation_times(duration={duration}, fpath=export_path)\\n')\n" + \
