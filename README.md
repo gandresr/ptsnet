@@ -123,6 +123,32 @@ plt.show()
 
 After creating the file, you can execute the code from the command line.
 
+### Selected pipe-point outputs
+
+PTSNET can retain head and flowrate histories at selected locations inside a
+pipe. Request outputs before initialization:
+
+~~~python
+sim.add_pipe_output(
+    name="P1_midpoint",
+    pipe_name="P1",
+    position=0.5,
+    position_type="fraction",
+    variables=("head", "flowrate"),
+)
+sim.run()
+
+head = sim.interior_results["P1_midpoint"]["head"]
+flowrate = sim.interior_results["P1_midpoint"]["flowrate"]
+~~~
+
+A fractional position is measured from the pipe's declared start and is
+interpolated between adjacent computational points. Fractions 0.0 and 1.0
+select the pipe endpoints; mesh indices exclude endpoints. A mesh index is
+zero-based among interior computational points and can change physical
+position when discretization changes. PTSNET retains only points needed by the requests.
+Under MPI, gathered results are available on rank 0 in sim.interior_results. These selected outputs are currently kept in memory and are not added to PTSNET workspace persistence.
+
 #### To execute the parallel version of PTSNET it is necessary to have __Linux/Mac__</span>. 
 
 If you have __Linux/Mac__ execute the following command on the terminal:

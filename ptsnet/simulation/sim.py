@@ -18,6 +18,12 @@ from ptsnet.parallel.worker import Worker
 from ptsnet.results.storage import StorageManager
 from ptsnet.results.workspaces import create_workspaces_folder, list_workspaces, new_workspace_name, get_num_tmp_workspaces
 from ptsnet.simulation.constants import NODE_RESULTS, PIPE_END_RESULTS, PIPE_START_RESULTS, SURGE_PROTECTION_TYPES
+from ptsnet.simulation.interior import (
+    PipeOutputRequest,
+    assemble_pipe_output_results,
+    requested_pipe_point_variables,
+    resolve_pipe_output_requests,
+)
 from ptsnet.profiler.profiler import Profiler
 
 class PTSNETSettings:
@@ -298,6 +304,11 @@ class PTSNETSimulation:
         self.t = 0
         self.worker = None
         self.results = None
+        self.pipe_output_requests = []
+        self.resolved_pipe_outputs = {}
+        self.interior_point_variables = {}
+        self.interior_results = {}
+        self._interior_results_collected = False
         self.storer = StorageManager(self.workspace_name, router = self.router)
 
     def init_wave_speeds(self):
@@ -463,7 +474,37 @@ class PTSNETSimulation:
                 element_index = self.ss[type_].lloc(element)
                 self.curves[curve_name]._add_element(element_index)
 
+
+    def add_pipe_output(
+        self,
+        name,
+        pipe_name,
+        position,
+        position_type="fraction",
+        variables=None,
+    ):
+        """Request selected pipe-point results before the simulation starts."""
+        if self.settings.is_initialized or self.worker is not None:
+            raise RuntimeError("pipe outputs must be requested before initialization")
+        if self.settings.active_persistance:
+            raise NotImplementedError(
+                "pipe-point outputs cannot be added to a persisted workspace"
+            )
+        request = PipeOutputRequest(
+            name=name,
+            pipe_name=pipe_name,
+            position=position,
+            position_type=position_type,
+            variables=variables,
+        )
+        if any(existing.name == request.name for existing in self.pipe_output_requests):
+            raise ValueError("duplicate output name: %s" % request.name)
+        self.pipe_output_requests.append(request)
+        return request
+
     def initialize(self):
+        self.interior_results = {}
+        self._interior_results_collected = False
         if not self.settings.defined_wave_speeds:
             raise NotImplementedError("wave speed values have not been defined for the pipes")
         for stype in self.SETTING_TYPES:
@@ -481,10 +522,26 @@ class PTSNETSimulation:
         self.t = 0
         self.initializer.create_secondary_elements()
         self.initializer.create_secondary_selectors()
+        self._resolve_pipe_output_requests()
         self._distribute_work()
         self.t = 1
         self.settings.is_initialized = True
         self.save_init_data()
+
+
+    def _resolve_pipe_output_requests(self):
+        if not self.pipe_output_requests:
+            self.resolved_pipe_outputs = {}
+            self.interior_point_variables = {}
+            return
+        self.resolved_pipe_outputs = resolve_pipe_output_requests(
+            self.ss['pipe'].labels,
+            self.ss['pipe'].segments,
+            self.pipe_output_requests,
+        )
+        self.interior_point_variables = requested_pipe_point_variables(
+            self.resolved_pipe_outputs
+        )
 
     def _distribute_work(self):
         self.worker = Worker(
@@ -496,7 +553,8 @@ class PTSNETSimulation:
             time_step = self.settings.time_step,
             time_steps = self.settings.time_steps,
             inpfile = self.inpfile,
-            profiler_on = self.settings.profiler_on)
+            profiler_on = self.settings.profiler_on,
+            interior_point_variables = self.interior_point_variables)
 
         self.results = self.worker.results
 
@@ -513,6 +571,34 @@ class PTSNETSimulation:
             self.router.add_communicator('pipe.end', splitter2)
         if color_node:
             self.router.add_communicator('node', splitter3)
+
+
+    def _collect_interior_results(self):
+        if self._interior_results_collected:
+            return
+        if not self.resolved_pipe_outputs:
+            self._interior_results_collected = True
+            return
+
+        local_histories = self.worker.interior_point_histories
+        gathered_histories = self.router['main'].gather(local_histories, root=0)
+        if self.router['main'].rank == 0:
+            point_histories = {}
+            for worker_histories in gathered_histories:
+                for point_index, histories in worker_histories.items():
+                    if point_index in point_histories:
+                        raise RuntimeError(
+                            "interior point %d was captured by multiple workers"
+                            % point_index
+                        )
+                    point_histories[point_index] = histories
+            self.interior_results = assemble_pipe_output_results(
+                self.resolved_pipe_outputs, point_histories
+            )
+            self.results['pipe.interior'] = self.interior_results
+        else:
+            self.interior_results = {}
+        self._interior_results_collected = True
 
     def run_step(self):
         if not self.settings.is_initialized:
@@ -546,6 +632,8 @@ class PTSNETSimulation:
             ###
 
         self.t += 1
+        if self.is_over:
+            self._collect_interior_results()
 
         if (not self.settings.warnings_on) and (self.router['main'].rank == 0) and self.settings.show_progress:
             self.progress.update(1)

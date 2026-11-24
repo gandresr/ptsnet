@@ -8,6 +8,7 @@ from ptsnet.utils.data import is_array
 from ptsnet.arrays.selectors import SelectorSet
 from ptsnet.simulation.funcs import run_general_junction, run_interior_step, run_pump_step, run_valve_step, run_open_protections, run_closed_protections
 from ptsnet.profiler.profiler import Profiler
+from ptsnet.simulation.interior import select_owned_pipe_points
 
 class Worker:
     def __init__(self, **kwargs):
@@ -59,6 +60,20 @@ class Worker:
         self.points = self.partition['points']['global_idx']
         self.num_points = len(self.points) # ponts assigned to the worker
         self.local_points = np.arange(self.num_points)
+        self.interior_point_variables = kwargs.get('interior_point_variables', {})
+        self.interior_point_histories = {}
+        local_to_global = self.partition['points']['local_idx']
+        owned_points = select_owned_pipe_points(
+            self.interior_point_variables,
+            self.processors,
+            local_to_global,
+            self.router['main'].rank,
+        )
+        for global_index, variables in owned_points.items():
+            self.interior_point_histories[global_index] = {
+                variable: np.zeros(self.time_steps, dtype=float)
+                for variable in variables
+            }
 
         ###
         self.profiler.start('_create_selectors')
@@ -355,6 +370,8 @@ class Worker:
             self.ss['closed_protection'].HA[:] = self.ss['node'].head[self.ss['closed_protection'].node] - self.ss['closed_protection'].water_level + Hb # air pressure head
             self.ss['closed_protection'].VA[:] = self.ss['closed_protection'].area*(self.ss['closed_protection'].height-self.ss['closed_protection'].water_level) # air volume
             self.ss['closed_protection'].C[:] = self.ss['closed_protection'].HA * self.ss['closed_protection'].VA**m
+
+        self._record_interior_point_values(0, 0)
             # Allocate space for results
             # self.results['closed_protection'] = Table2D(CLOSED_PROTECTION_RESULTS, self.num_closed_protections, self.time_steps, self)
 
@@ -488,6 +505,18 @@ class Worker:
         if self.num_nodes > 0:
             self.results['node'].head[:, t] = self.mem_pool_points.head[self.where.nodes['all_to_points'], t1]
         self.profiler.stop('store_results')
-        ###
+        self._record_interior_point_values(t, t1)
 
+    def _record_interior_point_values(self, time_index, memory_column):
+        if not self.interior_point_histories:
+            return
+        if time_index < 0 or time_index >= self.time_steps:
+            raise IndexError("interior output time index is out of range")
+
+        local_to_global = self.partition['points']['local_idx']
+        for global_index, variable_histories in self.interior_point_histories.items():
+            local_index = local_to_global[global_index]
+            for variable, history in variable_histories.items():
+                values = getattr(self.mem_pool_points, variable)
+                history[time_index] = values[local_index, memory_column]
 
