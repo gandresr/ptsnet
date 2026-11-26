@@ -115,8 +115,8 @@ class Initializer:
             start = pipes_idx[i-1]
             end = pipes_idx[i]
             self.where.points['to_pipes'][start:end] = i
-        self.where.points['are_uboundaries'] = np.cumsum(self.ss['pipe'].segments.astype(np.int)+1) - 1
-        self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ss['pipe'].segments.astype(np.int)
+        self.where.points['are_uboundaries'] = np.cumsum(self.ss['pipe'].segments.astype(int)+1) - 1
+        self.where.points['are_dboundaries'] = self.where.points['are_uboundaries'] - self.ss['pipe'].segments.astype(int)
         self.where.points['are_boundaries'] = imerge(self.where.points['are_dboundaries'], self.where.points['are_uboundaries'])
         self.where.points['are_boundaries',] = (np.arange(len(self.where.points['are_boundaries'])) % 2 != 0)
 

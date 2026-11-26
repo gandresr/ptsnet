@@ -76,14 +76,14 @@ class Profiler:
                 raw_comm_times = self.storer.load_data('raw_comm_times')[:]
                 csize = len(COMM_JOBS)
 
-            step_jobs = {job : np.float for job in STEP_JOBS}
+            step_jobs = {job : float for job in STEP_JOBS}
             self.summary['step_jobs'] = Table(step_jobs, raw_step_times.shape[1])
             critical_step_processors = np.argmax(raw_step_times[::ssize], axis = 0)
 
-            init_jobs = {job : np.float for job in INIT_JOBS}
+            init_jobs = {job : float for job in INIT_JOBS}
             self.summary['init_jobs'] = Table(init_jobs, raw_init_times.shape[1])
 
-            comm_jobs = {job : np.float for job in COMM_JOBS}
+            comm_jobs = {job : float for job in COMM_JOBS}
             if num_processors > 1:
                 rsshape = raw_comm_times.shape[1]
             else:

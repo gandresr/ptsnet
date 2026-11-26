@@ -196,10 +196,10 @@ class PTSNETElementSettings:
     def _sort(self):
         if self.values != [] and not self.is_sorted:
             self.values.sort(key = lambda x : x[1])
-            self.values = np.array(self.values, dtype=np.float)
-            self.elements = self.values[:,0].astype(np.int)
+            self.values = np.array(self.values, dtype=float)
+            self.elements = self.values[:,0].astype(int)
             self.values = self.values[:,1:]
-            self.activation_times, self.activation_indices = np.unique(self.values[:,0].astype(np.int), True)
+            self.activation_times, self.activation_indices = np.unique(self.values[:,0].astype(int), True)
             self.values = self.values[:,1]
             self.activation_times = dq(self.activation_times)
             self.activation_indices = dq(self.activation_indices)
@@ -681,7 +681,7 @@ class PTSNETSimulation:
         ic_type = self.SETTING_TYPES[type_]
 
         if type(element_name) == np.ndarray:
-            if element_name.dtype == np.int:
+            if np.issubdtype(element_name.dtype, np.integer):
                 if (ic_type == 'node' and type_ == 'burst'):
                     self.ss[ic_type].leak_coefficient[element_name] = value
                 elif (ic_type == 'node' and type_ == 'demand'):

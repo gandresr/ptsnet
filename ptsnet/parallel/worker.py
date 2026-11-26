@@ -225,7 +225,7 @@ class Worker:
         # ---------------------------
         self.where.points['are_uboundaries'] = np.where(np.isin(self.points, self.global_where.points['are_uboundaries']))[0]
         self.where.points['are_dboundaries'] = np.where(np.isin(self.points, self.global_where.points['are_dboundaries']))[0]
-        self.where.points['are_inner'] = np.setdiff1d(np.arange(self.num_points, dtype=np.int), \
+        self.where.points['are_inner'] = np.setdiff1d(np.arange(self.num_points, dtype=int), \
             np.concatenate((self.where.points['are_uboundaries'], self.where.points['are_dboundaries'])))
         # ---------------------------
         n_pipes = len(self.global_where.points['are_uboundaries'])
@@ -519,4 +519,3 @@ class Worker:
             for variable, history in variable_histories.items():
                 values = getattr(self.mem_pool_points, variable)
                 history[time_index] = values[local_index, memory_column]
-
